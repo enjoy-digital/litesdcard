@@ -1,0 +1,128 @@
+------------------------------------------------------------
+CID : Card Identification : 35344534c31364780c565346a011200
+
+MID : Manufacturer ID : 3
+
+OID : OEM/Application ID : SD : 0x5344
+
+PNM : Product Name : SL16G
+
+PRV : Product Revision : 8.0
+
+PSN : Product Serial Number : c565346a
+
+MDT : Maunfacturing Date : 2017.2
+
+CRC : CRC : 0
+------------------------------------------------------------
+CSD : Card-Specific Data : 400e00325b59000076b27f800a404000
+
+CSD_STRUCTURE: 1
+CSD Version : 2
+
+TAAC: data read access time : 14 : 0xe
+                       unit : 1000000
+                      value : 1 => 1.000000
+                            : 1000000.000000 (nanoseconds)
+
+NSAC: data read access time (in clock cycles) : 0
+
+TRAN_SPEED : max data transfer rate : 50
+                               unit : 10
+                              value : 6 => 2.500000
+                                    : 25.000000 (Mbit/s) 
+
+CCC : card command classes : 1461
+                           : class 0
+                           : class 2
+                           : class 4
+                           : class 5
+                           : class 7
+                           : class 8
+                           : class 10
+
+READ_BL_LEN : max read data block length : 9
+LEN_BL_READ : max read block data length : 512 bytes ( 2^9)
+
+READ_BL_PARTIAL : partial blocks for read allowed : no (0)
+
+WRITE_BLK_MISALIGN : write block misalignment : no (0)
+
+READ_BLK_MISALIGN : read block misalignment : no (0)
+
+DSR_IMP : DSR implemented : no (0)
+
+C_SIZE : device size : 30386 : 0x76b2
+         user data area capacity : 15558144 KiB
+                                 : 15193 MiB
+                                 : 14 GiB
+
+ERASE_BLOCK_EN : erase single block enable : yes (1)
+
+SECTOR_SIZE : erase sector size : 128 : 0x80 (write blocks)
+                                : 65536 B
+                                : 64 KiB
+
+WP_GRP_SIZE : write protect group size : 1
+                                       : 128 (KiB)
+
+WP_GRP_ENABLE : write protect group enable : no (0)
+
+R2W_FACTOR : write speed factor : 4
+                                : writing is 4 times slower than reading
+
+WRITE_BL_LEN : max write block data length : 9
+LEN_BL_WRITE : max write block data length : 512 bytes ( 2^9)
+
+WRITE_BL_PARTIAL : partial blocks for write allowed : no (0)
+
+FILE_FORMAT_GRP : file format group : 0
+
+COPY : copy flag : 1
+
+PERM_WRITE_PROTECT : permanent write protection : no (0)
+
+TMP_WRITE_PROTECT : temporary write protection : no (0)
+
+FILE_FORMAT : file format : 0 : Hard disk-like file system with partition table
+
+CRC : CRC : 0
+
+------------------------------------------------------------
+SCR : SD Card Configuration Register : 235800300000000
+
+SCR_STRUCTURE : SCR Structure Version : 0 : SCR version 1.0
+
+SD_SPEC : SD Memory Card - Spec. Version : 2
+SD_SPEC3 : Spec. Version 3.00 or higher : 1
+SD_SPEC: SD Memory Card - Spec. Version : Version 3.0X
+
+DATA_STAT_AFTER_ERASE : data status after erases : 0
+
+SD_SECURITY : CPRM Security Support : 3 : SDHC Card (Security Version 2.00)
+
+SD_BUS_WIDTHS : DAT Bus widths supported : 5
+                                         : 1 bit (DAT0)
+                                         : 4 bit (DAT0-3)
+
+EX_SECURITY : Extended Security Support : 0 (not supported)
+
+CMD_SUPPORT : Command Support bits : 3
+                                   : Set Block Count (CMD23)
+                                   : Speed Class Control (CMD20)
+
+------------------------------------------------------------
+Preferred Erase Size : 4194304
+                     : 4 MiB
+
+------------------------------------------------------------
+Erase Size : 512 KiB
+
+------------------------------------------------------------
+Derived Data
+
+LBA Sector Alignment
+--------------------
+
+Align each partition with the preferred erase size
+    4194304 / 512 = 8192 sectors
