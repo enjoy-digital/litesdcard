@@ -113,7 +113,7 @@ class SDSoC(SoCCore):
 
 def main():
     soc = SDSoC()
-    builder = Builder(soc)
+    builder = Builder(soc, csr_csv="../../litesdcard/software/csr.csv")
     builder.build()
 
 

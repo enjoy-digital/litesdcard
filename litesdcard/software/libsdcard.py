@@ -9,7 +9,7 @@ def decode_rca(r6):
     print("RCA: {:04x}".format(rca))
     return rca
 
-class SCR():
+class SCR:
     def __init__(self, scr):
         self.scr = scr
 
