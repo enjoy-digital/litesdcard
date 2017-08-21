@@ -1,0 +1,70 @@
+         __   _ __      _______  _____            __
+        / /  (_) /____ / __/ _ \/ ___/__ ________/ /
+       / /__/ / __/ -_)\ \/ // / /__/ _ `/ __/ _  / 
+      /____/_/\__/\__/___/____/\___/\_,_/_/  \_,_/  
+                                             
+          Copyright 2017 / LambdaConcept
+          Copyright 2017 / EnjoyDigital
+
+       A small footprint and configurable SD Card
+                 core powered by LiteX
+
+                 ********************
+                 * WORK IN PROGRESS *
+                 ********************
+
+[> Intro
+--------
+LiteSDCard is a small footprint and configurable embedded logic analyzer that you
+can use in your FPGA and aims to provide a free, portable and flexible
+alternative to vendor's solutions!
+
+LiteSDCard is part of LiteX libraries whose aims are to lower entry level of
+complex FPGA cores by providing simple, elegant and efficient implementations
+of components used in today's SoC such as Ethernet, SATA, PCIe, SDRAM Controller...
+
+The core uses simple and specific streaming buses and will provides in the future
+adapters to use standardized AXI or Avalon-ST streaming buses.
+
+Since Python is used to describe the HDL, the core is highly and easily
+configurable.
+
+LiteSDCard is built using LiteX and uses technologies developed in partnership with
+M-Labs Ltd:
+ - Migen enables generating HDL with Python in an efficient way.
+ - MiSoC provides the basic blocks to build a powerful and small footprint SoC.
+
+LiteSDCard can be used as LiteX library or can be integrated with your standard
+design flow by generating the verilog rtl that you will use as a standard core.
+
+[> Features
+-----------
+- TODO
+
+[> Proven
+---------
+- TODO
+
+[> Possible improvements
+------------------------
+- TODO
+
+
+[> Getting started
+------------------
+- TODO
+
+[> License
+----------
+- TODO
+
+[> Support and consulting
+-------------------------
+- TODO
+
+[> Contact
+----------
+E-mail:
+po [AT] lambdaconcept.com
+ramtin [AT] lambdaconcept.com
+florent [AT] enjoy-digital.fr
