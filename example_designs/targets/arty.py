@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import argparse
 
@@ -60,10 +61,10 @@ class _CRG(Module):
 
 class SDSoC(SoCCore):
     csr_map = {
-        'sdphy': 20,
-        'sdctrl': 21,
-        'ramreader': 22,
-        'ramwraddr': 23,
+        "sdphy":     20,
+        "sdctrl":    21,
+        "ramreader": 22,
+        "ramwraddr": 23
     }
     csr_map.update(SoCCore.csr_map)
 
@@ -77,7 +78,7 @@ class SDSoC(SoCCore):
                          csr_data_width=32,
                          with_uart=False,
                          with_timer=False,
-                         ident="Generic LiteX SoC",
+                         ident="SDCard Test SoC"
                          integrated_sram_size=1024,
                          **kwargs)
 
