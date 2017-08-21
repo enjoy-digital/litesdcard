@@ -1,23 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse
 from fractions import Fraction
 
 from litex.gen import *
-from litex.soc.integration.builder import *
-from litex.soc.integration.soc_core import *
-from litex.soc.integration.soc_sdram import *
-from litex.soc.interconnect.csr import *
-from litex.soc.interconnect import stream
-from litex.soc.cores.uart import UARTWishboneBridge, RS232PHY
-from litescope.core import LiteScopeAnalyzer
 from litex.gen.genlib.resetsync import AsyncResetSynchronizer
+
+from litex.build.generic_platform import *
+
+from litex.soc.cores.uart import UARTWishboneBridge
+
+from litex.soc.integration.soc_core import *
+from litex.soc.integration.builder import *
 
 from litesdcard.phy.sdphy import SDPHY, SDCtrl
 from litesdcard.frontend.ram import RAMReader, RAMWriter, RAMWrAddr
 from litesdcard.core.downc import Stream32to8
 from litesdcard.core.upc import Stream8to32
+
+from litex.boards.platforms import papilio_pro
+
+_sd_io = [
+    ("sdcard", 0,
+        Subsignal("data", Pins("P48 P66 P61 P58")),
+        Subsignal("cmd", Pins("P51"), Misc("PULLUP")),
+        Subsignal("clk", Pins("P56")),
+        Subsignal("cd", Pins("P67")),
+        IOStandard("LVCMOS33"), Misc("SLEW=FAST"),
+    )
+]
 
 class _CRG(Module):
     def __init__(self, platform, clk_freq):
@@ -79,7 +90,9 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, platform, **kwargs):
+    def __init__(self, **kwargs):
+        platform = papilio_pro.Platform()
+        platform.add_extension(_sd_io)
         clk_freq = 50*1000000
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
@@ -120,62 +133,10 @@ class SDSoC(SoCCore):
             self.stream32to8.source.connect(self.sdctrl.rsink),
         ]
 
-class LiteSoC(SDSoC):
-    csr_map = {
-        "analyzer": 24,
-    }
-    csr_map.update(SDSoC.csr_map)
-
-    def __init__(self, platform, **kwargs):
-        SDSoC.__init__(self, platform)
-
-        bridge = UARTWishboneBridge(platform.request("serial", 1), self.clk_freq, baudrate=3000000)
-        self.submodules.bridge = bridge
-        self.add_wb_master(self.bridge.wishbone)
-
-        analyzer = LiteScopeAnalyzer([
-            # self.sdctrl.crc16checker.valid,
-            # self.sdctrl.crc16checker.fifo[0],
-            # self.sdctrl.crc16checker.fifo[1],
-            # self.sdctrl.crc16checker.fifo[2],
-            # self.sdctrl.crc16checker.fifo[3],
-            # self.sdctrl.crc16checker.crctmp[0],
-            # self.sdctrl.crc16checker.crctmp[1],
-            # self.sdctrl.crc16checker.crctmp[2],
-            # self.sdctrl.crc16checker.crctmp[3],
-            # self.sdctrl.crc16checker.sink.valid,
-            # self.sdctrl.crc16checker.sink.data,
-            # self.sdctrl.crc16checker.sink.last,
-            # self.sdctrl.crc16checker.sink.ready,
-            self.sdphy.sttmpdata,
-            self.sdphy.data_i2,
-            self.sdphy.stsel,
-            self.sdphy.sink.valid,
-            self.sdphy.sink.data,
-            self.sdphy.sink.last,
-            self.sdphy.sink.ready,
-        ], 1024)
-        self.submodules.analyzer = analyzer
-
-    def do_exit(self, vns):
-        self.analyzer.export_csv(vns, "analyzer.csv")
-
-default_subtarget = SDSoC
-
 def main():
-    parser = argparse.ArgumentParser(description="Generic LiteX SoC")
-    builder_args(parser)
-    soc_core_args(parser)
-    args = parser.parse_args()
-
-    import papilio_pro
-    platform = papilio_pro.Platform()
-
-    soc = SDSoC(platform, **soc_core_argdict(args))
-    # soc = LiteSoC(platform, **soc_core_argdict(args))
-    builder = Builder(soc, **builder_argdict(args))
-    vns = builder.build()
-    # soc.do_exit(vns)
+    soc = SDSoC()
+    builder = Builder(soc, csr_csv="../../litesdcard/software/csr.csv")
+    builder.build()
 
 if __name__ == "__main__":
     main()

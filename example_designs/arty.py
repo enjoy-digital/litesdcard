@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse
-
 from litex.gen import *
 from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.generic_platform import *
-
-from litex.boards.platforms import arty
 
 from litex.soc.cores.uart import UARTWishboneBridge
 
@@ -20,6 +16,7 @@ from litesdcard.frontend.ram import RAMReader, RAMWriter, RAMWrAddr
 from litesdcard.core.downc import Stream32to8
 from litesdcard.core.upc import Stream8to32
 
+from litex.boards.platforms import arty
 
 _sd_io = [
     ("sdcard", 0,
