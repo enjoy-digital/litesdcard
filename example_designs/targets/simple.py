@@ -16,10 +16,10 @@ from litex.soc.cores.uart import UARTWishboneBridge, RS232PHY
 from litescope.core import LiteScopeAnalyzer
 from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 
-from sdcard.phy.sdphy import SDPHY, SDCtrl
-from sdcard.frontend.ram import RAMReader, RAMWriter, RAMWrAddr
-from sdcard.core.downc import Stream32to8
-from sdcard.core.upc import Stream8to32
+from litesdcard.phy.sdphy import SDPHY, SDCtrl
+from litesdcard.frontend.ram import RAMReader, RAMWriter, RAMWrAddr
+from litesdcard.core.downc import Stream32to8
+from litesdcard.core.upc import Stream8to32
 
 class _CRG(Module):
     def __init__(self, platform, clk_freq):

@@ -2,8 +2,8 @@ from litex.gen import *
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
-from sdcard.core.crcgeneric import CRC, CRCChecker
-from sdcard.core.crcchecker import DOWNCRCChecker, UPCRCAdd
+from litesdcard.core.crcgeneric import CRC, CRCChecker
+from litesdcard.core.crcchecker import DOWNCRCChecker, UPCRCAdd
 
 SDCARD_STREAM_CMD = 0
 SDCARD_STREAM_DATA = 1

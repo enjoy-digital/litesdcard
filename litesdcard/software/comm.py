@@ -9,7 +9,7 @@ from litex.soc.tools.remote.comm_udp import CommUDP
 litesdcard_path = "../../"
 sys.path.append(litesdcard_path) # XXX
 
-from sdcard.phy.sdphy import *
+from litesdcard.phy.sdphy import *
 from libsdcard import *
 from generated import csr
 

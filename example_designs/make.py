@@ -62,8 +62,8 @@ all             clean, build-csr-csv, build-csr-header, build-bitstream, load-bi
     parser.add_argument("-Op", "--platform-option", default=[], nargs=2, action="append", help="set platform-specific option")
     parser.add_argument("-Ob", "--build-option", default=[], nargs=2, action="append", help="set build option")
     parser.add_argument("--csr_csv", default="./build/csr.csv", help="CSV file to save the CSR map into")
-    parser.add_argument("--csr_header", default="../sdcard/software/generated/csr.h", help="C header file to save the CSR map into")
-    parser.add_argument("--csr_python", default="../sdcard/software/generated/csr.py", help="Python header file to save the CSR map into")
+    parser.add_argument("--csr_header", default="../litesdcard/software/generated/csr.h", help="C header file to save the CSR map into")
+    parser.add_argument("--csr_python", default="../litesdcard/software/generated/csr.py", help="Python header file to save the CSR map into")
 
     parser.add_argument("action", nargs="+", help="specify an action")
 

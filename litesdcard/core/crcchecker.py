@@ -3,7 +3,7 @@ from litex.gen.fhdl import verilog
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
-from sdcard.core.crcgeneric import CRC
+from litesdcard.core.crcgeneric import CRC
 
 class DOWNCRCChecker(Module):
     def __init__(self):
