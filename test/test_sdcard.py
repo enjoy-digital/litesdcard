@@ -10,7 +10,7 @@ litesdcard_path = "../../"
 sys.path.append(litesdcard_path) # XXX
 
 from litesdcard.phy.sdphy import *
-from libsdcard import *
+from litesdcard.software.libsdcard import *
 
 
 SD_OK = 0
