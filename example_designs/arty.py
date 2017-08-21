@@ -12,7 +12,7 @@ from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 
 from litesdcard.phy.sdphy import SDPHY, SDCtrl
-from litesdcard.frontend.ram import RAMReader, RAMWriter, RAMWrAddr
+from litesdcard.frontend.ram import RAMReader, RAMWriter
 from litesdcard.core.downc import Stream32to8
 from litesdcard.core.upc import Stream8to32
 
@@ -61,7 +61,7 @@ class SDSoC(SoCCore):
         "sdphy":     20,
         "sdctrl":    21,
         "ramreader": 22,
-        "ramwraddr": 23
+        "ramwriter": 23
     }
     csr_map.update(SoCCore.csr_map)
 
@@ -89,7 +89,6 @@ class SDSoC(SoCCore):
 
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()
-        self.submodules.ramwraddr = RAMWrAddr()
         self.add_wb_master(self.ramreader.bus)
         self.add_wb_master(self.ramwriter.bus)
 
@@ -101,8 +100,7 @@ class SDSoC(SoCCore):
             self.sdphy.source.connect(self.sdctrl.sink),
 
             self.sdctrl.rsource.connect(self.stream8to32.sink),
-            self.stream8to32.source.connect(self.ramwraddr.sink),
-            self.ramwraddr.source.connect(self.ramwriter.sink),
+            self.stream8to32.source.connect(self.ramwriter.sink),
 
             self.ramreader.source.connect(self.stream32to8.sink),
             self.stream32to8.source.connect(self.sdctrl.rsink),
