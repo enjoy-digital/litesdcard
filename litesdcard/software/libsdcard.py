@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
 def extract(x, start, size):
     return (x >> start) & (2**size - 1)
+
 
 def decode_rca(r6):
     rca = int.from_bytes(r6[2:4], 'little')
     print("RCA: {:04x}".format(rca))
     return rca
+
 
 class SCR:
     def __init__(self, scr):

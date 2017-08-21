@@ -33,9 +33,6 @@ SD_GROUP_DRIVERSTRENGTH = 2
 SD_GROUP_POWERLIMIT = 3
 
 
-def debug(wb):
-    print(hex(wb.regs.sdctrl_debug.read()))
-
 def wait_cmd_done(wb):
     while True:
         cmdevt = wb.regs.sdctrl_cmdevt.read()
@@ -61,7 +58,6 @@ def wait_data_done(wb):
                 ' (Timeout)' if dataevt & 0x4 else '',
                 ' (Write Error)' if dataevt & 0x2 else '',
             ))
-            debug(wb)
             if dataevt & 0x4:
                 return SD_TIMEOUT
             elif dataevt & 0x2:

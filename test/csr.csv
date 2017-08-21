@@ -11,11 +11,11 @@ csr_register,sdctrl_command,0xe000a804,1,rw
 csr_register,sdctrl_response,0xe000a808,4,ro
 csr_register,sdctrl_datatimeout,0xe000a818,1,rw
 csr_register,sdctrl_cmdtimeout,0xe000a81c,1,rw
-csr_register,sdctrl_cmdevt,0xe000a820,1,ro
-csr_register,sdctrl_dataevt,0xe000a824,1,ro
-csr_register,sdctrl_blocksize,0xe000a828,1,rw
-csr_register,sdctrl_blockcount,0xe000a82c,1,rw
-csr_register,sdctrl_debug,0xe000a830,1,ro
+csr_register,sdctrl_voltage,0xe000a820,1,rw
+csr_register,sdctrl_cmdevt,0xe000a824,1,ro
+csr_register,sdctrl_dataevt,0xe000a828,1,ro
+csr_register,sdctrl_blocksize,0xe000a82c,1,rw
+csr_register,sdctrl_blockcount,0xe000a830,1,rw
 constant,uart_interrupt,0,,
 constant,timer0_interrupt,1,,
 constant,csr_data_width,32,,

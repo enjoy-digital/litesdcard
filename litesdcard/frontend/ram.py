@@ -2,6 +2,7 @@ from litex.gen import *
 from litex.soc.interconnect import stream, wishbone
 from litex.soc.interconnect.csr import *
 
+
 class RAMWrAddr(Module, AutoCSR):
     def __init__(self):
         self.sink = stream.Endpoint([('data', 32), ('cnt', 2)])
@@ -29,9 +30,9 @@ class RAMWrAddr(Module, AutoCSR):
             ),
         ]
 
+
 class RAMReader(Module, AutoCSR):
     def __init__(self, data_width=32):
-
         self.bus = bus = wishbone.Interface(data_width)
         self.address = CSRStorage(32)
         self.length = CSRStorage(32)
@@ -81,6 +82,7 @@ class RAMReader(Module, AutoCSR):
             )
 
         ]
+
 
 class RAMWriter(Module):
     def __init__(self, data_width=32):
