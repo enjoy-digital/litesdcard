@@ -50,7 +50,7 @@ class _CRG(Module):
                      i_CLKIN1=clk100, i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb,
 
                      # 50 MHz
-                     p_CLKOUT0_DIVIDE=32, p_CLKOUT0_PHASE=0.0,
+                     p_CLKOUT0_DIVIDE=64, p_CLKOUT0_PHASE=0.0,
                      o_CLKOUT0=pll_sys
             ),
             Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
@@ -70,7 +70,7 @@ class SDSoC(SoCCore):
     def __init__(self, **kwargs):
         platform = arty.Platform()
         platform.add_extension(_sd_io)
-        clk_freq = 50*1000000
+        clk_freq = 25*1000000
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
