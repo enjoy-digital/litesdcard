@@ -332,16 +332,6 @@ class SDCtrl(Module, AutoCSR):
         )
 
 
-class SDPHYModel(Module):
-    def __init__(self, pads):
-        sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
-        self.source = stream.Endpoint([("data", 8), ("ctrl", 8)])
-
-        self.comb += [
-            sink.ready.eq(1)
-        ]
-
-
 class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device):
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
