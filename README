@@ -6,8 +6,8 @@
           Copyright 2017 / LambdaConcept
           Copyright 2017 / EnjoyDigital
 
-       A small footprint and configurable SD Card
-                 core powered by LiteX
+       A small footprint and configurable SDCard core
+                   powered by LiteX
 
                  ********************
                  * WORK IN PROGRESS *
@@ -15,9 +15,7 @@
 
 [> Intro
 --------
-LiteSDCard is a small footprint and configurable embedded logic analyzer that you
-can use in your FPGA and aims to provide a free, portable and flexible
-alternative to vendor's solutions!
+LiteSDCard is a small footprint and configurable SDCard core.
 
 LiteSDCard is part of LiteX libraries whose aims are to lower entry level of
 complex FPGA cores by providing simple, elegant and efficient implementations
