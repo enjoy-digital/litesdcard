@@ -328,7 +328,7 @@ class SDPHYModel(Module):
 
 
 class SDPHY(Module, AutoCSR):
-    def __init__(self, pads):
+    def __init__(self, pads, device):
         self.sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
         self.source = stream.Endpoint([("data", 8), ("ctrl", 8)])
 
@@ -381,35 +381,65 @@ class SDPHY(Module, AutoCSR):
         self.cmd_t = TSTriple()
         self.specials += self.cmd_t.get_tristate(pads.cmd)
 
-        self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
-            p_INIT=1, p_SRTYPE="SYNC",
-            i_D0=0, i_D1=clk, i_S=0, i_R=0, i_CE=1,
-            i_C0=ClockSignal("sys"), i_C1=~ClockSignal("sys"),
-            o_Q=pads.clk
-        )
-
-        if hasattr(pads, "clkfb"):
-            clkfb = Signal()
-            self.specials += Instance("IBUF", i_I=pads.clkfb, o_O=clkfb)
-            self.comb += sclk.eq(clkfb)
-        else:
-            self.comb += sclk.eq(ClockSignal("sys"))
-
-        # FIXME: handle sclk to sys clk cdc
-        for i in range(4):
-            self.specials += Instance("IDDR2",
-                p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-                i_C0=sclk, i_C1=~sclk,
-                i_CE=1, i_S=0, i_R=0,
-                i_D=self.data_t.i[i], o_Q0=data_i1[i], o_Q1=data_i2[i]
+        if device[:3] == "xc7":
+            self.specials += Instance("ODDR",
+                p_DDR_CLK_EDGE="SAME_EDGE",
+                i_C=ClockSignal("sys"), i_CE=1, i_S=0, i_R=0,
+                i_D1=0, i_D2=clk, o_Q=pads.clk
             )
 
-        self.specials += Instance("IDDR2",
-            p_DDR_ALIGNMENT="C1", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-            i_C0=sclk, i_C1=~sclk,
-            i_CE=1, i_S=0, i_R=0,
-            i_D=self.cmd_t.i, o_Q0=cmd_i1, o_Q1=cmd_i2
-        )
+            if hasattr(pads, "clkfb"):
+                clkfb = Signal()
+                self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=clkfb)
+                self.comb += sclk.eq(clkfb)
+            else:
+                self.comb += sclk.eq(ClockSignal("sys"))
+
+            # FIXME: handle sclk to sys clk cdc
+            for i in range(4):
+                self.specials += Instance("IDDR",
+                    p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+                    i_C=sclk, i_CE=1, i_S=0, i_R=0,
+                    i_D=self.data_t.i[i], o_Q1=data_i1[i], o_Q2=data_i2[i],
+                )
+
+            self.specials += Instance("IDDR",
+                p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+                i_C=sclk, i_CE=1, i_S=0, i_R=0,
+                i_D=self.cmd_t.i, o_Q1=cmd_i1, o_Q2=cmd_i2
+            )
+        elif device[:3] == "xc6":
+            self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
+                p_INIT=1, p_SRTYPE="SYNC",
+                i_D0=0, i_D1=clk, i_S=0, i_R=0, i_CE=1,
+                i_C0=ClockSignal("sys"), i_C1=~ClockSignal("sys"),
+                o_Q=pads.clk
+            )
+
+            if hasattr(pads, "clkfb"):
+                clkfb = Signal()
+                self.specials += Instance("IBUF", i_I=pads.clkfb, o_O=clkfb)
+                self.comb += sclk.eq(clkfb)
+            else:
+                self.comb += sclk.eq(ClockSignal("sys"))
+
+            # FIXME: handle sclk to sys clk cdc
+            for i in range(4):
+                self.specials += Instance("IDDR2",
+                    p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
+                    i_C0=sclk, i_C1=~sclk,
+                    i_CE=1, i_S=0, i_R=0,
+                    i_D=self.data_t.i[i], o_Q0=data_i1[i], o_Q1=data_i2[i]
+                )
+
+            self.specials += Instance("IDDR2",
+                p_DDR_ALIGNMENT="C1", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
+                i_C0=sclk, i_C1=~sclk,
+                i_CE=1, i_S=0, i_R=0,
+                i_D=self.cmd_t.i, o_Q0=cmd_i1, o_Q1=cmd_i2
+            )
+        else:
+            raise NotImplementedError
 
         self.comb += [
             cmddata.eq(self.sink.ctrl[0]),

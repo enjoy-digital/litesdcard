@@ -50,7 +50,7 @@ class _CRG(Module):
                      p_CLKFBOUT_MULT=16, p_DIVCLK_DIVIDE=1,
                      i_CLKIN1=clk100, i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb,
 
-                     # 50 MHz
+                     # 25 MHz
                      p_CLKOUT0_DIVIDE=64, p_CLKOUT0_PHASE=0.0,
                      o_CLKOUT0=pll_sys
             ),
@@ -78,7 +78,7 @@ class SDSoC(SoCCore):
                          csr_data_width=32,
                          with_uart=False,
                          with_timer=False,
-                         ident="SDCard Test SoC"
+                         ident="SDCard Test SoC",
                          integrated_sram_size=1024,
                          **kwargs)
 
@@ -87,7 +87,7 @@ class SDSoC(SoCCore):
         self.add_wb_master(self.cpu_or_bridge.wishbone)
 
 
-        self.submodules.sdphy = SDPHY(platform.request('sdcard'))
+        self.submodules.sdphy = SDPHY(platform.request('sdcard'), platform.device)
         self.submodules.sdctrl = SDCtrl()
 
         self.submodules.ramreader = RAMReader()

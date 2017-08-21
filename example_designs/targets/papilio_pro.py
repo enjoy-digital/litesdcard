@@ -96,7 +96,7 @@ class SDSoC(SoCCore):
         self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
         self.add_wb_master(self.cpu_or_bridge.wishbone)
 
-        self.submodules.sdphy = SDPHY(platform.request('sdcard'))
+        self.submodules.sdphy = SDPHY(platform.request('sdcard'), platform.device)
         self.submodules.sdctrl = SDCtrl()
 
         self.submodules.ramreader = RAMReader()
