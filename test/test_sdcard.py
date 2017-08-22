@@ -126,6 +126,12 @@ def cmd9(wb, rca):
     wb.regs.sdctrl_command.write((9 << 8) | SDCARD_CTRL_RESPONSE_LONG)
     return response(wb, SDCARD_CTRL_RESPONSE_LONG)
 
+def cmd10(wb, rca):
+    print("10: MMC_CMD_SEND_CID")
+    wb.regs.sdctrl_argument.write(rca << 16)
+    wb.regs.sdctrl_command.write((10 << 8) | SDCARD_CTRL_RESPONSE_LONG)
+    return response(wb, SDCARD_CTRL_RESPONSE_LONG)
+
 def cmd11(wb):
     print("11: MMC_CMD_VOLTAGE_SWITCH")
     wb.regs.sdctrl_argument.write(0x00000000)
@@ -311,6 +317,11 @@ def main(wb, s18r=False):
 
     # SEND CSD
     cmd9(wb, rca)
+
+    # SEND CID
+    cid = cmd10(wb, rca)
+    decode_cid(wb)
+
     # SELECT CARD
     cmd7(wb, rca)
 

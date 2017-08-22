@@ -12,6 +12,46 @@ def decode_rca(r6):
     return rca
 
 
+class CID:
+    def __init__(self, cid):
+        self.cid = cid
+
+        self.mid = extract(cid, 120-8, 8)
+        self.oid = extract(cid, 104-8, 16)
+        self.pnm = extract(cid, 64-8, 40)
+        self.prv = extract(cid, 56-8, 8)
+        self.psn = extract(cid, 24-8, 32)
+        self.mdt = extract(cid, 8-8, 12)
+
+    def __str__(self):
+        r = """
+    CID Register: 0x{:016x}
+    Manufacturer ID: 0x{:x}
+    Application ID: 0x{:x}
+    Product name: {:s}
+    Product revision: 0x{:x}
+    Product serial number: 0x{:x}
+""".format(
+    self.cid,
+    self.mid,
+    self.oid,
+    str(self.pnm.to_bytes(5, "big")),
+    self.prv,
+    self.psn,
+    self.mdt
+)
+        return r
+
+def decode_cid(comm):
+    data = comm.read(comm.regs.sdctrl_response.addr, 4)
+    ba = bytearray()
+    for d in data:
+        ba += bytearray(d.to_bytes(4, 'big'))
+    cid = CID(int(ba.hex(), 16))
+    print(cid)
+    return cid
+
+
 class SCR:
     def __init__(self, scr):
         self.scr = scr
