@@ -6,10 +6,7 @@ import time
 
 from litex.soc.tools.remote import RemoteClient
 
-litesdcard_path = "../../"
-sys.path.append(litesdcard_path) # XXX
-
-from litesdcard.phy.sdphy import *
+from litesdcard.phy import *
 from litesdcard.software.libsdcard import *
 
 
