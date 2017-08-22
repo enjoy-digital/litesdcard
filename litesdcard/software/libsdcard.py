@@ -52,6 +52,52 @@ def decode_cid(comm):
     return cid
 
 
+class CSD:
+    def __init__(self, csd):
+        self.csd = csd
+
+        self.csd_structure = extract(csd, 126-8, 2)
+
+        if self.csd_structure == 0:
+            self.tran_speed = extract(csd, 96-8, 8)
+            self.read_bl_len = extract(csd, 80-8, 4)
+            self.device_size = extract(csd, 62-8, 12)
+        elif self.csd_structure == 1:
+            self.tran_speed = extract(csd, 96-8, 8)
+            self.read_bl_len = extract(csd, 80-8, 4)
+            self.device_size = extract(csd, 48-8, 22)
+        else:
+            raise NotImplementedError
+
+    def __str__(self):
+        r = """
+    CSD Register: 0x{:016x}
+    CSD Structure: {}
+    Max data transfer rate: {} MHz
+    Max read block length: {} bytes
+    Device size: {} GB
+""".format(
+    self.csd,
+    {0: "CSD version 1.0",
+     1: "CSD version 2.0",
+     2: "CSD version reserved",
+     3: "CSD version reserved"}[self.csd_structure],
+    self.tran_speed,
+    2**self.read_bl_len,
+    ((self.device_size + 1)*512)/(1024*1024)
+)
+        return r
+
+def decode_csd(comm):
+    data = comm.read(comm.regs.sdctrl_response.addr, 4)
+    ba = bytearray()
+    for d in data:
+        ba += bytearray(d.to_bytes(4, 'big'))
+    csd = CSD(int(ba.hex(), 16))
+    print(csd)
+    return csd
+
+
 class SCR:
     def __init__(self, scr):
         self.scr = scr

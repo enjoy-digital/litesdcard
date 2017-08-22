@@ -315,12 +315,13 @@ def main(wb, s18r=False):
     r6,status = cmd3(wb)
     rca = decode_rca(r6)
 
-    # SEND CSD
-    cmd9(wb, rca)
-
     # SEND CID
     cid = cmd10(wb, rca)
     decode_cid(wb)
+
+    # SEND CSD
+    cmd9(wb, rca)
+    decode_csd(wb)
 
     # SELECT CARD
     cmd7(wb, rca)
