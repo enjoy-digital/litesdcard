@@ -2,8 +2,9 @@ from litex.gen import *
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
-from litesdcard.core.crcgeneric import CRC, CRCChecker
-from litesdcard.core.crcchecker import DOWNCRCChecker, UPCRCAdd
+from litesdcard.crc import CRC, CRCChecker
+from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
+
 
 SDCARD_STREAM_CMD = 0
 SDCARD_STREAM_DATA = 1
@@ -57,10 +58,10 @@ class SDCtrl(Module, AutoCSR):
 
         self.submodules.crc7 = CRC(9, 7, 40)
         self.submodules.crc7checker = CRCChecker(9, 7, 120)
-        self.submodules.crc16 = UPCRCAdd()
-        self.submodules.crc16checker = DOWNCRCChecker()
+        self.submodules.crc16inserter = CRCUpstreamInserter()
+        self.submodules.crc16checker = CRCDownstreamChecker()
 
-        self.rsink = self.crc16.sink
+        self.rsink = self.crc16inserter.sink
         self.rsource = self.crc16checker.source
 
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
@@ -305,15 +306,17 @@ class SDCtrl(Module, AutoCSR):
         )
 
         fsm.act("SEND_DATA",
-            source.data.eq(self.crc16.source.data),
+            source.data.eq(self.crc16inserter.source.data),
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_WRITE),
             mode.eq(SDCARD_STREAM_XFER),
-            source.last.eq(self.crc16.source.last),
-            source.valid.eq(self.crc16.source.valid),
-            self.crc16.source.ready.eq(source.ready),
+            source.last.eq(self.crc16inserter.source.last),
+            source.valid.eq(self.crc16inserter.source.valid),
+            self.crc16inserter.source.ready.eq(source.ready),
 
-            If(self.crc16.source.valid & self.crc16.source.last & self.crc16.source.ready,
+            If(self.crc16inserter.source.valid &
+               self.crc16inserter.source.last &
+               self.crc16inserter.source.ready,
                 If(self.blockcount.storage > blkcnt,
                     NextValue(blkcnt, blkcnt + 1)
                 ).Else(
@@ -330,6 +333,7 @@ class SDCtrl(Module, AutoCSR):
                 )
             )
         )
+
 
 class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device):

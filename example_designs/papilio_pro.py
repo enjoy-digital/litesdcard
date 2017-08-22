@@ -13,10 +13,9 @@ from litex.soc.cores.uart import UARTWishboneBridge
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 
-from litesdcard.phy.sdphy import SDPHY, SDCtrl
-from litesdcard.frontend.ram import RAMReader, RAMWriter
-from litesdcard.core.downc import Stream32to8
-from litesdcard.core.upc import Stream8to32
+from litesdcard.phy import SDPHY, SDCtrl
+from litesdcard.ram import RAMReader, RAMWriter
+from litesdcard.convert import Stream32to8, Stream8to32
 
 from litex.boards.platforms import papilio_pro
 
@@ -91,7 +90,7 @@ class SDSoC(SoCCore):
     csr_map.update(SoCCore.csr_map)
 
     def __init__(self, **kwargs):
-        platform = arty.Platform()
+        platform = papilio_pro.Platform()
         platform.add_extension(_sd_io)
         clk_freq = 50*1000000
         SoCCore.__init__(self, platform,

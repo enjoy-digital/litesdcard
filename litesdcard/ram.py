@@ -61,7 +61,6 @@ class RAMReader(Module, AutoCSR):
         ]
 
 
-
 class RAMWriter(Module, AutoCSR):
     def __init__(self, data_width=32):
         self.sink = sink = stream.Endpoint([('data', 32), ('cnt', 2)])
