@@ -164,7 +164,7 @@ class CRCUpstreamInserter(Module):
         fsm.act("SENDCRC",
             sink.ready.eq(0),
             source.valid.eq(1),
-            If(cnt==7,
+            If(cnt == 7,
                 source.last.eq(1),
             ),
             Case(cnt, cases),
