@@ -10,31 +10,31 @@ from litesdcard.phy import *
 from litesdcard.software.libsdcard import *
 
 
-SD_OK = 0
-SD_CRCERROR = 1
-SD_TIMEOUT = 2
+SD_OK         = 0
+SD_CRCERROR   = 1
+SD_TIMEOUT    = 2
 SD_WRITEERROR = 3
 
-SD_SWITCH_CHECK = 0
+SD_SWITCH_CHECK  = 0
 SD_SWITCH_SWITCH = 1
 
-SD_SPEED_SDR12 = 0
-SD_SPEED_SDR25 = 1
-SD_SPEED_SDR50 = 2
+SD_SPEED_SDR12  = 0
+SD_SPEED_SDR25  = 1
+SD_SPEED_SDR50  = 2
 SD_SPEED_SDR104 = 3
-SD_SPEED_DDR50 = 4
+SD_SPEED_DDR50  = 4
 
-SD_GROUP_ACCESSMODE = 0
-SD_GROUP_COMMANDSYSTEM = 1
+SD_GROUP_ACCESSMODE     = 0
+SD_GROUP_COMMANDSYSTEM  = 1
 SD_GROUP_DRIVERSTRENGTH = 2
-SD_GROUP_POWERLIMIT = 3
+SD_GROUP_POWERLIMIT     = 3
 
 
 def wait_cmd_done(wb):
     while True:
         cmdevt = wb.regs.sdctrl_cmdevt.read()
         if cmdevt & 0x1:
-            print('cmdevt: {:08x}{}{}'.format(
+            print('cmdevt: 0x{:08x}{}{}'.format(
                 cmdevt,
                 ' (CRC Error)' if cmdevt & 0x8 else '',
                 ' (Timeout)' if cmdevt & 0x4 else '',
@@ -49,7 +49,7 @@ def wait_data_done(wb):
     while True:
         dataevt = wb.regs.sdctrl_dataevt.read()
         if dataevt & 0x1:
-            print('dataevt: {:08x}{}{}{}'.format(
+            print('dataevt: 0x{:08x}{}{}{}'.format(
                 dataevt,
                 ' (CRC Error)' if dataevt & 0x8 else '',
                 ' (Timeout)' if dataevt & 0x4 else '',
@@ -67,11 +67,11 @@ def response(wb, length, nocrccheck=False):
     status = wait_cmd_done(wb)
     response = wb.read(wb.regs.sdctrl_response.addr, 4)
     if length == SDCARD_CTRL_RESPONSE_SHORT:
-        s = "{:08x}".format(response[3])
+        s = "0x{:08x}".format(response[3])
         ba = bytearray(response[3].to_bytes(4, 'little'))
     elif length == SDCARD_CTRL_RESPONSE_LONG:
         ba = bytearray()
-        s = "{:08x} {:08x} {:08x} {:08x}".format(*response)
+        s = "0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}".format(*response)
         for r in reversed(response):
             ba += bytearray(r.to_bytes(4, 'little'))
     print(s)
@@ -266,13 +266,11 @@ def wait_ramread_done(wb):
 def ramread(wb, srcaddr):
     wb.regs.ramreader_address.write(srcaddr//4)
     wb.regs.ramreader_length.write(512)
-    print("ramread")
     wait_ramread_done(wb)
-    print("done")
 
 def dumpall(wb, addr, length):
     for i in range(length//4):
-        print('{:08x}: {:08x}'.format(addr + 4*i, wb.read(addr + 4*i)))
+        print('0x{:08x}: 0x{:08x}'.format(addr + 4*i, wb.read(addr + 4*i)))
 
 def incremental(wb, addr):
     for i in range(512//4):
@@ -280,7 +278,7 @@ def incremental(wb, addr):
         dw = k | ((k+1)<<8) | ((k+2)<<16) | ((k+3)<<24)
         wb.write(addr + 4*i, dw & 0xffffffff)
 
-def main(wb, sim=False):
+def main(wb, s18r=False):
     clkfreq = 50000000
     settimeout(wb, clkfreq, 0.1)
 
@@ -289,17 +287,15 @@ def main(wb, sim=False):
     cmd8(wb)
 
     # WAIT FOR CARD READY
-    s18r = False
     while True:
         cmd55(wb)
-        r3,status = acmd41(wb, hcs=True, s18r=s18r)
+        r3,status = acmd41(wb, hcs=True, s18r=True)
         if r3[3] & 0x80:
-            print('ready')
-            if s18r and (r3[3] & 0x01):
-                print('1.8V ok')
+            print("SDCard ready | ", end="")
+            if r3[3] & 0x01:
+                print("1.8V supported")
             else:
-                s18r = False
-                print('1.8V NOT ok')
+                print("1.8V not supported")
             break
 
     # VOLTAGE SWITCH
@@ -324,23 +320,16 @@ def main(wb, sim=False):
 
     # SEND SCR
     cmd55(wb, rca)
-    acmd51(wb, wb.mems.sram.base) # SCR register (rouge): 02 35 80 03 00 00 00 00 (Phy Layer Version 3.0)
+    acmd51(wb, wb.mems.sram.base)
     dumpall(wb, wb.mems.sram.base, 8)
     scr = decode_scr(wb, wb.mems.sram.base)
     if not scr.cmd_support_sbc:
         print("Need CMD23 support")
         return
 
-    # SEND STATUS
-    # cmd55(wb, rca)
-    # acmd13(wb, wb.mems.sram.base)
-    # dumpall(wb, wb.mems.sram.base, 64)
-
     # SWITCH SPEED
     cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR25, wb.mems.sram.base)
-    dumpall(wb, wb.mems.sram.base, 64) # 00 c8 80 01 80 01 80 01 80 01 c0 01 80 03 00 00 01 00 00 00 00 00 00 00 ...
-    # cmd6(wb, SD_SWITCH_SWITCH, SD_GROUP_ACCESSMODE, SD_SPEED_SDR25, wb.mems.sram.base)
-    # dumpall(wb, wb.mems.sram.base, 64)
+    dumpall(wb, wb.mems.sram.base, 64)
 
     # SET BLOCKLEN
     cmd16(wb, 512)
@@ -352,7 +341,7 @@ def main(wb, sim=False):
 
     # READ MULTIPLE BLOCKS
     memset(wb, wb.mems.sram.base, 0, 1024)
-    cmd23(wb, 2) # If supported in SCR
+    cmd23(wb, 2) # if supported in SCR
     cmd18(wb, 0, 2, wb.mems.sram.base)
     cmd13(wb, rca)
     # dumpall(wb, wb.mems.sram.base, 1024)
@@ -363,7 +352,7 @@ def main(wb, sim=False):
     memset(wb, wb.mems.sram.base, 0x0f0f0f0f, 1024)
     blkcnt = 16
     while True:
-        r,status = cmd23(wb, blkcnt) # If supported in SCR
+        r,status = cmd23(wb, blkcnt) # if supported in SCR
         if not status:
             break
     cmd25(wb, 0, blkcnt)
@@ -378,13 +367,14 @@ def main(wb, sim=False):
 
     # READ MULTIPLE BLOCKS
     memset(wb, wb.mems.sram.base, 0, 1024)
-    cmd23(wb, 2) # If supported in SCR
+    cmd23(wb, 2) # if supported in SCR
     cmd18(wb, 0, 2, wb.mems.sram.base)
     cmd13(wb, rca)
     dumpall(wb, wb.mems.sram.base, 1024)
 
+
 if __name__ == '__main__':
     wb = RemoteClient(port=1234, debug=False)
     wb.open()
-    main(wb, sim=False)
+    main(wb)
     wb.close()
