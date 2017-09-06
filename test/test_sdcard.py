@@ -284,7 +284,7 @@ def incremental(wb, addr):
         dw = k | ((k+1)<<8) | ((k+2)<<16) | ((k+3)<<24)
         wb.write(addr + 4*i, dw & 0xffffffff)
 
-def main(wb, s18r=True):
+def main(wb):
     clkfreq = 50000000
     settimeout(wb, clkfreq, 0.1)
 
@@ -293,19 +293,21 @@ def main(wb, s18r=True):
     cmd8(wb)
 
     # WAIT FOR CARD READY
+    s18a = False
     while True:
         cmd55(wb)
         r3,status = acmd41(wb, hcs=True, s18r=True)
         if r3[3] & 0x80:
             print("SDCard ready | ", end="")
-            if r3[3] & 0x01:
-                print("1.8V supported")
+            s18a = r3[3] & 0x01
+            if s18a:
+                print("1.8V switch supported")
             else:
-                print("1.8V not supported")
+                print("1.8V switch not supported/needed")
             break
 
     # VOLTAGE SWITCH
-    if s18r:
+    if s18a:
         cmd11(wb)
         wb.regs.sdvoltage_out.write(1)
 
