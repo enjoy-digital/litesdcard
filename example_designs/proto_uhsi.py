@@ -14,6 +14,7 @@ from litex.soc.cores.uart import UARTWishboneBridge
 
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
+from litex.soc.cores.gpio import GPIOOut
 
 from litesdcard.phy import SDPHY, SDCtrl
 from litesdcard.ram import RAMReader, RAMWriter
@@ -40,8 +41,8 @@ _io = [
         Subsignal("cmd", Pins("L14"), Misc("PULLUP")),
         Subsignal("clk", Pins("J12")),
         Subsignal("clkfb", Pins("J16")),
-        Subsignal("cd", Pins("H14")),
-        IOStandard("LVCMOS33"), Misc("SLEW=FAST"),
+        Subsignal("sel", Pins("H14")),
+        IOStandard("LVCMOS18"), Misc("SLEW=FAST"),
     ),
 ]
 
@@ -106,8 +107,9 @@ class SDSoC(SoCCore):
     csr_map = {
         "sdphy":     20,
         "sdctrl":    21,
-        "ramreader": 22,
-        "ramwriter": 23
+        "sdvoltage": 22,
+        "ramreader": 23,
+        "ramwriter": 24
     }
     csr_map.update(SoCCore.csr_map)
 
@@ -130,8 +132,10 @@ class SDSoC(SoCCore):
         self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
         self.add_wb_master(self.cpu_or_bridge.wishbone)
 
-        self.submodules.sdphy = SDPHY(platform.request('sdcard'), platform.device)
+        sdcard_pads = platform.request('sdcard')
+        self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdctrl = SDCtrl()
+        self.submodules.sdvoltage = GPIOOut(sdcard_pads.sel)
 
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()

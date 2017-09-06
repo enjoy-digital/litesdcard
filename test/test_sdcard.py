@@ -284,7 +284,7 @@ def incremental(wb, addr):
         dw = k | ((k+1)<<8) | ((k+2)<<16) | ((k+3)<<24)
         wb.write(addr + 4*i, dw & 0xffffffff)
 
-def main(wb, s18r=False):
+def main(wb, s18r=True):
     clkfreq = 50000000
     settimeout(wb, clkfreq, 0.1)
 
@@ -307,6 +307,7 @@ def main(wb, s18r=False):
     # VOLTAGE SWITCH
     if s18r:
         cmd11(wb)
+        wb.regs.sdvoltage_out.write(1)
 
     # SEND IDENTIFICATION
     cmd2(wb)
