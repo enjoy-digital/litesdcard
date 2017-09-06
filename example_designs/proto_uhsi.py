@@ -120,6 +120,7 @@ class SDSoC(SoCCore):
                          with_uart=False,
                          with_timer=False,
                          ident="SDCard Test SoC",
+                         ident_version=True,
                          integrated_sram_size=1024,
                          **kwargs)
 
