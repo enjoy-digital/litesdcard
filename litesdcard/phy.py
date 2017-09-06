@@ -414,14 +414,14 @@ class SDPHY(Module, AutoCSR):
             for i in range(4):
                 self.specials += Instance("IDDR2",
                     p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-                    i_C0=pads.clkfb, i_C1=~pads.clkfb,
+                    i_C0=ClockSignal("sys"), i_C1=~ClockSignal("sys"),
                     i_CE=1, i_S=0, i_R=0,
                     i_D=data_t.i[i], o_Q0=data_i1[i], o_Q1=data_i2[i]
                 )
 
             self.specials += Instance("IDDR2",
                 p_DDR_ALIGNMENT="C1", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-                i_C0=pads.clkfb, i_C1=~pads.clkfb,
+                i_C0=ClockSignal("sys"), i_C1=~ClockSignal("sys"),
                 i_CE=1, i_S=0, i_R=0,
                 i_D=cmd_t.i, o_Q0=cmd_i1, o_Q1=cmd_i2
             )
