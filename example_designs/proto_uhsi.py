@@ -71,7 +71,7 @@ class _CRG(Module):
                                   p_DIVIDE_BYPASS="TRUE", p_I_INVERT="FALSE",
                                   i_I=clk50a, o_DIVCLK=clk50b)
         f = Fraction(int(clk_freq), int(f0))
-        n, m, p = f.denominator, f.numerator, 16
+        n, m, p = f.denominator, f.numerator, 64
         assert f0/n*m == clk_freq
         pll_lckd = Signal()
         pll_fb = Signal()
@@ -99,6 +99,7 @@ class _CRG(Module):
         )
         self.specials += Instance("BUFG", i_I=pll[4], o_O=self.cd_sys.clk)
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd)
+        print(m*p//n)
 
 
 class SDSoC(SoCCore):
@@ -112,7 +113,7 @@ class SDSoC(SoCCore):
 
     def __init__(self, **kwargs):
         platform = Platform()
-        clk_freq = 25*1000000
+        clk_freq = int(6.25*1000000)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
