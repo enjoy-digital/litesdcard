@@ -71,7 +71,7 @@ class _CRG(Module):
                                   p_DIVIDE_BYPASS="TRUE", p_I_INVERT="FALSE",
                                   i_I=clk50a, o_DIVCLK=clk50b)
         f = Fraction(int(clk_freq), int(f0))
-        n, m, p = f.denominator, f.numerator, 16
+        n, m, p = f.denominator, f.numerator, 64
         assert f0/n*m == clk_freq
         pll_lckd = Signal()
         pll_fb = Signal()
@@ -119,7 +119,7 @@ class SDSoC(SoCCore):
 
     def __init__(self, with_analyzer=True):
         platform = Platform()
-        clk_freq = int(25*1000000)
+        clk_freq = int(6.25*1000000)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
@@ -180,12 +180,11 @@ class SDSoC(SoCCore):
 
     def do_exit(self, vns):
         if hasattr(self, "analyzer"):
-            self.analyzer.export_csv(vns, "test/sayma_amc/analyzer.csv")
+            self.analyzer.export_csv(vns, "../test/analyzer.csv")
 
 def main():
     soc = SDSoC()
     builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
-    builder.build()
     vns = builder.build()
     soc.do_exit(vns)
 
