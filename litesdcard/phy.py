@@ -59,43 +59,38 @@ class SDPHYCFG(Module):
             )
 
 
-class SDPHYCMDRFB(Module):
-    def __init__(self, pads, enable):
+class SDPHYRFB(Module):
+    def __init__(self, idata, enable):
         self.source = source = stream.Endpoint([("data", 8)])
 
         # # #
 
-        sel = Signal(3)
+        n = 8//len(idata)
+        sel = Signal(max=n)
         data = Signal(8)
 
-        self.submodules.fsm = fsm = FSM()
+        self.submodules.fsm = fsm = ResetInserter()(FSM())
+        self.comb += fsm.reset.eq(~enable)
 
         fsm.act("IDLE",
-            If(enable,
-                NextValue(sel, 0),
-                NextState("READSTART")
-            )
+            NextValue(sel, 0),
+            NextState("READSTART")
         )
 
         fsm.act("READSTART",
-            If(~enable,
-                NextState("IDLE")
-            ).Elif(pads.cmd.i == 0,
-                NextValue(data, 0),
-                NextValue(sel, 1),
+            If(idata == 0,
+                NextValue(sel, sel + 1),
                 NextState("READ")
             )
         )
 
         fsm.act("READ",
-            If(~enable,
-                NextState("IDLE")
-            ).Elif(sel == 7,
+            If(sel == (n-1),
                 source.valid.eq(1),
-                source.data.eq(Cat(pads.cmd.i, data)),
+                source.data.eq(Cat(idata, data)),
                 NextValue(sel, 0)
             ).Else(
-                NextValue(data, Cat(pads.cmd.i, data)),
+                NextValue(data, Cat(idata, data)),
                 NextValue(sel, sel + 1)
             )
         )
@@ -111,7 +106,7 @@ class SDPHYCMDR(Module):
 
         enable = Signal()
 
-        self.submodules.cmdrfb = ClockDomainsRenamer("sd_rx")(SDPHYCMDRFB(self.pads, enable))
+        self.submodules.cmdrfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(self.pads.cmd.i, enable))
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
             stream.AsyncFIFO(self.cmdrfb.source.description, 4)
         )
@@ -279,48 +274,6 @@ class SDPHYCMDW(Module):
         )
 
 
-class SDPHYDATARFB(Module):
-    def __init__(self, pads, enable):
-        self.source = source = stream.Endpoint([("data", 8)])
-
-        # # #
-
-        sel = Signal(1)
-        data = Signal(8)
-
-        self.submodules.fsm = fsm = FSM()
-
-        fsm.act("IDLE",
-            If(enable,
-                NextValue(sel, 0),
-                NextState("READSTART")
-            )
-        )
-
-        fsm.act("READSTART",
-            If(~enable,
-                NextState("IDLE")
-            ).Elif(pads.data.i == 0,
-                NextValue(data, 0),
-                NextValue(sel, 0),
-                NextState("READ")
-            )
-        )
-
-        fsm.act("READ",
-            If(~enable,
-                NextState("IDLE")
-            ).Elif(sel == 1,
-                source.valid.eq(1),
-                source.data.eq(Cat(pads.data.i, data)),
-                NextValue(sel, 0)
-            ).Else(
-                NextValue(data, Cat(pads.data.i, data)),
-                NextValue(sel, 1)
-            )
-        )
-
-
 class SDPHYDATAR(Module):
     def __init__(self, cfg):
         self.pads = Record(SDPADS)
@@ -331,7 +284,7 @@ class SDPHYDATAR(Module):
 
         enable = Signal()
 
-        self.submodules.datarfb = ClockDomainsRenamer("sd_rx")(SDPHYDATARFB(self.pads, enable))
+        self.submodules.datarfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(self.pads.data.i, enable))
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
             stream.AsyncFIFO(self.datarfb.source.description, 4)
         )
