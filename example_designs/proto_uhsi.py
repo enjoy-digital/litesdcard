@@ -14,7 +14,6 @@ from litex.soc.cores.uart import UARTWishboneBridge
 
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
-from litex.soc.cores.gpio import GPIOOut
 
 from litesdcard.phy import SDPHY
 from litesdcard.core import SDCore
@@ -60,7 +59,8 @@ class Platform(XilinxPlatform):
 class _CRG(Module):
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_bufgmux = ClockDomain()
+        self.clock_domains.cd_sd_tx = ClockDomain()
+        self.clock_domains.cd_sd_rx = ClockDomain()
 
         f0 = 50*1000000
         clk50 = platform.request("clk50")
@@ -102,9 +102,10 @@ class _CRG(Module):
 
         # XXX remove
         self.comb += [
-            self.cd_bufgmux.clk.eq(ClockSignal()),
-            self.cd_bufgmux.rst.eq(ClockSignal())
+            self.cd_sd_tx.clk.eq(ClockSignal()),
+            self.cd_sd_tx.rst.eq(ClockSignal())
         ]
+
 
 class SDSoC(SoCCore):
     csr_map = {
@@ -154,10 +155,12 @@ class SDSoC(SoCCore):
             self.stream32to8.source.connect(self.sdcore.sink)
         ]
 
+
 def main():
     soc = SDSoC()
     builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
     builder.build()
+
 
 if __name__ == "__main__":
     main()

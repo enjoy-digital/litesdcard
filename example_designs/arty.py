@@ -31,7 +31,8 @@ _sd_io = [
 class _CRG(Module):
     def __init__(self, platform):
         self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_bufgmux = ClockDomain()
+        self.clock_domains.cd_sd_tx = ClockDomain()
+        self.clock_domains.cd_sd_rx = ClockDomain()
 
         clk100 = platform.request("clk100")
         rst = ~platform.request("cpu_reset")
@@ -58,8 +59,8 @@ class _CRG(Module):
 
         # XXX remove
         self.comb += [
-            self.cd_bufgmux.clk.eq(ClockSignal()),
-            self.cd_bufgmux.rst.eq(ClockSignal())
+            self.cd_sd_tx.clk.eq(ClockSignal()),
+            self.cd_sd_tx.rst.eq(ClockSignal())
         ]
 
 
@@ -88,6 +89,7 @@ class SDSoC(SoCCore):
                          **kwargs)
 
         self.submodules.crg = _CRG(platform)
+
         self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
         self.add_wb_master(self.cpu_or_bridge.wishbone)
 
@@ -114,7 +116,7 @@ class SDSoC(SoCCore):
 
 def main():
     soc = SDSoC()
-    builder = Builder(soc, csr_csv="../test/csr.csv")
+    builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
     builder.build()
 
 
