@@ -93,7 +93,7 @@ class SDSoC(SoCCore):
 
         sdcard_pads = platform.request('sdcard')
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
-        self.submodules.sdcore = SDCore()
+        self.submodules.sdcore = SDCore(self.sdphy)
 
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()
@@ -104,14 +104,11 @@ class SDSoC(SoCCore):
         self.submodules.stream8to32 = Stream8to32()
 
         self.comb += [
-            self.sdcore.source.connect(self.sdphy.sink),
-            self.sdphy.source.connect(self.sdcore.sink),
-
-            self.sdcore.rsource.connect(self.stream8to32.sink),
+            self.sdcore.source.connect(self.stream8to32.sink),
             self.stream8to32.source.connect(self.ramwriter.sink),
 
             self.ramreader.source.connect(self.stream32to8.sink),
-            self.stream32to8.source.connect(self.sdcore.rsink),
+            self.stream32to8.source.connect(self.sdcore.sink)
         ]
 
 
