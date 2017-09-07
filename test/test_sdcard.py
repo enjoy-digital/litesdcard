@@ -293,10 +293,11 @@ def main(wb):
     cmd8(wb)
 
     # WAIT FOR CARD READY
+    s18r = hasattr(wb.regs, sdvoltage_out)
     s18a = False
     while True:
         cmd55(wb)
-        r3,status = acmd41(wb, hcs=True, s18r=True)
+        r3,status = acmd41(wb, hcs=True, s18r=s18r)
         if r3[3] & 0x80:
             print("SDCard ready | ", end="")
             s18a = r3[3] & 0x01
@@ -307,7 +308,7 @@ def main(wb):
             break
 
     # VOLTAGE SWITCH
-    if s18a:
+    if s18r and s18a:
         cmd11(wb)
         wb.regs.sdvoltage_out.write(1)
 
