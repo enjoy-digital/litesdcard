@@ -178,6 +178,15 @@ def cmd18(wb, blkaddr, blkcnt, destaddr):
     wait_data_done(wb)
     return r
 
+def cmd19(wb, destaddr):
+    print("19: MMC_CMD_SEND_TUNING_BLOCK")
+    wb.regs.sdctrl_argument.write(0x00000000)
+    wb.regs.ramwriter_address.write(destaddr//4)
+    wb.regs.sdctrl_command.write((19 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
+    wait_data_done(wb)
+    return r
+
 def cmd23(wb, blkcnt):
     print("23: MMC_CMD_SET_BLOCK_COUNT")
     wb.regs.sdctrl_argument.write(blkcnt) # 1 means 1 block
