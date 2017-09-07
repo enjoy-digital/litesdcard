@@ -103,7 +103,7 @@ class _CRG(Module):
         # XXX remove
         self.comb += [
             self.cd_sd_tx.clk.eq(ClockSignal()),
-            self.cd_sd_tx.rst.eq(ClockSignal())
+            self.cd_sd_tx.rst.eq(ResetSignal())
         ]
 
 
@@ -154,9 +154,6 @@ class SDSoC(SoCCore):
             self.ramreader.source.connect(self.stream32to8.sink),
             self.stream32to8.source.connect(self.sdcore.sink)
         ]
-
-        platform.add_platform_command(
-            """PIN "BUFG.O" CLOCK_DEDICATED_ROUTE = FALSE;""")
 
         # analyzer
         if with_analyzer:

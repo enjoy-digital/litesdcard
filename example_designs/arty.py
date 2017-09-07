@@ -60,7 +60,7 @@ class _CRG(Module):
         # XXX remove
         self.comb += [
             self.cd_sd_tx.clk.eq(ClockSignal()),
-            self.cd_sd_tx.rst.eq(ClockSignal())
+            self.cd_sd_tx.rst.eq(ResetSignal())
         ]
 
 
