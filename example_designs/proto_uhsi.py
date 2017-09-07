@@ -16,13 +16,12 @@ from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.gpio import GPIOOut
 
-from litesdcard.phy import SDPHY, SDCtrl
+from litesdcard.phy import SDPHY
+from litesdcard.core import SDCore
 from litesdcard.ram import RAMReader, RAMWriter
 from litesdcard.convert import Stream32to8, Stream8to32
 
 from litex.boards.platforms import papilio_pro
-
-
 
 
 _io = [
@@ -110,7 +109,7 @@ class _CRG(Module):
 class SDSoC(SoCCore):
     csr_map = {
         "sdphy":     20,
-        "sdctrl":    21,
+        "sdcore":    21,
         "sdvoltage": 22,
         "ramreader": 23,
         "ramwriter": 24
@@ -138,7 +137,7 @@ class SDSoC(SoCCore):
 
         sdcard_pads = platform.request('sdcard')
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
-        self.submodules.sdctrl = SDCtrl()
+        self.submodules.sdcore = SDCore()
         self.submodules.sdvoltage = GPIOOut(sdcard_pads.sel)
 
         self.submodules.ramreader = RAMReader()
@@ -150,14 +149,14 @@ class SDSoC(SoCCore):
         self.submodules.stream8to32 = Stream8to32()
 
         self.comb += [
-            self.sdctrl.source.connect(self.sdphy.sink),
-            self.sdphy.source.connect(self.sdctrl.sink),
+            self.sdcore.source.connect(self.sdphy.sink),
+            self.sdphy.source.connect(self.sdcore.sink),
 
-            self.sdctrl.rsource.connect(self.stream8to32.sink),
+            self.sdcore.rsource.connect(self.stream8to32.sink),
             self.stream8to32.source.connect(self.ramwriter.sink),
 
             self.ramreader.source.connect(self.stream32to8.sink),
-            self.stream32to8.source.connect(self.sdctrl.rsink),
+            self.stream32to8.source.connect(self.sdcore.rsink),
         ]
 
 def main():
