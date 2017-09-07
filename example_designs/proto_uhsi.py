@@ -61,7 +61,7 @@ class Platform(XilinxPlatform):
 class _CRG(Module):
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_sys_ps = ClockDomain()
+        self.clock_domains.cd_bufgmux = ClockDomain()
 
         f0 = 50*1000000
         clk50 = platform.request("clk50")
@@ -100,8 +100,12 @@ class _CRG(Module):
         )
         self.specials += Instance("BUFG", i_I=pll[4], o_O=self.cd_sys.clk)
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd)
-        print(m*p//n)
 
+        # XXX remove
+        self.comb += [
+            self.cd_bufgmux.clk.eq(ClockSignal()),
+            self.cd_bufgmux.rst.eq(ClockSignal())
+        ]
 
 class SDSoC(SoCCore):
     csr_map = {

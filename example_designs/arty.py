@@ -30,6 +30,7 @@ _sd_io = [
 class _CRG(Module):
     def __init__(self, platform):
         self.clock_domains.cd_sys = ClockDomain()
+        self.clock_domains.cd_bufgmux = ClockDomain()
 
         clk100 = platform.request("clk100")
         rst = ~platform.request("cpu_reset")
@@ -52,6 +53,12 @@ class _CRG(Module):
             ),
             Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
             AsyncResetSynchronizer(self.cd_sys, ~pll_locked | rst),
+        ]
+
+        # XXX remove
+        self.comb += [
+            self.cd_bufgmux.clk.eq(ClockSignal()),
+            self.cd_bufgmux.rst.eq(ClockSignal())
         ]
 
 
