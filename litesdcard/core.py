@@ -23,6 +23,8 @@ class SDCore(Module, AutoCSR):
         self.blocksize = CSRStorage(16)
         self.blockcount = CSRStorage(16)
 
+        self.debug = Signal(4)
+
         # # #
 
         self.submodules.crc7 = CRC(9, 7, 40)
@@ -90,6 +92,7 @@ class SDCore(Module, AutoCSR):
         ]
 
         fsm.act("IDLE",
+            self.debug.eq(0),
             NextValue(pos, 0),
             If(self.datatimeout.re,
                 NextState("CFG_TIMEOUT_DATA"),
@@ -132,6 +135,7 @@ class SDCore(Module, AutoCSR):
             ]
 
         fsm.act("CFG_TIMEOUT_DATA",
+            self.debug.eq(1),
             phy.sink.valid.eq(1),
             Case(pos, dtcases),
             If(phy.sink.valid & phy.sink.ready,
@@ -143,6 +147,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("CFG_TIMEOUT_CMD",
+            self.debug.eq(2),
             phy.sink.valid.eq(1),
             Case(pos, ctcases),
             If(phy.sink.valid & phy.sink.ready,
@@ -154,6 +159,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("CFG_BLKSIZE",
+            self.debug.eq(3),
             phy.sink.valid.eq(1),
             Case(pos, blkcases),
             If(phy.sink.valid & phy.sink.ready,
@@ -165,6 +171,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("CFG_VOLTAGE",
+            self.debug.eq(4),
             phy.sink.valid.eq(1),
             phy.sink.data.eq(self.voltage.storage[0:8]),
             mode.eq(SDCARD_STREAM_CFG_VOLTAGE),
@@ -174,6 +181,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("SEND_CMD",
+            self.debug.eq(5),
             phy.sink.valid.eq(1),
             cmddata.eq(SDCARD_STREAM_CMD),
             rdwr.eq(SDCARD_STREAM_WRITE),
@@ -196,6 +204,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("RECV_RESP",
+            self.debug.eq(6),
             If(waitresp == SDCARD_CTRL_RESPONSE_SHORT,
                 phy.sink.data.eq(5) # (5+1)*8 == 48bits
             ).Elif(waitresp == SDCARD_CTRL_RESPONSE_LONG,
@@ -206,12 +215,6 @@ class SDCore(Module, AutoCSR):
             cmddata.eq(SDCARD_STREAM_CMD),
             rdwr.eq(SDCARD_STREAM_READ),
             mode.eq(SDCARD_STREAM_XFER),
-            If(phy.sink.valid & phy.sink.ready, # In async fifo
-                NextState("WAIT_RESP")
-            )
-        )
-
-        fsm.act("WAIT_RESP",
             If(phy.source.valid, # Wait for resp or timeout coming from phy
                 phy.source.ready.eq(1),
                 If(phy.source.ctrl[0] == SDCARD_STREAM_CMD, # Should be always true
@@ -242,6 +245,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("RECV_DATA",
+            self.debug.eq(7),
             phy.sink.data.eq(0), # Read 1 block
             phy.sink.valid.eq(1),
             phy.sink.last.eq(self.blockcount.storage == blkcnt),
@@ -254,6 +258,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("WAIT_DATA",
+            self.debug.eq(8),
             If(phy.source.valid,
                 If(phy.source.ctrl[0] == SDCARD_STREAM_DATA, # Should be always true
                     If(status == SDCARD_STREAM_STATUS_OK,
@@ -286,6 +291,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("SEND_DATA",
+            self.debug.eq(9),
             phy.sink.data.eq(self.crc16.source.data),
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_WRITE),

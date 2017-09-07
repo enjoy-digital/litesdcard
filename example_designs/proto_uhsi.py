@@ -155,6 +155,9 @@ class SDSoC(SoCCore):
             self.stream32to8.source.connect(self.sdcore.sink)
         ]
 
+        platform.add_platform_command(
+            """PIN "BUFG.O" CLOCK_DEDICATED_ROUTE = FALSE;""")
+
         # analyzer
         if with_analyzer:
             phy_group = [
@@ -162,9 +165,10 @@ class SDSoC(SoCCore):
                 self.sdphy.cmdw.sink,
                 self.sdphy.cmdr.sink,
                 self.sdphy.cmdr.source,
-                self.sdphy.cmdw.sink,
-                self.sdphy.cmdr.sink,
-                self.sdphy.cmdr.source,
+                self.sdphy.dataw.sink,
+                self.sdphy.datar.sink,
+                self.sdphy.datar.source,
+                self.sdcore.debug
             ]
 
             dummy_group = [
@@ -176,7 +180,7 @@ class SDSoC(SoCCore):
                 0 : phy_group,
                 1 : dummy_group
             }
-            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 1024, cd="sys")
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, cd="sys")
 
     def do_exit(self, vns):
         if hasattr(self, "analyzer"):

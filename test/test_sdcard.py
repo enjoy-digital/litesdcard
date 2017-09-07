@@ -9,6 +9,8 @@ from litex.soc.tools.remote import RemoteClient
 from litesdcard.phy import *
 from litesdcard.software.libsdcard import *
 
+from litescope.software.driver.analyzer import LiteScopeAnalyzerDriver
+
 
 SD_OK         = 0
 SD_CRCERROR   = 1
@@ -302,7 +304,7 @@ def main(wb):
     cmd8(wb)
 
     # WAIT FOR CARD READY
-    s18r = hasattr(wb.regs, sdphy_voltage_sel)
+    s18r = hasattr(wb.regs, "sdphy_voltage_sel")
     s18a = False
     while True:
         cmd55(wb)
@@ -343,59 +345,59 @@ def main(wb):
     cmd55(wb, rca)
     acmd6(wb)
 
-    # SEND SCR
-    cmd55(wb, rca)
-    acmd51(wb, wb.mems.sram.base)
-    dumpall(wb, wb.mems.sram.base, 8)
-    scr = decode_scr(wb, wb.mems.sram.base)
-    if not scr.cmd_support_sbc:
-        print("Need CMD23 support")
-        return
+#    # SEND SCR
+#    cmd55(wb, rca)
+#    acmd51(wb, wb.mems.sram.base)
+#    dumpall(wb, wb.mems.sram.base, 8)
+#    scr = decode_scr(wb, wb.mems.sram.base)
+#    if not scr.cmd_support_sbc:
+#        print("Need CMD23 support")
+#        return
 
-    # SWITCH SPEED
-    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR25, wb.mems.sram.base)
-    dumpall(wb, wb.mems.sram.base, 64)
-
-    # SET BLOCKLEN
-    cmd16(wb, 512)
-
-    # # READ ONE BLOCK
-    # memset(wb, wb.mems.sram.base, 0, 1024)
-    # cmd17(wb, 0, wb.mems.sram.base)
-    # dumpall(wb, wb.mems.sram.base, 512)
-
-    # READ MULTIPLE BLOCKS
-    memset(wb, wb.mems.sram.base, 0, 1024)
-    cmd23(wb, 2) # if supported in SCR
-    cmd18(wb, 0, 2, wb.mems.sram.base)
-    cmd13(wb, rca)
-    # dumpall(wb, wb.mems.sram.base, 1024)
-
-    # WRITE MULTIPLE BLOCKS
-    # incremental(wb, wb.mems.sram.base)
-    # writemem(wb)
-    memset(wb, wb.mems.sram.base, 0x0f0f0f0f, 1024)
-    blkcnt = 16
-    while True:
-        r,status = cmd23(wb, blkcnt) # if supported in SCR
-        if not status:
-            break
-    cmd25(wb, 0, blkcnt)
-    for i in range(blkcnt):
-        ramread(wb, wb.mems.sram.base)
-    if not wait_data_done(wb) == SD_OK:
-        cmd12(wb)
-    cmd13(wb, rca)
-    cmd55(wb, rca)
-    acmd22(wb, wb.mems.sram.base)
-    dumpall(wb, wb.mems.sram.base, 4)
-
-    # READ MULTIPLE BLOCKS
-    memset(wb, wb.mems.sram.base, 0, 1024)
-    cmd23(wb, 2) # if supported in SCR
-    cmd18(wb, 0, 2, wb.mems.sram.base)
-    cmd13(wb, rca)
-    dumpall(wb, wb.mems.sram.base, 1024)
+#    # SWITCH SPEED
+#    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR25, wb.mems.sram.base)
+#    dumpall(wb, wb.mems.sram.base, 64)
+#
+#    # SET BLOCKLEN
+#    cmd16(wb, 512)
+#
+#    # # READ ONE BLOCK
+#    # memset(wb, wb.mems.sram.base, 0, 1024)
+#    # cmd17(wb, 0, wb.mems.sram.base)
+#    # dumpall(wb, wb.mems.sram.base, 512)
+#
+#    # READ MULTIPLE BLOCKS
+#    memset(wb, wb.mems.sram.base, 0, 1024)
+#    cmd23(wb, 2) # if supported in SCR
+#    cmd18(wb, 0, 2, wb.mems.sram.base)
+#    cmd13(wb, rca)
+#    # dumpall(wb, wb.mems.sram.base, 1024)
+#
+#    # WRITE MULTIPLE BLOCKS
+#    # incremental(wb, wb.mems.sram.base)
+#    # writemem(wb)
+#    memset(wb, wb.mems.sram.base, 0x0f0f0f0f, 1024)
+#    blkcnt = 16
+#    while True:
+#        r,status = cmd23(wb, blkcnt) # if supported in SCR
+#        if not status:
+#            break
+#    cmd25(wb, 0, blkcnt)
+#    for i in range(blkcnt):
+#        ramread(wb, wb.mems.sram.base)
+#    if not wait_data_done(wb) == SD_OK:
+#        cmd12(wb)
+#    cmd13(wb, rca)
+#    cmd55(wb, rca)
+#    acmd22(wb, wb.mems.sram.base)
+#    dumpall(wb, wb.mems.sram.base, 4)
+#
+#    # READ MULTIPLE BLOCKS
+#    memset(wb, wb.mems.sram.base, 0, 1024)
+#    cmd23(wb, 2) # if supported in SCR
+#    cmd18(wb, 0, 2, wb.mems.sram.base)
+#    cmd13(wb, rca)
+#    dumpall(wb, wb.mems.sram.base, 1024)
 
 
 if __name__ == '__main__':

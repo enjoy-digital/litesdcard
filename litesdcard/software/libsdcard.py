@@ -43,7 +43,7 @@ class CID:
         return r
 
 def decode_cid(comm):
-    data = comm.read(comm.regs.sdctrl_response.addr, 4)
+    data = comm.read(comm.regs.sdcore_response.addr, 4)
     ba = bytearray()
     for d in data:
         ba += bytearray(d.to_bytes(4, 'big'))
@@ -89,7 +89,7 @@ class CSD:
         return r
 
 def decode_csd(comm):
-    data = comm.read(comm.regs.sdctrl_response.addr, 4)
+    data = comm.read(comm.regs.sdcore_response.addr, 4)
     ba = bytearray()
     for d in data:
         ba += bytearray(d.to_bytes(4, 'big'))

@@ -133,18 +133,19 @@ class SDPHYCMDR(Module):
         self.submodules.fsm = fsm = FSM()
 
         fsm.act("IDLE",
+            self.pads.cmd.oe.eq(1),
+            self.pads.cmd.o.eq(1),
             If(sink.valid,
                 NextValue(ctimeout, 0),
                 NextValue(cread, 0),
                 NextValue(ctoread, sink.data),
-                # enable.eq(1),
                 NextState("CMD_READSTART")
             )
         )
 
         fsm.act("CMD_READSTART",
             enable.eq(1),
-            self.pads.cmd.oe.eq(0), # XXX
+            self.pads.cmd.oe.eq(0),
             self.pads.clk.eq(1),
             NextValue(ctimeout, ctimeout + 1),
             If(self.fifo.source.valid,
@@ -156,7 +157,7 @@ class SDPHYCMDR(Module):
 
         fsm.act("CMD_READ",
             enable.eq(1),
-            self.pads.cmd.oe.eq(0), # XXX
+            self.pads.cmd.oe.eq(0),
             self.pads.clk.eq(1),
 
             source.valid.eq(self.fifo.source.valid),
@@ -164,7 +165,6 @@ class SDPHYCMDR(Module):
             status.eq(SDCARD_STREAM_STATUS_OK),
             source.last.eq(cread == ctoread),
             self.fifo.source.ready.eq(source.ready),
-
             If(source.valid & source.ready,
                 NextValue(cread, cread + 1),
                 If(cread == ctoread,
@@ -353,6 +353,8 @@ class SDPHYDATAR(Module):
         self.submodules.fsm = fsm = FSM()
 
         fsm.act("IDLE",
+            self.pads.cmd.oe.eq(1),
+            self.pads.cmd.o.eq(1),
             If(sink.valid,
                 NextValue(dtimeout, 0),
                 NextValue(read, 0),
@@ -364,7 +366,7 @@ class SDPHYDATAR(Module):
 
         fsm.act("DATA_READSTART",
             enable.eq(1),
-            self.pads.data.oe.eq(0), # XXX
+            self.pads.data.oe.eq(0),
             self.pads.clk.eq(1),
             NextValue(dtimeout, dtimeout + 1),
             If(self.fifo.source.valid,
