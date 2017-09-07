@@ -110,7 +110,6 @@ class SDSoC(SoCCore):
     csr_map = {
         "sdphy":     20,
         "sdcore":    21,
-        "sdvoltage": 22,
         "ramreader": 23,
         "ramwriter": 24
     }
@@ -138,7 +137,6 @@ class SDSoC(SoCCore):
         sdcard_pads = platform.request('sdcard')
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
-        self.submodules.sdvoltage = GPIOOut(sdcard_pads.sel)
 
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()

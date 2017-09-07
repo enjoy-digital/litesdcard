@@ -1,5 +1,6 @@
 from litex.gen import *
 from litex.soc.interconnect import stream
+from litex.soc.interconnect.csr import *
 
 from litesdcard.common import *
 
@@ -569,10 +570,13 @@ class SDPHYIOS7(Module):
             )
 
 
-class SDPHY(Module):
+class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device):
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
+        if hasattr(pads, "sel"):
+            self.voltage_sel = CSRStorage()
+            self.comb += pads.sel.eq(self.voltage_sel.storage)
 
         # # #
 
