@@ -486,18 +486,8 @@ class SDPHYDATAW(Module):
         )
 
 
-class SDPHY(Module):
-    def __init__(self, pads, device):
-        sdpads = Record(SDPADS)
-
-        cmddata = Signal()
-        rdwr = Signal()
-        mode = Signal(6)
-
-        # Streams
-        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
-        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
-
+class SDPHYIOS6(Module):
+    def __init__(self, sdpads, pads):
         # Data tristate
         self.data_t = TSTriple(4)
         self.specials += self.data_t.get_tristate(pads.data)
@@ -537,13 +527,28 @@ class SDPHY(Module):
                 i_D=self.data_t.i[i], o_Q0=data_i1[i], o_Q1=sdpads.data.i[i]
             )
 
-        # Output enable bits
-        self.comb += [
-            self.cmd_t.oe.eq(sdpads.cmd.oe),
-            self.cmd_t.o.eq(sdpads.cmd.o),
 
-            self.data_t.oe.eq(sdpads.data.oe),
-            self.data_t.o.eq(sdpads.data.o),
+class SDPHY(Module):
+    def __init__(self, pads, device):
+        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
+        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
+
+        # # #
+
+        sdpads = Record(SDPADS)
+
+        cmddata = Signal()
+        rdwr = Signal()
+        mode = Signal(6)
+
+        # IOs (device specific)
+        self.submodules.io = SDPHYIOS6(sdpads, pads)
+        self.comb += [
+            self.io.cmd_t.oe.eq(sdpads.cmd.oe),
+            self.io.cmd_t.o.eq(sdpads.cmd.o),
+
+            self.io.data_t.oe.eq(sdpads.data.oe),
+            self.io.data_t.o.eq(sdpads.data.o)
         ]
 
         # Stream ctrl bits
