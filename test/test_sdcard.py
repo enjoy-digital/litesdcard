@@ -32,7 +32,7 @@ SD_GROUP_POWERLIMIT     = 3
 
 def wait_cmd_done(wb):
     while True:
-        cmdevt = wb.regs.sdctrl_cmdevt.read()
+        cmdevt = wb.regs.sdcore_cmdevt.read()
         if cmdevt & 0x1:
             print('cmdevt: 0x{:08x}{}{}'.format(
                 cmdevt,
@@ -47,7 +47,7 @@ def wait_cmd_done(wb):
 
 def wait_data_done(wb):
     while True:
-        dataevt = wb.regs.sdctrl_dataevt.read()
+        dataevt = wb.regs.sdcore_dataevt.read()
         if dataevt & 0x1:
             print('dataevt: 0x{:08x}{}{}{}'.format(
                 dataevt,
@@ -65,7 +65,7 @@ def wait_data_done(wb):
 
 def response(wb, length, nocrccheck=False):
     status = wait_cmd_done(wb)
-    response = wb.read(wb.regs.sdctrl_response.addr, 4)
+    response = wb.read(wb.regs.sdcore_response.addr, 4)
     if length == SDCARD_CTRL_RESPONSE_SHORT:
         s = "0x{:08x}".format(response[3])
         ba = bytearray(response[3].to_bytes(4, 'little'))
@@ -79,19 +79,19 @@ def response(wb, length, nocrccheck=False):
 
 def cmd0(wb):
     print("0: MMC_CMD_GO_IDLE_STATE")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_command.write((0 << 8) | SDCARD_CTRL_RESPONSE_NONE)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_command.write((0 << 8) | SDCARD_CTRL_RESPONSE_NONE)
 
 def cmd2(wb):
     print("2: MMC_CMD_ALL_SEND_CID")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_command.write((2 << 8) | SDCARD_CTRL_RESPONSE_LONG)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_command.write((2 << 8) | SDCARD_CTRL_RESPONSE_LONG)
     return response(wb, SDCARD_CTRL_RESPONSE_LONG)
 
 def cmd3(wb):
     print("3: MMC_CMD_SET_RELATIVE_CSR")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_command.write((3 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_command.write((3 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd6(wb, mode, group, value, destaddr):
@@ -99,135 +99,135 @@ def cmd6(wb, mode, group, value, destaddr):
     arg = (mode << 31) | 0xffffff
     arg &= ~(0xf << (group * 4))
     arg |= value << (group * 4)
-    wb.regs.sdctrl_argument.write(arg)
-    wb.regs.sdctrl_blocksize.write(64-1)
-    wb.regs.sdctrl_blockcount.write(0)
+    wb.regs.sdcore_argument.write(arg)
+    wb.regs.sdcore_blocksize.write(64-1)
+    wb.regs.sdcore_blockcount.write(0)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdctrl_command.write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
 
 def cmd7(wb, rca):
     print("7: MMC_CMD_SELECT_CARD")
-    wb.regs.sdctrl_argument.write(rca << 16)
-    wb.regs.sdctrl_command.write((7 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(rca << 16)
+    wb.regs.sdcore_command.write((7 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd8(wb):
     print("8: MMC_CMD_SEND_EXT_CSD")
-    wb.regs.sdctrl_argument.write(0x000001aa)
-    wb.regs.sdctrl_command.write((8 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(0x000001aa)
+    wb.regs.sdcore_command.write((8 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd9(wb, rca):
     print("9: MMC_CMD_SEND_CSD")
-    wb.regs.sdctrl_argument.write(rca << 16)
-    wb.regs.sdctrl_command.write((9 << 8) | SDCARD_CTRL_RESPONSE_LONG)
+    wb.regs.sdcore_argument.write(rca << 16)
+    wb.regs.sdcore_command.write((9 << 8) | SDCARD_CTRL_RESPONSE_LONG)
     return response(wb, SDCARD_CTRL_RESPONSE_LONG)
 
 def cmd10(wb, rca):
     print("10: MMC_CMD_SEND_CID")
-    wb.regs.sdctrl_argument.write(rca << 16)
-    wb.regs.sdctrl_command.write((10 << 8) | SDCARD_CTRL_RESPONSE_LONG)
+    wb.regs.sdcore_argument.write(rca << 16)
+    wb.regs.sdcore_command.write((10 << 8) | SDCARD_CTRL_RESPONSE_LONG)
     return response(wb, SDCARD_CTRL_RESPONSE_LONG)
 
 def cmd11(wb):
     print("11: MMC_CMD_VOLTAGE_SWITCH")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_command.write((11 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_command.write((11 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd12(wb):
     print("12: MMC_CMD_STOP_TRANSMISSION")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_command.write((12 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_command.write((12 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd13(wb, rca):
     print("13: MMC_CMD_SEND_STATUS")
-    wb.regs.sdctrl_argument.write(rca << 16)
-    wb.regs.sdctrl_command.write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(rca << 16)
+    wb.regs.sdcore_command.write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd16(wb, blocklen):
     print("16: MMC_CMD_SET_BLOCKLEN")
-    wb.regs.sdctrl_argument.write(blocklen)
-    wb.regs.sdctrl_command.write((16 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(blocklen)
+    wb.regs.sdcore_command.write((16 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd17(wb, blkaddr, destaddr):
     print("17: MMC_CMD_READ_SINGLE_BLOCK")
-    wb.regs.sdctrl_argument.write(blkaddr)
-    wb.regs.sdctrl_blocksize.write(512-1)
-    wb.regs.sdctrl_blockcount.write(0)
+    wb.regs.sdcore_argument.write(blkaddr)
+    wb.regs.sdcore_blocksize.write(512-1)
+    wb.regs.sdcore_blockcount.write(0)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdctrl_command.write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
 
 def cmd18(wb, blkaddr, blkcnt, destaddr):
     print("18: MMC_CMD_READ_MULTIPLE_BLOCK")
-    wb.regs.sdctrl_argument.write(blkaddr)
-    wb.regs.sdctrl_blocksize.write(512-1)
-    wb.regs.sdctrl_blockcount.write(blkcnt-1)
+    wb.regs.sdcore_argument.write(blkaddr)
+    wb.regs.sdcore_blocksize.write(512-1)
+    wb.regs.sdcore_blockcount.write(blkcnt-1)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdctrl_command.write((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
 
 def cmd19(wb, destaddr):
     print("19: MMC_CMD_SEND_TUNING_BLOCK")
-    wb.regs.sdctrl_argument.write(0x00000000)
+    wb.regs.sdcore_argument.write(0x00000000)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdctrl_command.write((19 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((19 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
 
 def cmd23(wb, blkcnt):
     print("23: MMC_CMD_SET_BLOCK_COUNT")
-    wb.regs.sdctrl_argument.write(blkcnt) # 1 means 1 block
-    wb.regs.sdctrl_command.write((23 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(blkcnt) # 1 means 1 block
+    wb.regs.sdcore_command.write((23 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd24(wb):
     print("24: MMC_CMD_WRITE_SINGLE_BLOCK")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_blocksize.write(512-1)
-    wb.regs.sdctrl_blockcount.write(0)
-    wb.regs.sdctrl_command.write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_blocksize.write(512-1)
+    wb.regs.sdcore_blockcount.write(0)
+    wb.regs.sdcore_command.write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd25(wb, blkaddr, blkcnt):
     print("25: MMC_CMD_WRITE_MULTIPLE_BLOCK")
-    wb.regs.sdctrl_argument.write(blkaddr)
-    wb.regs.sdctrl_blocksize.write(512-1)
-    wb.regs.sdctrl_blockcount.write(blkcnt-1)
-    wb.regs.sdctrl_command.write((25 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
+    wb.regs.sdcore_argument.write(blkaddr)
+    wb.regs.sdcore_blocksize.write(512-1)
+    wb.regs.sdcore_blockcount.write(blkcnt-1)
+    wb.regs.sdcore_command.write((25 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd55(wb, rca=0):
     print("55: MMC_CMD_APP_CMD")
-    wb.regs.sdctrl_argument.write(rca << 16)
-    wb.regs.sdctrl_command.write((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(rca << 16)
+    wb.regs.sdcore_command.write((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def acmd6(wb):
     print("6: SD_CMD_APP_SET_BUS_WIDTH")
-    wb.regs.sdctrl_argument.write(0x00000002)
-    wb.regs.sdctrl_command.write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(0x00000002)
+    wb.regs.sdcore_command.write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def acmd13(wb, destaddr):
     print("13: SD_CMD_APP_SEND_STATUS")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_blocksize.write(64-1)
-    wb.regs.sdctrl_blockcount.write(0)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_blocksize.write(64-1)
+    wb.regs.sdcore_blockcount.write(0)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdctrl_command.write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
@@ -239,36 +239,36 @@ def acmd41(wb, hcs=False, s18r=False):
         arg |= 0x60000000
     if s18r:
         arg |= 0x01000000
-    wb.regs.sdctrl_argument.write(arg)
-    wb.regs.sdctrl_command.write((41 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
+    wb.regs.sdcore_argument.write(arg)
+    wb.regs.sdcore_command.write((41 << 8) | SDCARD_CTRL_RESPONSE_SHORT)
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT, nocrccheck=True)
 
 def acmd51(wb, destaddr):
     print("51: SD_CMD_APP_SEND_SCR")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_blocksize.write(8-1)
-    wb.regs.sdctrl_blockcount.write(0)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_blocksize.write(8-1)
+    wb.regs.sdcore_blockcount.write(0)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdctrl_command.write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
 
 def acmd22(wb, destaddr):
     print("22: SD_CMD_APP_SEND_NUM_WR_BLOCKS")
-    wb.regs.sdctrl_argument.write(0x00000000)
-    wb.regs.sdctrl_blocksize.write(4-1)
-    wb.regs.sdctrl_blockcount.write(0)
+    wb.regs.sdcore_argument.write(0x00000000)
+    wb.regs.sdcore_blocksize.write(4-1)
+    wb.regs.sdcore_blockcount.write(0)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdctrl_command.write((22 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((22 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
 
 def settimeout(wb, clkfreq, timeout):
     clktimeout = int(timeout * clkfreq)
-    wb.regs.sdctrl_cmdtimeout.write(clktimeout)
-    wb.regs.sdctrl_datatimeout.write(clktimeout)
+    wb.regs.sdcore_cmdtimeout.write(clktimeout)
+    wb.regs.sdcore_datatimeout.write(clktimeout)
 
 def memset(wb, addr, value, length):
     for i in range(length//4):
@@ -302,7 +302,7 @@ def main(wb):
     cmd8(wb)
 
     # WAIT FOR CARD READY
-    s18r = hasattr(wb.regs, sdvoltage_out)
+    s18r = hasattr(wb.regs, sdphy_voltage_sel)
     s18a = False
     while True:
         cmd55(wb)
@@ -319,7 +319,7 @@ def main(wb):
     # VOLTAGE SWITCH
     if s18r and s18a:
         cmd11(wb)
-        wb.regs.sdvoltage_out.write(1)
+        wb.regs.sdphy_voltage_sel.write(1)
 
     # SEND IDENTIFICATION
     cmd2(wb)
