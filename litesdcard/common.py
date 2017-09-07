@@ -33,3 +33,10 @@ SDCARD_CTRL_DATA_TRANSFER_WRITE = 2
 SDCARD_CTRL_RESPONSE_NONE = 0
 SDCARD_CTRL_RESPONSE_SHORT = 1
 SDCARD_CTRL_RESPONSE_LONG = 2
+
+SDCARD_TUNING_BLOCK = [
+    0xff0fff00, 0xffccc3cc, 0xc33cccff, 0xfefffeef,
+    0xffdfffdd, 0xfffbfffb, 0xbfff7fff, 0x77f7bdef,
+    0xfff0fff0, 0x0ffccc3c, 0xcc33cccf, 0xffefffee,
+    0xfffdfffd, 0xdfffbfff, 0xbbfff7ff, 0xf77f7bde,
+]
