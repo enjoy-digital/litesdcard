@@ -5,19 +5,23 @@ from litex.soc.interconnect.csr import *
 from litesdcard.common import *
 
 
-SDPADS = [
-    ("data", [
-        ("i", 4, DIR_S_TO_M),
-        ("o", 4, DIR_M_TO_S),
-        ("oe", 1, DIR_M_TO_S)
-    ]),
-    ("cmd", [
-        ("i", 1, DIR_S_TO_M),
-        ("o", 1, DIR_M_TO_S),
-        ("oe", 1, DIR_M_TO_S)
-    ]),
-    ("clk", 1, DIR_M_TO_S)
-]
+def _sdpads():
+    sdpads = Record([
+        ("data", [
+            ("i", 4, DIR_S_TO_M),
+            ("o", 4, DIR_M_TO_S),
+            ("oe", 1, DIR_M_TO_S)
+        ]),
+        ("cmd", [
+            ("i", 1, DIR_S_TO_M),
+            ("o", 1, DIR_M_TO_S),
+            ("oe", 1, DIR_M_TO_S)
+        ]),
+        ("clk", 1, DIR_M_TO_S)
+    ])
+    sdpads.cmd.o.reset = 1
+    sdpads.cmd.oe.reset = 1
+    return sdpads
 
 
 class SDPHYCFG(Module):
@@ -98,7 +102,7 @@ class SDPHYRFB(Module):
 
 class SDPHYCMDR(Module):
     def __init__(self, cfg):
-        self.pads = Record(SDPADS)
+        self.pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
 
@@ -124,8 +128,6 @@ class SDPHYCMDR(Module):
         self.submodules.fsm = fsm = FSM()
 
         fsm.act("IDLE",
-            self.pads.cmd.oe.eq(1),
-            self.pads.cmd.o.eq(1),
             If(sink.valid,
                 NextValue(ctimeout, 0),
                 NextValue(cread, 0),
@@ -170,8 +172,6 @@ class SDPHYCMDR(Module):
         )
 
         fsm.act("CMD_CLK8",
-            self.pads.cmd.oe.eq(1),
-            self.pads.cmd.o.eq(1),
             If(cnt < 7,
                 NextValue(cnt, cnt + 1),
                 self.pads.clk.eq(1)
@@ -196,7 +196,7 @@ class SDPHYCMDR(Module):
 
 class SDPHYCMDW(Module):
     def __init__(self):
-        self.pads = Record(SDPADS)
+        self.pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
 
         # # #
@@ -210,8 +210,6 @@ class SDPHYCMDW(Module):
         wrcases = {} # For command write
         for i in range(8):
             wrcases[i] =  self.pads.cmd.o.eq(wrtmpdata[7-i])
-
-        self.comb += self.pads.cmd.oe.eq(1)
 
         self.submodules.fsm = fsm = FSM()
 
@@ -232,7 +230,6 @@ class SDPHYCMDW(Module):
         fsm.act("INIT",
             # Initialize sdcard with 80 clock cycles
             self.pads.clk.eq(1),
-            self.pads.cmd.o.eq(1),
             If(cntinit < 80,
                 NextValue(cntinit, cntinit + 1),
                 NextValue(self.pads.data.oe, 1),
@@ -262,7 +259,6 @@ class SDPHYCMDW(Module):
         )
 
         fsm.act("CMD_CLK8",
-            self.pads.cmd.o.eq(1),
             If(cnt < 7,
                 NextValue(cnt, cnt + 1),
                 self.pads.clk.eq(1)
@@ -276,7 +272,7 @@ class SDPHYCMDW(Module):
 
 class SDPHYDATAR(Module):
     def __init__(self, cfg):
-        self.pads = Record(SDPADS)
+        self.pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
 
@@ -302,8 +298,6 @@ class SDPHYDATAR(Module):
         self.submodules.fsm = fsm = FSM()
 
         fsm.act("IDLE",
-            self.pads.cmd.oe.eq(1),
-            self.pads.cmd.o.eq(1),
             If(sink.valid,
                 NextValue(dtimeout, 0),
                 NextValue(read, 0),
@@ -327,7 +321,7 @@ class SDPHYDATAR(Module):
 
         fsm.act("DATA_READ",
             enable.eq(1),
-            self.pads.data.oe.eq(0), # XXX
+            self.pads.data.oe.eq(0),
             self.pads.clk.eq(1),
 
             source.valid.eq(self.fifo.source.valid),
@@ -376,7 +370,7 @@ class SDPHYDATAR(Module):
 
 class SDPHYDATAW(Module):
     def __init__(self):
-        self.pads = Record(SDPADS)
+        self.pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
 
         # # #
@@ -519,7 +513,7 @@ class SDPHY(Module, AutoCSR):
 
         # # #
 
-        self.sdpads = sdpads = Record(SDPADS)
+        self.sdpads = sdpads = _sdpads()
 
         cmddata = Signal()
         rdwr = Signal()
@@ -558,10 +552,7 @@ class SDPHY(Module, AutoCSR):
             If(sink.valid,
                 # Configuration mode
                 If(mode != SDCARD_STREAM_XFER,
-                    sink.connect(self.cfg.sink),
-                    sdpads.clk.eq(0),
-                    sdpads.cmd.oe.eq(1),
-                    sdpads.cmd.o.eq(1)
+                    sink.connect(self.cfg.sink)
                 # Command mode
                 ).Elif(cmddata == SDCARD_STREAM_CMD,
                     # Write command
@@ -587,8 +578,4 @@ class SDPHY(Module, AutoCSR):
                         self.datar.source.connect(source)
                     )
                 )
-            ).Else(
-                sdpads.clk.eq(0),
-                sdpads.cmd.oe.eq(1),
-                sdpads.cmd.o.eq(1)
             )
