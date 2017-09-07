@@ -568,7 +568,7 @@ class SDPHY(Module, AutoCSR):
 
         # # #
 
-        sdpads = Record(SDPADS)
+        self.sdpads = sdpads = Record(SDPADS)
 
         cmddata = Signal()
         rdwr = Signal()

@@ -20,7 +20,7 @@ from litesdcard.core import SDCore
 from litesdcard.ram import RAMReader, RAMWriter
 from litesdcard.convert import Stream32to8, Stream8to32
 
-from litex.boards.platforms import papilio_pro
+from litescope import LiteScopeAnalyzer
 
 
 _io = [
@@ -112,11 +112,12 @@ class SDSoC(SoCCore):
         "sdphy":     20,
         "sdcore":    21,
         "ramreader": 23,
-        "ramwriter": 24
+        "ramwriter": 24,
+        "analyzer":  30
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, **kwargs):
+    def __init__(self, with_analyzer=True):
         platform = Platform()
         clk_freq = int(25*1000000)
         SoCCore.__init__(self, platform,
@@ -127,8 +128,7 @@ class SDSoC(SoCCore):
                          with_timer=False,
                          ident="SDCard Test SoC",
                          ident_version=True,
-                         integrated_sram_size=1024,
-                         **kwargs)
+                         integrated_sram_size=1024)
 
         self.submodules.crg = _CRG(platform, clk_freq)
 
@@ -155,11 +155,39 @@ class SDSoC(SoCCore):
             self.stream32to8.source.connect(self.sdcore.sink)
         ]
 
+        # analyzer
+        if with_analyzer:
+            phy_group = [
+                self.sdphy.sdpads,
+                self.sdphy.cmdw.sink,
+                self.sdphy.cmdr.sink,
+                self.sdphy.cmdr.source,
+                self.sdphy.cmdw.sink,
+                self.sdphy.cmdr.sink,
+                self.sdphy.cmdr.source,
+            ]
+
+            dummy_group = [
+                Signal(),
+                Signal()
+            ]
+
+            analyzer_signals = {
+                0 : phy_group,
+                1 : dummy_group
+            }
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 1024, cd="sys")
+
+    def do_exit(self, vns):
+        if hasattr(self, "analyzer"):
+            self.analyzer.export_csv(vns, "test/sayma_amc/analyzer.csv")
 
 def main():
     soc = SDSoC()
     builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
     builder.build()
+    vns = builder.build()
+    soc.do_exit(vns)
 
 
 if __name__ == "__main__":
