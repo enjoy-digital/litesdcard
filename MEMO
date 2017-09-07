@@ -1,0 +1,34 @@
+SD spec:
+--------
+physical_layer_simplified_specification_ver6.00.pdf
+
+SD commands:
+------------
+CMD    -standard command
+ACMD   -application specific command (CMD55 before)
+
+SD init for UHS-I(3.9.4):
+-------------------------
+CMD0
+CMD8     -verify host and card are able to talk
+ACMD41   -check if card can use requested voltage
+CMD11    -issue voltage change
+CMD2     -identification
+CMD3
+CMD7
+CMD42    -unlock the card
+ACMD6    -set to 4 bits mode
+CMD6     -set driver strength
+CMD19    -send tuning block to the host (mandatory for SDR104,  -optional for SDR50)
+
+SD speeds (3.9.6):
+-------------------------
+SDR104: 104MB/s, 208MHz clk, 1.8v
+SDR50:   50MB/s, 100MHz clk, 1.8v
+DDR50:   50MB/s,  50MHz clk, 1.8v
+SDR25:   25MB/s,  50MHz clk, 1.8v
+SDR12: 12.5MB/s,  25MHz clk, 1.8v
+HS:      25MB/s,  50MHz clk, 3.3v
+DS:    12.5MB/s,  25MHz clk, 3.3v
+
+
