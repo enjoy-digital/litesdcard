@@ -498,7 +498,10 @@ class SDPHYIOS6(Module):
 
         # Clk domain feedback
         self.clock_domains.cd_fb = ClockDomain()
-        self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=self.cd_fb.clk)
+        if hasattr(pads, "clkfb"):
+            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=self.cd_fb.clk)
+        else:
+            self.cd_fb.clk.eq(ClockSignal("bufgmux"))
 
         # Clk output
         self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
@@ -509,22 +512,60 @@ class SDPHYIOS6(Module):
         )
 
         # Cmd input DDR
-        cmd_i1 = Signal()
         self.specials += Instance("IDDR2",
             p_DDR_ALIGNMENT="C1", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
             i_C0=ClockSignal("fb"), i_C1=~ClockSignal("fb"),
             i_CE=1, i_S=0, i_R=0,
-            i_D=self.cmd_t.i, o_Q0=cmd_i1, o_Q1=sdpads.cmd.i
+            i_D=self.cmd_t.i, o_Q0=Signal(), o_Q1=sdpads.cmd.i
         )
 
         # Data input DDR
-        data_i1 = Signal(4)
         for i in range(4):
             self.specials += Instance("IDDR2",
                 p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
                 i_C0=ClockSignal("fb"), i_C1=~ClockSignal("fb"),
                 i_CE=1, i_S=0, i_R=0,
-                i_D=self.data_t.i[i], o_Q0=data_i1[i], o_Q1=sdpads.data.i[i]
+                i_D=self.data_t.i[i], o_Q0=Signal(), o_Q1=sdpads.data.i[i]
+            )
+
+
+class SDPHYIOS7(Module):
+    def __init__(self, sdpads, pads):
+        # Data tristate
+        self.data_t = TSTriple(4)
+        self.specials += self.data_t.get_tristate(pads.data)
+
+        # Cmd tristate
+        self.cmd_t = TSTriple()
+        self.specials += self.cmd_t.get_tristate(pads.cmd)
+
+        # Clk domain feedback
+        self.clock_domains.cd_fb = ClockDomain()
+        if hasattr(pads, "clkfb"):
+            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=self.cd_fb.clk)
+        else:
+            self.cd_fb.clk.eq(ClockSignal("bufgmux"))
+
+        # Clk output
+        self.specials += Instance("ODDR",
+            p_DDR_CLK_EDGE="SAME_EDGE",
+            i_C=ClockSignal("bufgmux"), i_CE=1, i_S=0, i_R=0,
+            i_D1=0, i_D2=sdpads.clk, o_Q=pads.clk
+        )
+
+        # Cmd input DDR
+        self.specials += Instance("IDDR",
+            p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+            i_C=ClockSignal("fb"), i_CE=1, i_S=0, i_R=0,
+            i_D=self.cmd_t.i, o_Q1=Signal(), o_Q2=sdpads.cmd.i
+        )
+
+        # Data input DDR
+        for i in range(4):
+            self.specials += Instance("IDDR",
+                p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+                i_C=ClockSignal("fb"), i_CE=1, i_S=0, i_R=0,
+                i_D=self.data_t.i[i], o_Q1=Signal(), o_Q2=sdpads.data.i[i],
             )
 
 
@@ -542,7 +583,12 @@ class SDPHY(Module):
         mode = Signal(6)
 
         # IOs (device specific)
-        self.submodules.io = SDPHYIOS6(sdpads, pads)
+        if device[:3] == "xc6":
+            self.submodules.io = SDPHYIOS6(sdpads, pads)
+        elif device[:3] == "xc7":
+            self.submodules.io = SDPHYIOS7(sdpads, pads)
+        else:
+            raise NotImplementedError
         self.comb += [
             self.io.cmd_t.oe.eq(sdpads.cmd.oe),
             self.io.cmd_t.o.eq(sdpads.cmd.o),
