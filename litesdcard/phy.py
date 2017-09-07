@@ -68,17 +68,13 @@ class SDPHYCMDRFB(Module):
         sel = Signal(3)
         data = Signal(8)
 
-        cases = {}
-        for i in range(7): # LSB is comb
-            cases[i] = NextValue(data[6-i], pads.cmd.i)
-
         self.submodules.fsm = fsm = FSM()
 
         fsm.act("IDLE",
             If(enable,
                 NextValue(sel, 0),
                 NextState("READSTART")
-            ),
+            )
         )
 
         fsm.act("READSTART",
@@ -87,8 +83,8 @@ class SDPHYCMDRFB(Module):
             ).Elif(pads.cmd.i == 0,
                 NextValue(data, 0),
                 NextValue(sel, 1),
-                NextState("READ"),
-            ),
+                NextState("READ")
+            )
         )
 
         fsm.act("READ",
@@ -97,10 +93,10 @@ class SDPHYCMDRFB(Module):
             ).Elif(sel == 7,
                 source.valid.eq(1),
                 source.data.eq(Cat(pads.cmd.i, data)),
-                NextValue(sel, 0),
+                NextValue(sel, 0)
             ).Else(
-                Case(sel, cases),
-                NextValue(sel, sel + 1),
+                NextValue(data, Cat(pads.cmd.i, data)),
+                NextValue(sel, sel + 1)
             )
         )
 
@@ -290,7 +286,7 @@ class SDPHYDATARFB(Module):
         # # #
 
         sel = Signal(1)
-        data = Signal(4)
+        data = Signal(8)
 
         self.submodules.fsm = fsm = FSM()
 
@@ -319,7 +315,7 @@ class SDPHYDATARFB(Module):
                 source.data.eq(Cat(pads.data.i, data)),
                 NextValue(sel, 0)
             ).Else(
-                NextValue(data, pads.data.i),
+                NextValue(data, Cat(pads.data.i, data)),
                 NextValue(sel, 1)
             )
         )
