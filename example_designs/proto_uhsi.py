@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 from fractions import Fraction
 
 from litex.build.generic_platform import *
@@ -120,7 +121,7 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_emulator=True, with_analyzer=True):
+    def __init__(self, with_emulator=False, with_analyzer=True):
         platform = Platform()
         clk_freq = int(6.25*1000000)
         SoCCore.__init__(self, platform,
@@ -191,7 +192,13 @@ class SDSoC(SoCCore):
             self.analyzer.export_csv(vns, "../test/analyzer.csv")
 
 def main():
-    soc = SDSoC()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "emulator":
+            soc = SDSoC(with_emulator=True)
+        else:
+            raise ValueError
+    else:
+        soc = soc = SDSoC()
     builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
     vns = builder.build()
     soc.do_exit(vns)
