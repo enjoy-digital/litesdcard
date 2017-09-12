@@ -435,11 +435,6 @@ class SDPHYIOS6(Module):
         # Clk domain feedback
         if hasattr(pads, "clkfb"):
             self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_rx"))
-        else:
-            self.comb += [
-                ClockSignal("sd_rx").eq(ClockSignal("sd_tx")),
-                ResetSignal("sd_rx").eq(ResetSignal("sd_tx"))
-            ]
 
         # Clk output
         self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
@@ -480,11 +475,6 @@ class SDPHYIOS7(Module):
         # Clk domain feedback
         if hasattr(pads, "clkfb"):
             self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_rx"))
-        else:
-            self.comb += [
-                ClockSignal("sd_rx").eq(ClockSignal("sd_tx")),
-                ResetSignal("sd_rx").eq(ResetSignal("sd_tx"))
-            ]
 
         # Clk output
         self.specials += Instance("ODDR",
@@ -526,19 +516,42 @@ class SDPHY(Module, AutoCSR):
         mode = Signal(6)
 
         # IOs (device specific)
-        if device[:3] == "xc6":
-            self.submodules.io = SDPHYIOS6(sdpads, pads)
-        elif device[:3] == "xc7":
-            self.submodules.io = SDPHYIOS7(sdpads, pads)
-        else:
-            raise NotImplementedError
-        self.comb += [
-            self.io.cmd_t.oe.eq(sdpads.cmd.oe),
-            self.io.cmd_t.o.eq(sdpads.cmd.o),
+        if not hasattr(pads, "clkfb"):
+            self.comb += [
+                ClockSignal("sd_rx").eq(ClockSignal("sd_tx")),
+                ResetSignal("sd_rx").eq(ResetSignal("sd_tx"))
+            ]
+        if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
+            # emulator phy
+            self.comb += [
+                pads.cmd_i.eq(1),
+                If(sdpads.cmd.oe, pads.cmd_i.eq(sdpads.cmd.o)),
+                sdpads.cmd.i.eq(1),
+                If(~pads.cmd_t, sdpads.cmd.i.eq(pads.cmd_i)),
 
-            self.io.data_t.oe.eq(sdpads.data.oe),
-            self.io.data_t.o.eq(sdpads.data.o)
-        ]
+                pads.dat_i.eq(0b1111),
+                If(sdpads.data.oe, pads.dat_i.eq(sdpads.data.o)),
+                sdpads.data.i.eq(0b1111),
+                If(~pads.dat_t[0], sdpads.data.i[0].eq(pads.dat_i[0])),
+                If(~pads.dat_t[1], sdpads.data.i[1].eq(pads.dat_i[1])),
+                If(~pads.dat_t[2], sdpads.data.i[2].eq(pads.dat_i[2])),
+                If(~pads.dat_t[3], sdpads.data.i[3].eq(pads.dat_i[3]))
+            ]
+        else:
+            # real phy
+            if device[:3] == "xc6":
+                self.submodules.io = SDPHYIOS6(sdpads, pads)
+            elif device[:3] == "xc7":
+                self.submodules.io = SDPHYIOS7(sdpads, pads)
+            else:
+                raise NotImplementedError
+            self.comb += [
+                self.io.cmd_t.oe.eq(sdpads.cmd.oe),
+                self.io.cmd_t.o.eq(sdpads.cmd.o),
+
+                self.io.data_t.oe.eq(sdpads.data.oe),
+                self.io.data_t.o.eq(sdpads.data.o)
+            ]
 
         # Stream ctrl bits
         self.comb += [
