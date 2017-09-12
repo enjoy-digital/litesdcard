@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 from litex.gen import *
 from litex.gen.genlib.resetsync import AsyncResetSynchronizer

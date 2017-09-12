@@ -20,6 +20,8 @@ from litesdcard.core import SDCore
 from litesdcard.ram import RAMReader, RAMWriter
 from litesdcard.convert import Stream32to8, Stream8to32
 
+from litesdcard.emulator import SDEmulator, _sdemulator_pads
+
 from litescope import LiteScopeAnalyzer
 
 
@@ -109,15 +111,16 @@ class _CRG(Module):
 
 class SDSoC(SoCCore):
     csr_map = {
-        "sdphy":     20,
-        "sdcore":    21,
-        "ramreader": 23,
-        "ramwriter": 24,
-        "analyzer":  30
+        "sdphy":      20,
+        "sdcore":     21,
+        "sdemulator": 22,
+        "ramreader":  23,
+        "ramwriter":  24,
+        "analyzer":   30
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_analyzer=True):
+    def __init__(self, with_emulator=True, with_analyzer=True):
         platform = Platform()
         clk_freq = int(6.25*1000000)
         SoCCore.__init__(self, platform,
@@ -135,7 +138,11 @@ class SDSoC(SoCCore):
         self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
         self.add_wb_master(self.cpu_or_bridge.wishbone)
 
-        sdcard_pads = platform.request('sdcard')
+        if with_emulator:
+            sdcard_pads = _sdemulator_pads()
+            self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
+        else:
+            sdcard_pads = platform.request('sdcard')
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
 
