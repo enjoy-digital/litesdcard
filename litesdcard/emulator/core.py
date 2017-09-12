@@ -21,8 +21,8 @@ class SDEmulator(Module, AutoCSR):
         self.comb += ev.trigger.eq(act & ~prev_act)
         self.comb += done.eq(ev.clear)
 
-    def __init__(self, platform, pads, **kwargs):
-        self.submodules.ll = ClockDomainsRenamer("local")(SDLinkLayer(platform, pads, **kwargs))
+    def __init__(self, platform, pads):
+        self.submodules.ll = ClockDomainsRenamer("local")(SDLinkLayer(platform, pads))
 
         # Event interrupts and acknowledgment
         self.submodules.ev = EventManager()

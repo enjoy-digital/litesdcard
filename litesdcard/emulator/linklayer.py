@@ -2,6 +2,19 @@ import os
 from litex.gen import *
 
 
+def _sdemulator_pads():
+    pads = Record([
+        ("cmd_i", 1),
+        ("cmd_o", 1),
+        ("cmd_t", 1),
+        ("dat_i", 4),
+        ("dat_o", 4),
+        ("dat_t", 4),
+        ("clk", 1)
+    ])
+    return pads
+
+
 class SDLinkLayer(Module):
     """This is a Migen wrapper around the lower-level parts of the SD card emulator
        from Google Project Vault's Open Reference Platform. This core still does all
@@ -10,33 +23,16 @@ class SDLinkLayer(Module):
        """
     block_size = 512
 
-    def  __init__(self, platform, pads, enable_hs=True):
+    def  __init__(self, platform, pads):
         self.pads = pads
 
         # Verilog sources from ProjectVault ORP
         platform.add_sources(os.path.join(os.path.abspath(os.path.dirname(__file__)), "verilog"),
             "sd_common.v", "sd_link.v", "sd_phy.v")
 
-        # Adapt PHY tristate style.
-        # It uses the opposite polarity, and requires individual control over D0-D3.
-        self.cmd_t = TSTriple()
-        self.dat_t = Array([ TSTriple() for n in range(4) ])
-        self.sd_cmd_t = Signal()
-        self.sd_dat_i = Signal(4)
-        self.sd_dat_o = Signal(4)
-        self.sd_dat_t = Signal(4)
-        self.specials += self.cmd_t.get_tristate(pads.cmd)
-        self.comb += self.cmd_t.oe.eq(~self.sd_cmd_t)
-        for n in range(4):
-            self.specials += self.dat_t[n].get_tristate(pads.d[n])
-            self.comb += self.dat_t[n].oe.eq(~self.sd_dat_t[n])
-            self.comb += self.dat_t[n].o.eq(self.sd_dat_o[n])
-            self.comb += self.sd_dat_i[n].eq(self.dat_t[n].i)
-
         # The external SD clock drives a separate clock domain
         self.clock_domains.cd_sd = ClockDomain(reset_less=True)
         self.comb += self.cd_sd.clk.eq(pads.clk)
-        platform.add_period_constraint(pads.clk, (40.0, 19.2)[enable_hs])
 
         self.specials.rd_buffer = Memory(32, self.block_size//4)
         self.specials.wr_buffer = Memory(32, self.block_size//4)
@@ -113,12 +109,12 @@ class SDLinkLayer(Module):
             i_clk_50 = ClockSignal(),
             i_reset_n = ~ResetSignal(),
             i_sd_clk = ClockSignal("sd"),
-            i_sd_cmd_i = self.cmd_t.i,
-            o_sd_cmd_o = self.cmd_t.o,
-            o_sd_cmd_t = self.sd_cmd_t,
-            i_sd_dat_i = self.sd_dat_i,
-            o_sd_dat_o = self.sd_dat_o,
-            o_sd_dat_t = self.sd_dat_t,
+            i_sd_cmd_i = pads.cmd_i,
+            o_sd_cmd_o = pads.cmd_o,
+            o_sd_cmd_t = pads.cmd_t,
+            i_sd_dat_i = pads.dat_i,
+            o_sd_dat_o = pads.dat_o,
+            o_sd_dat_t = pads.dat_t,
             i_card_state = self.card_state,
             o_cmd_in = self.cmd_in,
             o_cmd_in_crc_good = self.cmd_in_crc_good,
@@ -201,7 +197,7 @@ class SDLinkLayer(Module):
             o_block_preerase_num = self.block_preerase_num,
             o_block_erase_start = self.block_erase_start,
             o_block_erase_end = self.block_erase_end,
-            i_opt_enable_hs = Constant(enable_hs),
+            i_opt_enable_hs = 1,
             o_cmd_in_last = self.cmd_in_last,
             o_info_card_desel = self.info_card_desel,
             o_err_unhandled_cmd = self.err_unhandled_cmd,
