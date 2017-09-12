@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import sys
+
 from litex.gen import *
 from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 
@@ -75,7 +77,7 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_emulator=True):
+    def __init__(self, with_emulator=False):
         platform = arty.Platform()
         platform.add_extension(_sd_io)
         clk_freq = 25*1000000
@@ -120,7 +122,13 @@ class SDSoC(SoCCore):
 
 
 def main():
-    soc = SDSoC()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "emulator":
+            soc = SDSoC(with_emulator=True)
+        else:
+            raise ValueError
+    else:
+        soc = soc = SDSoC()
     builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
     builder.build()
 
