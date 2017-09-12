@@ -436,7 +436,10 @@ class SDPHYIOS6(Module):
         if hasattr(pads, "clkfb"):
             self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_rx"))
         else:
-            ClockSignal("sd_rx").eq(ClockSignal("sd_tx"))
+            self.comb += [
+                ClockSignal("sd_rx").eq(ClockSignal("sd_tx")),
+                ResetSignal("sd_rx").eq(ResetSignal("sd_tx"))
+            ]
 
         # Clk output
         self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
@@ -478,7 +481,10 @@ class SDPHYIOS7(Module):
         if hasattr(pads, "clkfb"):
             self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_rx"))
         else:
-            ClockSignal("sd_rx").eq(ClockSignal("sd_tx"))
+            self.comb += [
+                ClockSignal("sd_rx").eq(ClockSignal("sd_tx")),
+                ResetSignal("sd_rx").eq(ResetSignal("sd_tx"))
+            ]
 
         # Clk output
         self.specials += Instance("ODDR",
