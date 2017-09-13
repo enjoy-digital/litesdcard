@@ -52,10 +52,12 @@ class _CRG(Module):
             self.cd_sd_tx.rst.eq(ResetSignal())
         ]
 
-emulator_rca = 0x1337
+emulator_rca    = 0x1337
+sram_base       = 0x10000000
+sdemulator_base = 0x20000000
 
 class SDTester(Module):
-    def __init__(self, core):
+    def __init__(self, core, ramwriter, ramreader, bus):
         counter = Signal(32)
         self.sync += counter.eq(counter + 1)
         self.sync += [
@@ -138,8 +140,9 @@ class SDTester(Module):
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(8-1),
                 core.blockcount.storage.eq(0),
-                # FIXME add ram writer control
-                core.command.storage.eq((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
+                ramwriter.address.storage.eq(sram_base//4),
+                core.command.storage.eq((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                	                    (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
                 core.command.re.eq(1)
             ).Elif(counter == 512*16,
                 Finish()
@@ -149,23 +152,22 @@ class SDTester(Module):
 
 class SDSim(Module):
     def __init__(self, platform):
-        clk_freq = int(50*1000000)
+        self.submodules.crg = _CRG(platform, int(50e6))
 
-        self.submodules.crg = _CRG(platform, clk_freq)
+        # SRAM
+        self.submodules.sram = wishbone.SRAM(1024)
 
+        # SD Emulator
         sdcard_pads = _sdemulator_pads()
         self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
+        
+        # SD Core
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
-
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()
-        #self.add_wb_master(self.ramreader.bus) # FIXME
-        #self.add_wb_master(self.ramwriter.bus) # FIXME
-
         self.submodules.stream32to8 = Stream32to8()
         self.submodules.stream8to32 = Stream8to32()
-
         self.comb += [
             self.sdcore.source.connect(self.stream8to32.sink),
             self.stream8to32.source.connect(self.ramwriter.sink),
@@ -174,7 +176,21 @@ class SDSim(Module):
             self.stream32to8.source.connect(self.sdcore.sink)
         ]
 
-        self.submodules.sdtester = SDTester(self.sdcore)
+        # Wishbone
+        self.bus = wishbone.Interface()
+        wb_masters = [
+        	self.bus,
+        	self.ramreader.bus,
+        	self.ramwriter.bus
+        ]
+        wb_slaves = [
+            (mem_decoder(sram_base), self.sram.bus),
+            (mem_decoder(sdemulator_base), self.sdemulator.bus)
+        ]
+        self.submodules.wb_decoder = wishbone.InterconnectShared(wb_masters, wb_slaves, register=True)
+
+        # Tester
+        self.submodules.sdtester = SDTester(self.sdcore, self.ramreader, self.ramwriter, self.bus)
 
 
 def clean():
