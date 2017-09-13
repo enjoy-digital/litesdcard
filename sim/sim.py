@@ -13,6 +13,7 @@ from litex.soc.interconnect import wishbone
 
 from litex.soc.integration.soc_core import *
 
+from litesdcard.common import *
 from litesdcard.phy import SDPHY
 from litesdcard.core import SDCore
 from litesdcard.ram import RAMReader, RAMWriter
@@ -32,31 +33,116 @@ class Platform(XilinxPlatform):
 class _CRG(Module):
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
+        self.clock_domains.cd_por = ClockDomain(reset_less=True)
         self.clock_domains.cd_sd_tx = ClockDomain()
         self.clock_domains.cd_sd_rx = ClockDomain()
 
+        clk50 = platform.request("clk50")
+        rst_done = Signal()
+        rst_counter = Signal(16)
+        self.comb += rst_done.eq(rst_counter == 15)
+        self.sync.por += If(~rst_done, rst_counter.eq(rst_counter + 1))
         self.comb += [
-            self.cd_sys.clk.eq(platform.request("clk50")),
+            self.cd_sys.clk.eq(clk50),
+            self.cd_por.clk.eq(clk50),
+            self.cd_sys.rst.eq(~rst_done)
+        ]
+        self.comb += [
             self.cd_sd_tx.clk.eq(ClockSignal()),
             self.cd_sd_tx.rst.eq(ResetSignal())
         ]
 
+emulator_rca = 0x1337
 
 class SDTester(Module):
     def __init__(self, core):
         counter = Signal(32)
-        self.sync += [
-            counter.eq(counter + 1),
-            If(counter[:16] == 0,
-                Display("here")
-            )
-        ]
-
+        self.sync += counter.eq(counter + 1)
         self.sync += [
             core.command.re.eq(0),
-            If(counter == 256,
-                core.command.re.eq(1),
-                Display("send command")
+            If(counter == 512*1,
+                # cmd0
+                Display("cmd0 | MMC_CMD_GO_IDLE_STATE"),
+                core.argument.storage.eq(0x00000000),
+                core.command.storage.eq((0 << 8) | SDCARD_CTRL_RESPONSE_NONE),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*2,
+                # cmd8
+                Display("cmd8 | MMC_CMD_SEND_EXT_CSD"),
+                core.argument.storage.eq(0x000001aa),
+                core.command.storage.eq((8 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*4,
+                # cmd55
+                Display("cmd55 | MMC_CMD_APP_CMD"),
+                core.argument.storage.eq(0x00000000),
+                core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*5,
+                # acmd41
+                Display("acmd41 | SD_CMD_APP_SEND_OP_COND"),
+                core.argument.storage.eq(0x10ff8000 | 0x60000000),
+                core.command.storage.eq((41 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*6,
+                # cmd2
+                Display("cmd2 | MMC_CMD_ALL_SEND_CID"),
+                core.argument.storage.eq(0x00000000),
+                core.command.storage.eq((2 << 8) | SDCARD_CTRL_RESPONSE_LONG),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*7,
+                # cmd3
+                Display("cmd3 | MMC_CMD_SET_RELATIVE_CSR"),
+                core.argument.storage.eq(0x00000000),
+                core.command.storage.eq((3 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*8,
+                # cmd10
+                Display("cmd10 | MMC_CMD_SET_RELATIVE_CSR"),
+                core.argument.storage.eq(emulator_rca << 16),
+                core.command.storage.eq((10 << 8) | SDCARD_CTRL_RESPONSE_LONG),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*9,
+                # cmd9
+                Display("cmd9 | MMC_CMD_SET_RELATIVE_CSR"),
+                core.argument.storage.eq(emulator_rca << 16),
+                core.command.storage.eq((9 << 8) | SDCARD_CTRL_RESPONSE_LONG),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*10,
+                # cmd7
+                Display("cmd7 | MMC_CMD_SELECT_CARD"),
+                core.argument.storage.eq(emulator_rca << 16),
+                core.command.storage.eq((7 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*11,
+                # cmd55
+                Display("cmd55 | MMC_CMD_APP_CMD"),
+                core.argument.storage.eq(emulator_rca << 16),
+                core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*12, 
+                # acmd6
+                Display("acmd6 | SD_CMD_APP_SET_BUS_WIDTH"),
+                core.argument.storage.eq(0x00000002),
+                core.command.storage.eq((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*13, 
+                # cmd55
+                Display("cmd55 | MMC_CMD_APP_CMD"),
+                core.argument.storage.eq(emulator_rca << 16),
+                core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*14, 
+                # acmd51
+                Display("acmd51 | SD_CMD_APP_SEND_SCR"),
+                core.argument.storage.eq(0x00000000),
+                core.blocksize.storage.eq(8-1),
+                core.blockcount.storage.eq(0),
+                # FIXME add ram writer control
+                core.command.storage.eq((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
+                core.command.re.eq(1)
+            ).Elif(counter == 512*16,
+                Finish()
             )
         ]
 
@@ -98,7 +184,7 @@ def clean():
 def generate_top():
     platform = Platform()
     soc = SDSim(platform)
-    platform.build(soc, build_dir="./", run=False)
+    platform.build(soc, build_dir="./", run=False, regular_comb=False)
 
 
 def generate_top_tb():

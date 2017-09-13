@@ -6,30 +6,11 @@ import time
 
 from litex.soc.tools.remote import RemoteClient
 
+from litesdcard.common import *
 from litesdcard.phy import *
 from litesdcard.software.libsdcard import *
 
 from litescope.software.driver.analyzer import LiteScopeAnalyzerDriver
-
-
-SD_OK         = 0
-SD_CRCERROR   = 1
-SD_TIMEOUT    = 2
-SD_WRITEERROR = 3
-
-SD_SWITCH_CHECK  = 0
-SD_SWITCH_SWITCH = 1
-
-SD_SPEED_SDR12  = 0
-SD_SPEED_SDR25  = 1
-SD_SPEED_SDR50  = 2
-SD_SPEED_SDR104 = 3
-SD_SPEED_DDR50  = 4
-
-SD_GROUP_ACCESSMODE     = 0
-SD_GROUP_COMMANDSYSTEM  = 1
-SD_GROUP_DRIVERSTRENGTH = 2
-SD_GROUP_POWERLIMIT     = 3
 
 
 def wait_cmd_done(wb):

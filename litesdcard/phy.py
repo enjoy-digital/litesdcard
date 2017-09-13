@@ -27,11 +27,11 @@ def _sdpads():
 class SDPHYCFG(Module):
     def __init__(self):
         # Data timeout
-        self.cfgdtimeout = Signal(32)
+        self.cfgdtimeout = Signal(32, reset=2**32-1)
         # Command timeout
-        self.cfgctimeout = Signal(32)
+        self.cfgctimeout = Signal(32, reset=2**32-1)
         # Blocksize
-        self.cfgblksize = Signal(16)
+        self.cfgblksize = Signal(16, reset=512)
         # Voltage config: 0: 3.3v, 1: 1.8v
         self.cfgvoltage = Signal()
 
@@ -524,18 +524,20 @@ class SDPHY(Module, AutoCSR):
         if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
             # emulator phy
             self.comb += [
+                If(sdpads.clk, pads.clk.eq(~ClockSignal("sd_tx"))),
+
                 pads.cmd_i.eq(1),
                 If(sdpads.cmd.oe, pads.cmd_i.eq(sdpads.cmd.o)),
                 sdpads.cmd.i.eq(1),
-                If(~pads.cmd_t, sdpads.cmd.i.eq(pads.cmd_i)),
+                If(~pads.cmd_t, sdpads.cmd.i.eq(pads.cmd_o)),
 
                 pads.dat_i.eq(0b1111),
                 If(sdpads.data.oe, pads.dat_i.eq(sdpads.data.o)),
                 sdpads.data.i.eq(0b1111),
-                If(~pads.dat_t[0], sdpads.data.i[0].eq(pads.dat_i[0])),
-                If(~pads.dat_t[1], sdpads.data.i[1].eq(pads.dat_i[1])),
-                If(~pads.dat_t[2], sdpads.data.i[2].eq(pads.dat_i[2])),
-                If(~pads.dat_t[3], sdpads.data.i[3].eq(pads.dat_i[3]))
+                If(~pads.dat_t[0], sdpads.data.i[0].eq(pads.dat_o[0])),
+                If(~pads.dat_t[1], sdpads.data.i[1].eq(pads.dat_o[1])),
+                If(~pads.dat_t[2], sdpads.data.i[2].eq(pads.dat_o[2])),
+                If(~pads.dat_t[3], sdpads.data.i[3].eq(pads.dat_o[3]))
             ]
         else:
             # real phy
