@@ -35,7 +35,7 @@ class SDPHYCFG(Module, AutoCSR):
 
 class SDPHYRFB(Module):
     def __init__(self, idata, enable):
-        self.source = source = stream.Endpoint([("data", 2)])
+        self.source = source = stream.Endpoint([("data", 8)])
 
         # # #
 
@@ -47,13 +47,12 @@ class SDPHYRFB(Module):
         self.comb += fsm.reset.eq(~enable)
 
         fsm.act("IDLE",
-            NextValue(sel, 0),
             NextState("READSTART")
         )
 
         fsm.act("READSTART",
             If(idata == 0,
-                NextValue(sel, sel + 1),
+                NextValue(sel, 0),
                 NextState("READ")
             )
         )
