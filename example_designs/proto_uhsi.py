@@ -74,7 +74,7 @@ class _CRG(Module):
                                   p_DIVIDE_BYPASS="TRUE", p_I_INVERT="FALSE",
                                   i_I=clk50a, o_DIVCLK=clk50b)
         f = Fraction(int(clk_freq), int(f0))
-        n, m, p = f.denominator, f.numerator, 64
+        n, m, p = f.denominator, f.numerator, 32
         assert f0/n*m == clk_freq
         pll_lckd = Signal()
         pll_fb = Signal()
@@ -121,9 +121,9 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_emulator=False, with_analyzer=True):
+    def __init__(self, with_emulator=False, with_analyzer=False):
         platform = Platform()
-        clk_freq = int(6.25*1000000)
+        clk_freq = int(12.5*1000000)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
@@ -172,8 +172,7 @@ class SDSoC(SoCCore):
                 self.sdphy.cmdr.source,
                 self.sdphy.dataw.sink,
                 self.sdphy.datar.sink,
-                self.sdphy.datar.source,
-                self.sdcore.debug
+                self.sdphy.datar.source
             ]
 
             dummy_group = [

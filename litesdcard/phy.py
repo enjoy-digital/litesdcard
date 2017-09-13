@@ -1,4 +1,5 @@
 from litex.gen import *
+from litex.gen.genlib.cdc import MultiReg
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
@@ -33,8 +34,9 @@ class SDPHYCFG(Module, AutoCSR):
         self.blocksize = Signal(16)
 
 
+@ResetInserter()
 class SDPHYRFB(Module):
-    def __init__(self, idata, enable):
+    def __init__(self, idata, skip_start_bit=False):
         self.source = source = stream.Endpoint([("data", 8)])
 
         # # #
@@ -43,16 +45,16 @@ class SDPHYRFB(Module):
         sel = Signal(max=n)
         data = Signal(8)
 
-        self.submodules.fsm = fsm = ResetInserter()(FSM())
-        self.comb += fsm.reset.eq(~enable)
+        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
 
         fsm.act("IDLE",
-            NextState("READSTART")
-        )
-
-        fsm.act("READSTART",
             If(idata == 0,
-                NextValue(sel, 0),
+                NextValue(data, 0),
+                If(skip_start_bit,
+                    NextValue(sel, 0)
+                ).Else(
+                    NextValue(sel, 1)
+                ),
                 NextState("READ")
             )
         )
@@ -77,9 +79,9 @@ class SDPHYCMDR(Module):
 
         # # #
 
-        enable = Signal()
+        cmdrfb_reset = Signal()
 
-        self.submodules.cmdrfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.cmd.i, enable))
+        self.submodules.cmdrfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.cmd.i, False))
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
             stream.AsyncFIFO(self.cmdrfb.source.description, 4)
         )
@@ -102,11 +104,14 @@ class SDPHYCMDR(Module):
                 NextValue(cread, 0),
                 NextValue(ctoread, sink.data),
                 NextState("CMD_READSTART")
+            ).Else(
+                cmdrfb_reset.eq(1),
+                self.fifo.source.ready.eq(1),
             )
         )
+        self.specials += MultiReg(cmdrfb_reset, self.cmdrfb.reset, "sd_rx")
 
         fsm.act("CMD_READSTART",
-            enable.eq(1),
             pads.cmd.oe.eq(0),
             pads.clk.eq(1),
             NextValue(ctimeout, ctimeout + 1),
@@ -118,7 +123,6 @@ class SDPHYCMDR(Module):
         )
 
         fsm.act("CMD_READ",
-            enable.eq(1),
             pads.cmd.oe.eq(0),
             pads.clk.eq(1),
             source.valid.eq(self.fifo.source.valid),
@@ -246,9 +250,9 @@ class SDPHYDATAR(Module):
 
         # # #
 
-        enable = Signal()
+        datarfb_reset = Signal()
 
-        self.submodules.datarfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.data.i, enable))
+        self.submodules.datarfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.data.i, True))
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
             stream.AsyncFIFO(self.datarfb.source.description, 4)
         )
@@ -272,11 +276,15 @@ class SDPHYDATAR(Module):
                 # Read 1 block + 8*8 == 64 bits CRC
                 NextValue(toread, cfg.blocksize + 8),
                 NextState("DATA_READSTART")
+            ).Else(
+                datarfb_reset.eq(1),
+                self.fifo.source.ready.eq(1),
             )
         )
 
+        self.specials += MultiReg(datarfb_reset, self.datarfb.reset, "sd_rx")
+
         fsm.act("DATA_READSTART",
-            enable.eq(1),
             pads.data.oe.eq(0),
             pads.clk.eq(1),
             NextValue(dtimeout, dtimeout + 1),
@@ -288,16 +296,13 @@ class SDPHYDATAR(Module):
         )
 
         fsm.act("DATA_READ",
-            enable.eq(1),
             pads.data.oe.eq(0),
             pads.clk.eq(1),
-
             source.valid.eq(self.fifo.source.valid),
             source.data.eq(self.fifo.source.data),
             status.eq(SDCARD_STREAM_STATUS_OK),
             source.last.eq(read == toread),
             self.fifo.source.ready.eq(source.ready),
-
             If(source.valid & source.ready,
                 NextValue(read, read + 1),
                 If(read == toread,
@@ -414,10 +419,10 @@ class SDPHYIOS6(Module):
 
         # Cmd input DDR
         self.specials += Instance("IDDR2",
-            p_DDR_ALIGNMENT="C1", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
+            p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
             i_C0=ClockSignal("sd_rx"), i_C1=~ClockSignal("sd_rx"),
             i_CE=1, i_S=0, i_R=0,
-            i_D=self.cmd_t.i, o_Q0=Signal(), o_Q1=sdpads.cmd.i
+            i_D=self.cmd_t.i, o_Q0=sdpads.cmd.i, o_Q1=Signal()
         )
 
         # Data input DDR
@@ -426,7 +431,7 @@ class SDPHYIOS6(Module):
                 p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
                 i_C0=ClockSignal("sd_rx"), i_C1=~ClockSignal("sd_rx"),
                 i_CE=1, i_S=0, i_R=0,
-                i_D=self.data_t.i[i], o_Q0=Signal(), o_Q1=sdpads.data.i[i]
+                i_D=self.data_t.i[i], o_Q0=sdpads.data.i[i], o_Q1=Signal()
             )
 
 
