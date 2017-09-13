@@ -15,17 +15,22 @@ class SDCore(Module, AutoCSR):
         self.argument = CSRStorage(32)
         self.command = CSRStorage(32)
         self.response = CSRStatus(120)
-        self.datatimeout = CSRStorage(32)
-        self.cmdtimeout = CSRStorage(32)
-        self.voltage = CSRStorage(8)
+
         self.cmdevt = CSRStatus(32)
         self.dataevt = CSRStatus(32)
+
         self.blocksize = CSRStorage(16)
         self.blockcount = CSRStorage(16)
 
-        self.debug = Signal(4)
+        self.datatimeout = CSRStorage(32, reset=2**16)
+        self.cmdtimeout = CSRStorage(32, reset=2**16)
 
         # # #
+
+        for csr in ["blocksize",
+                    "datatimeout",
+                    "cmdtimeout"]:
+            self.comb += getattr(phy.cfg, csr).eq(getattr(self, csr).storage)
 
         self.submodules.crc7 = CRC(9, 7, 40)
         self.submodules.crc7checker = CRCChecker(9, 7, 120)
@@ -48,7 +53,6 @@ class SDCore(Module, AutoCSR):
 
         cmddata = Signal()
         rdwr = Signal()
-        mode = Signal(6)
         status = Signal(4)
 
         cerrtimeout = Signal()
@@ -69,7 +73,7 @@ class SDCore(Module, AutoCSR):
                                        derrtimeout,
                                        derrread_en & ~self.crc16checker.valid)),
 
-            phy.sink.ctrl.eq(Cat(cmddata, rdwr, mode)),
+            phy.sink.ctrl.eq(Cat(cmddata, rdwr)),
             status.eq(phy.source.ctrl[1:5]),
 
             self.crc7.val.eq(Cat(self.argument.storage,
@@ -92,17 +96,8 @@ class SDCore(Module, AutoCSR):
         ]
 
         fsm.act("IDLE",
-            self.debug.eq(0),
             NextValue(pos, 0),
-            If(self.datatimeout.re,
-                NextState("CFG_TIMEOUT_DATA"),
-            ).Elif(self.cmdtimeout.re,
-                NextState("CFG_TIMEOUT_CMD"),
-            ).Elif(self.voltage.re,
-                NextState("CFG_VOLTAGE"),
-            ).Elif(self.blocksize.re,
-                NextState("CFG_BLKSIZE"),
-            ).Elif(self.command.re,
+            If(self.command.re,
                 NextValue(cmddone, 0),
                 NextValue(cerrtimeout, 0),
                 NextValue(cerrcrc_en, 0),
@@ -115,77 +110,10 @@ class SDCore(Module, AutoCSR):
             )
         )
 
-        dtcases = {}
-        for i in range(4):
-            dtcases[i] = [
-                phy.sink.data.eq(self.datatimeout.storage[24-(8*i):32-(8*i)]),
-                mode.eq(SDCARD_STREAM_CFG_TIMEOUT_DATA_HH + i)
-            ]
-        ctcases = {}
-        for i in range(4):
-            ctcases[i] = [
-                phy.sink.data.eq(self.cmdtimeout.storage[24-(8*i):32-(8*i)]),
-                mode.eq(SDCARD_STREAM_CFG_TIMEOUT_CMD_HH + i)
-            ]
-        blkcases = {}
-        for i in range(2):
-            blkcases[i] = [
-                phy.sink.data.eq(self.blocksize.storage[8-(8*i):16-(8*i)]),
-                mode.eq(SDCARD_STREAM_CFG_BLKSIZE_H + i)
-            ]
-
-        fsm.act("CFG_TIMEOUT_DATA",
-            self.debug.eq(1),
-            phy.sink.valid.eq(1),
-            Case(pos, dtcases),
-            If(phy.sink.valid & phy.sink.ready,
-                NextValue(pos, pos + 1),
-                If(pos == 3,
-                    NextState("IDLE")
-                )
-            )
-        )
-
-        fsm.act("CFG_TIMEOUT_CMD",
-            self.debug.eq(2),
-            phy.sink.valid.eq(1),
-            Case(pos, ctcases),
-            If(phy.sink.valid & phy.sink.ready,
-                NextValue(pos, pos + 1),
-                If(pos == 3,
-                    NextState("IDLE")
-                )
-            )
-        )
-
-        fsm.act("CFG_BLKSIZE",
-            self.debug.eq(3),
-            phy.sink.valid.eq(1),
-            Case(pos, blkcases),
-            If(phy.sink.valid & phy.sink.ready,
-                NextValue(pos, pos + 1),
-                If(pos == 1,
-                    NextState("IDLE")
-                )
-            )
-        )
-
-        fsm.act("CFG_VOLTAGE",
-            self.debug.eq(4),
-            phy.sink.valid.eq(1),
-            phy.sink.data.eq(self.voltage.storage[0:8]),
-            mode.eq(SDCARD_STREAM_CFG_VOLTAGE),
-            If(phy.sink.valid & phy.sink.ready,
-                NextState("IDLE")
-            )
-        )
-
         fsm.act("SEND_CMD",
-            self.debug.eq(5),
             phy.sink.valid.eq(1),
             cmddata.eq(SDCARD_STREAM_CMD),
             rdwr.eq(SDCARD_STREAM_WRITE),
-            mode.eq(SDCARD_STREAM_XFER),
             Case(csel, ccases),
             If(phy.sink.valid & phy.sink.ready,
                 If(csel < 5,
@@ -204,7 +132,6 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("RECV_RESP",
-            self.debug.eq(6),
             If(waitresp == SDCARD_CTRL_RESPONSE_SHORT,
                 phy.sink.data.eq(5) # (5+1)*8 == 48bits
             ).Elif(waitresp == SDCARD_CTRL_RESPONSE_LONG,
@@ -214,7 +141,6 @@ class SDCore(Module, AutoCSR):
             phy.sink.last.eq(dataxfer == SDCARD_CTRL_DATA_TRANSFER_NONE),
             cmddata.eq(SDCARD_STREAM_CMD),
             rdwr.eq(SDCARD_STREAM_READ),
-            mode.eq(SDCARD_STREAM_XFER),
             If(phy.source.valid, # Wait for resp or timeout coming from phy
                 phy.source.ready.eq(1),
                 If(phy.source.ctrl[0] == SDCARD_STREAM_CMD, # Should be always true
@@ -245,13 +171,11 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("RECV_DATA",
-            self.debug.eq(7),
             phy.sink.data.eq(0), # Read 1 block
             phy.sink.valid.eq(1),
             phy.sink.last.eq(self.blockcount.storage == blkcnt),
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_READ),
-            mode.eq(SDCARD_STREAM_XFER),
             If(phy.source.valid,
                 If(phy.source.ctrl[0] == SDCARD_STREAM_DATA, # Should be always true
                     If(status == SDCARD_STREAM_STATUS_OK,
@@ -284,11 +208,9 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("SEND_DATA",
-            self.debug.eq(8),
             phy.sink.data.eq(self.crc16.source.data),
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_WRITE),
-            mode.eq(SDCARD_STREAM_XFER),
             phy.sink.last.eq(self.crc16.source.last),
             phy.sink.valid.eq(self.crc16.source.valid),
             self.crc16.source.ready.eq(phy.sink.ready),

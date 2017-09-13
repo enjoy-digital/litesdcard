@@ -8,13 +8,13 @@ from litesdcard.common import *
 def _sdpads():
     sdpads = Record([
         ("data", [
-            ("i", 4, DIR_S_TO_M),
-            ("o", 4, DIR_M_TO_S),
+            ("i",  4, DIR_S_TO_M),
+            ("o",  4, DIR_M_TO_S),
             ("oe", 1, DIR_M_TO_S)
         ]),
         ("cmd", [
-            ("i", 1, DIR_S_TO_M),
-            ("o", 1, DIR_M_TO_S),
+            ("i",  1, DIR_S_TO_M),
+            ("o",  1, DIR_M_TO_S),
             ("oe", 1, DIR_M_TO_S)
         ]),
         ("clk", 1, DIR_M_TO_S)
@@ -26,48 +26,16 @@ def _sdpads():
     return sdpads
 
 
-class SDPHYCFG(Module):
+class SDPHYCFG(Module, AutoCSR):
     def __init__(self):
-        # Data timeout
-        self.cfgdtimeout = Signal(32, reset=2**32-1)
-        # Command timeout
-        self.cfgctimeout = Signal(32, reset=2**32-1)
-        # Blocksize
-        self.cfgblksize = Signal(16)
-        # Voltage config: 0: 3.3v, 1: 1.8v
-        self.cfgvoltage = Signal()
-
-        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
-
-        # # #
-
-        mode = Signal(6)
-
-        cfgcases = {} # PHY configuration
-        for i in range(4):
-            cfgcases[SDCARD_STREAM_CFG_TIMEOUT_DATA_HH + i] = (
-                self.cfgdtimeout[24-(8*i):32-(8*i)].eq(sink.data))
-            cfgcases[SDCARD_STREAM_CFG_TIMEOUT_CMD_HH + i] = (
-                self.cfgctimeout[24-(8*i):32-(8*i)].eq(sink.data))
-        for i in range(2):
-            cfgcases[SDCARD_STREAM_CFG_BLKSIZE_H + i] = (
-                self.cfgblksize[8-(8*i):16-(8*i)].eq(sink.data))
-        cfgcases[SDCARD_STREAM_CFG_VOLTAGE] = self.cfgvoltage.eq(sink.data[0])
-
-        self.comb += [
-            mode.eq(sink.ctrl[2:8]),
-            sink.ready.eq(sink.valid)
-        ]
-
-        self.sync += \
-            If(sink.valid,
-               Case(mode, cfgcases)
-            )
+        self.datatimeout = Signal(32)
+        self.cmdtimeout = Signal(32)
+        self.blocksize = Signal(16)
 
 
 class SDPHYRFB(Module):
     def __init__(self, idata, enable):
-        self.source = source = stream.Endpoint([("data", 8)])
+        self.source = source = stream.Endpoint([("data", 2)])
 
         # # #
 
@@ -105,8 +73,8 @@ class SDPHYRFB(Module):
 class SDPHYCMDR(Module):
     def __init__(self, cfg):
         self.pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
-        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
+        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
+        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
         # # #
 
@@ -145,7 +113,7 @@ class SDPHYCMDR(Module):
             NextValue(ctimeout, ctimeout + 1),
             If(self.fifo.source.valid,
                 NextState("CMD_READ")
-            ).Elif(ctimeout > cfg.cfgctimeout,
+            ).Elif(ctimeout > cfg.cmdtimeout,
                 NextState("TIMEOUT")
             )
         )
@@ -198,7 +166,7 @@ class SDPHYCMDR(Module):
 class SDPHYCMDW(Module):
     def __init__(self):
         self.pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
+        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
         # # #
 
@@ -274,8 +242,8 @@ class SDPHYCMDW(Module):
 class SDPHYDATAR(Module):
     def __init__(self, cfg):
         self.pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
-        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
+        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
+        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
         # # #
 
@@ -303,7 +271,7 @@ class SDPHYDATAR(Module):
                 NextValue(dtimeout, 0),
                 NextValue(read, 0),
                 # Read 1 block + 8*8 == 64 bits CRC
-                NextValue(toread, cfg.cfgblksize + 8),
+                NextValue(toread, cfg.blocksize + 8),
                 NextState("DATA_READSTART")
             )
         )
@@ -315,7 +283,7 @@ class SDPHYDATAR(Module):
             NextValue(dtimeout, dtimeout + 1),
             If(self.fifo.source.valid,
                 NextState("DATA_READ")
-            ).Elif(dtimeout > (cfg.cfgdtimeout),
+            ).Elif(dtimeout > (cfg.datatimeout),
                 NextState("TIMEOUT")
             )
         )
@@ -372,7 +340,7 @@ class SDPHYDATAR(Module):
 class SDPHYDATAW(Module):
     def __init__(self):
         self.pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
+        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
         # # #
 
@@ -502,8 +470,8 @@ class SDPHYIOS7(Module):
 
 class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device):
-        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 8)])
-        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 8)])
+        self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
+        self.source = source = stream.Endpoint([("data", 8), ("ctrl", 2)])
         if hasattr(pads, "sel"):
             self.voltage_sel = CSRStorage()
             self.comb += pads.sel.eq(self.voltage_sel.storage)
@@ -514,7 +482,6 @@ class SDPHY(Module, AutoCSR):
 
         cmddata = Signal()
         rdwr = Signal()
-        mode = Signal(6)
 
         # IOs (device specific)
         if not hasattr(pads, "clkfb"):
@@ -559,8 +526,7 @@ class SDPHY(Module, AutoCSR):
         # Stream ctrl bits
         self.comb += [
             cmddata.eq(sink.ctrl[0]),
-            rdwr.eq(sink.ctrl[1]),
-            mode.eq(sink.ctrl[2:8])
+            rdwr.eq(sink.ctrl[1])
         ]
 
         # PHY submodules
@@ -572,11 +538,8 @@ class SDPHY(Module, AutoCSR):
 
         self.comb += \
             If(sink.valid,
-                # Configuration mode
-                If(mode != SDCARD_STREAM_XFER,
-                    sink.connect(self.cfg.sink)
                 # Command mode
-                ).Elif(cmddata == SDCARD_STREAM_CMD,
+                If(cmddata == SDCARD_STREAM_CMD,
                     # Write command
                     If(rdwr == SDCARD_STREAM_WRITE,
                         sink.connect(self.cmdw.sink),

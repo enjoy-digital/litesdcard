@@ -123,27 +123,25 @@ class SDTester(Module):
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
-            ).Elif(counter == 512*12, 
+            ).Elif(counter == 512*12,
                 # acmd6
                 Display("acmd6 | SD_CMD_APP_SET_BUS_WIDTH"),
                 core.argument.storage.eq(0x00000002),
                 core.command.storage.eq((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
-            ).Elif(counter == 512*13, 
+            ).Elif(counter == 512*13,
                 # cmd55
                 Display("cmd55 | MMC_CMD_APP_CMD"),
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 512*14,
-                core.blocksize.storage.eq(8-1),
-                core.blockcount.storage.eq(0),
-                core.blocksize.re.eq(1),
-                ramwriter.address.storage.eq(sram_base//4),
-            ).Elif(counter == 512*15,
                 # acmd51
                 Display("acmd51 | SD_CMD_APP_SEND_SCR"),
                 core.argument.storage.eq(0x00000000),
+                core.blocksize.storage.eq(8-1),
+                core.blockcount.storage.eq(0),
+                ramwriter.address.storage.eq(sram_base//4),
                 core.command.storage.eq((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                 	                    (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
                 core.command.re.eq(1)
@@ -163,7 +161,7 @@ class SDSim(Module):
         # SD Emulator
         sdcard_pads = _sdemulator_pads()
         self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
-        
+
         # SD Core
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
