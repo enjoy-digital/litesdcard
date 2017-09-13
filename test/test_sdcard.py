@@ -326,10 +326,10 @@ def main(wb):
     cmd55(wb, rca)
     acmd6(wb)
 
-#    # SEND SCR
-#    cmd55(wb, rca)
-#    acmd51(wb, wb.mems.sram.base)
-#    dumpall(wb, wb.mems.sram.base, 8)
+    # SEND SCR
+    cmd55(wb, rca)
+    acmd51(wb, wb.mems.sram.base)
+    dumpall(wb, wb.mems.sram.base, 8)
 #    scr = decode_scr(wb, wb.mems.sram.base)
 #    if not scr.cmd_support_sbc:
 #        print("Need CMD23 support")
