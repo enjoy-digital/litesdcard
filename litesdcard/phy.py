@@ -72,7 +72,7 @@ class SDPHYRFB(Module):
 
 class SDPHYCMDR(Module):
     def __init__(self, cfg):
-        self.pads = _sdpads()
+        self.pads = pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
         self.source = source = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
@@ -80,7 +80,7 @@ class SDPHYCMDR(Module):
 
         enable = Signal()
 
-        self.submodules.cmdrfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(self.pads.cmd.i, enable))
+        self.submodules.cmdrfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.cmd.i, enable))
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
             stream.AsyncFIFO(self.cmdrfb.source.description, 4)
         )
@@ -108,8 +108,8 @@ class SDPHYCMDR(Module):
 
         fsm.act("CMD_READSTART",
             enable.eq(1),
-            self.pads.cmd.oe.eq(0),
-            self.pads.clk.eq(1),
+            pads.cmd.oe.eq(0),
+            pads.clk.eq(1),
             NextValue(ctimeout, ctimeout + 1),
             If(self.fifo.source.valid,
                 NextState("CMD_READ")
@@ -120,8 +120,8 @@ class SDPHYCMDR(Module):
 
         fsm.act("CMD_READ",
             enable.eq(1),
-            self.pads.cmd.oe.eq(0),
-            self.pads.clk.eq(1),
+            pads.cmd.oe.eq(0),
+            pads.clk.eq(1),
             source.valid.eq(self.fifo.source.valid),
             source.data.eq(self.fifo.source.data),
             status.eq(SDCARD_STREAM_STATUS_OK),
@@ -143,7 +143,7 @@ class SDPHYCMDR(Module):
         fsm.act("CMD_CLK8",
             If(cnt < 7,
                 NextValue(cnt, cnt + 1),
-                self.pads.clk.eq(1)
+                pads.clk.eq(1)
             ).Else(
                 NextValue(cnt, 0),
                 sink.ready.eq(1),
@@ -165,7 +165,7 @@ class SDPHYCMDR(Module):
 
 class SDPHYCMDW(Module):
     def __init__(self):
-        self.pads = _sdpads()
+        self.pads = pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
         # # #
@@ -178,7 +178,7 @@ class SDPHYCMDW(Module):
 
         wrcases = {} # For command write
         for i in range(8):
-            wrcases[i] =  self.pads.cmd.o.eq(wrtmpdata[7-i])
+            wrcases[i] =  pads.cmd.o.eq(wrtmpdata[7-i])
 
         self.submodules.fsm = fsm = FSM()
 
@@ -187,8 +187,8 @@ class SDPHYCMDW(Module):
                 If(~isinit,
                     NextState("INIT")
                 ).Else(
-                    self.pads.clk.eq(1),
-                    self.pads.cmd.o.eq(sink.data[7]),
+                    pads.clk.eq(1),
+                    pads.cmd.o.eq(sink.data[7]),
                     NextValue(wrtmpdata, sink.data),
                     NextValue(wrsel, 1),
                     NextState("CMD_WRITE")
@@ -198,15 +198,15 @@ class SDPHYCMDW(Module):
 
         fsm.act("INIT",
             # Initialize sdcard with 80 clock cycles
-            self.pads.clk.eq(1),
+            pads.clk.eq(1),
             If(cntinit < 80,
                 NextValue(cntinit, cntinit + 1),
-                NextValue(self.pads.data.oe, 1),
-                NextValue(self.pads.data.o, 0xf)
+                NextValue(pads.data.oe, 1),
+                NextValue(pads.data.o, 0xf)
             ).Else(
                 NextValue(cntinit, 0),
                 NextValue(isinit, 1),
-                NextValue(self.pads.data.oe, 0),
+                NextValue(pads.data.oe, 0),
                 NextState("IDLE")
             )
         )
@@ -216,21 +216,21 @@ class SDPHYCMDW(Module):
             NextValue(wrsel, wrsel + 1),
             If(wrsel == 0,
                 If(sink.last,
-                    self.pads.clk.eq(1),
+                    pads.clk.eq(1),
                     NextState("CMD_CLK8")
                 ).Else(
                     sink.ready.eq(1),
                     NextState("IDLE")
                 )
             ).Else(
-                self.pads.clk.eq(1)
+                pads.clk.eq(1)
             )
         )
 
         fsm.act("CMD_CLK8",
             If(cnt < 7,
                 NextValue(cnt, cnt + 1),
-                self.pads.clk.eq(1)
+                pads.clk.eq(1)
             ).Else(
                 NextValue(cnt, 0),
                 sink.ready.eq(1),
@@ -241,7 +241,7 @@ class SDPHYCMDW(Module):
 
 class SDPHYDATAR(Module):
     def __init__(self, cfg):
-        self.pads = _sdpads()
+        self.pads = pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
         self.source = source = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
@@ -249,7 +249,7 @@ class SDPHYDATAR(Module):
 
         enable = Signal()
 
-        self.submodules.datarfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(self.pads.data.i, enable))
+        self.submodules.datarfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.data.i, enable))
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
             stream.AsyncFIFO(self.datarfb.source.description, 4)
         )
@@ -278,20 +278,20 @@ class SDPHYDATAR(Module):
 
         fsm.act("DATA_READSTART",
             enable.eq(1),
-            self.pads.data.oe.eq(0),
-            self.pads.clk.eq(1),
+            pads.data.oe.eq(0),
+            pads.clk.eq(1),
             NextValue(dtimeout, dtimeout + 1),
             If(self.fifo.source.valid,
                 NextState("DATA_READ")
-            ).Elif(dtimeout > (cfg.datatimeout),
+            ).Elif(dtimeout > cfg.datatimeout,
                 NextState("TIMEOUT")
             )
         )
 
         fsm.act("DATA_READ",
             enable.eq(1),
-            self.pads.data.oe.eq(0),
-            self.pads.clk.eq(1),
+            pads.data.oe.eq(0),
+            pads.clk.eq(1),
 
             source.valid.eq(self.fifo.source.valid),
             source.data.eq(self.fifo.source.data),
@@ -313,11 +313,11 @@ class SDPHYDATAR(Module):
         )
 
         fsm.act("DATA_CLK40",
-            self.pads.data.oe.eq(1),
-            self.pads.data.o.eq(0xf),
+            pads.data.oe.eq(1),
+            pads.data.o.eq(0xf),
             If(cnt < 40,
                 NextValue(cnt, cnt + 1),
-                self.pads.clk.eq(1)
+                pads.clk.eq(1)
             ).Else(
                 NextValue(cnt, 0),
                 sink.ready.eq(1),
@@ -339,7 +339,7 @@ class SDPHYDATAR(Module):
 
 class SDPHYDATAW(Module):
     def __init__(self):
-        self.pads = _sdpads()
+        self.pads = pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
         # # #
@@ -350,30 +350,30 @@ class SDPHYDATAW(Module):
 
         fsm.act("IDLE",
             If(sink.valid,
-                self.pads.clk.eq(1),
-                self.pads.data.oe.eq(1),
+                pads.clk.eq(1),
+                pads.data.oe.eq(1),
                 If(wrstarted,
-                    self.pads.data.o.eq(sink.data[4:8]),
+                    pads.data.o.eq(sink.data[4:8]),
                     NextState("DATA_WRITE")
                 ).Else(
-                    self.pads.data.o.eq(0),
+                    pads.data.o.eq(0),
                     NextState("DATA_WRITESTART")
                 )
             )
         )
 
         fsm.act("DATA_WRITESTART",
-            self.pads.clk.eq(1),
-            self.pads.data.oe.eq(1),
-            self.pads.data.o.eq(sink.data[4:8]),
+            pads.clk.eq(1),
+            pads.data.oe.eq(1),
+            pads.data.o.eq(sink.data[4:8]),
             NextValue(wrstarted, 1),
             NextState("DATA_WRITE")
         )
 
         fsm.act("DATA_WRITE",
-            self.pads.clk.eq(1),
-            self.pads.data.oe.eq(1),
-            self.pads.data.o.eq(sink.data[0:4]),
+            pads.clk.eq(1),
+            pads.data.oe.eq(1),
+            pads.data.o.eq(sink.data[0:4]),
             If(sink.last,
                 NextState("DATA_WRITESTOP")
             ).Else(
@@ -383,9 +383,9 @@ class SDPHYDATAW(Module):
         )
 
         fsm.act("DATA_WRITESTOP",
-            self.pads.clk.eq(1),
-            self.pads.data.oe.eq(1),
-            self.pads.data.o.eq(0xf),
+            pads.clk.eq(1),
+            pads.data.oe.eq(1),
+            pads.data.o.eq(0xf),
             NextValue(wrstarted, 0),
             NextState("IDLE") # XXX not implemented
         )
@@ -510,17 +510,17 @@ class SDPHY(Module, AutoCSR):
         else:
             # real phy
             if device[:3] == "xc6":
-                self.submodules.io = SDPHYIOS6(sdpads, pads)
+                self.submodules.io = io = SDPHYIOS6(sdpads, pads)
             elif device[:3] == "xc7":
-                self.submodules.io = SDPHYIOS7(sdpads, pads)
+                self.submodules.io = io = SDPHYIOS7(sdpads, pads)
             else:
                 raise NotImplementedError
             self.comb += [
-                self.io.cmd_t.oe.eq(sdpads.cmd.oe),
-                self.io.cmd_t.o.eq(sdpads.cmd.o),
+                io.cmd_t.oe.eq(sdpads.cmd.oe),
+                io.cmd_t.o.eq(sdpads.cmd.o),
 
-                self.io.data_t.oe.eq(sdpads.data.oe),
-                self.io.data_t.o.eq(sdpads.data.o)
+                io.data_t.oe.eq(sdpads.data.oe),
+                io.data_t.o.eq(sdpads.data.o)
             ]
 
         # Stream ctrl bits
@@ -530,11 +530,11 @@ class SDPHY(Module, AutoCSR):
         ]
 
         # PHY submodules
-        self.submodules.cfg = SDPHYCFG()
-        self.submodules.cmdw = SDPHYCMDW()
-        self.submodules.cmdr = SDPHYCMDR(self.cfg)
-        self.submodules.dataw = SDPHYDATAW()
-        self.submodules.datar = SDPHYDATAR(self.cfg)
+        self.submodules.cfg = cfg = SDPHYCFG()
+        self.submodules.cmdw = cmdw = SDPHYCMDW()
+        self.submodules.cmdr = cmdr = SDPHYCMDR(cfg)
+        self.submodules.dataw = dataw = SDPHYDATAW()
+        self.submodules.datar = datar = SDPHYDATAR(cfg)
 
         self.comb += \
             If(sink.valid,
@@ -542,25 +542,25 @@ class SDPHY(Module, AutoCSR):
                 If(cmddata == SDCARD_STREAM_CMD,
                     # Write command
                     If(rdwr == SDCARD_STREAM_WRITE,
-                        sink.connect(self.cmdw.sink),
-                        self.cmdw.pads.connect(sdpads)
+                        sink.connect(cmdw.sink),
+                        cmdw.pads.connect(sdpads)
                     # Read response
                     ).Elif(rdwr == SDCARD_STREAM_READ,
-                        sink.connect(self.cmdr.sink),
-                        self.cmdr.pads.connect(sdpads),
-                        self.cmdr.source.connect(source)
+                        sink.connect(cmdr.sink),
+                        cmdr.pads.connect(sdpads),
+                        cmdr.source.connect(source)
                     )
                 # Data mode
                 ).Elif(cmddata == SDCARD_STREAM_DATA,
                     # Write data
                     If(rdwr == SDCARD_STREAM_WRITE,
-                        sink.connect(self.dataw.sink),
-                        self.dataw.pads.connect(sdpads)
+                        sink.connect(dataw.sink),
+                        dataw.pads.connect(sdpads)
                     # Read data
                     ).Elif(rdwr == SDCARD_STREAM_READ,
-                        sink.connect(self.datar.sink),
-                        self.datar.pads.connect(sdpads),
-                        self.datar.source.connect(source)
+                        sink.connect(datar.sink),
+                        datar.pads.connect(sdpads),
+                        datar.source.connect(source)
                     )
                 )
             )
