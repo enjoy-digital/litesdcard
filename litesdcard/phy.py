@@ -21,6 +21,8 @@ def _sdpads():
     ])
     sdpads.cmd.o.reset = 1
     sdpads.cmd.oe.reset = 1
+    sdpads.data.o.reset = 0b1111
+    sdpads.data.oe.reset = 0b1111
     return sdpads
 
 
@@ -31,7 +33,7 @@ class SDPHYCFG(Module):
         # Command timeout
         self.cfgctimeout = Signal(32, reset=2**32-1)
         # Blocksize
-        self.cfgblksize = Signal(16, reset=512)
+        self.cfgblksize = Signal(16)
         # Voltage config: 0: 3.3v, 1: 1.8v
         self.cfgvoltage = Signal()
 
@@ -152,7 +154,6 @@ class SDPHYCMDR(Module):
             enable.eq(1),
             self.pads.cmd.oe.eq(0),
             self.pads.clk.eq(1),
-
             source.valid.eq(self.fifo.source.valid),
             source.data.eq(self.fifo.source.data),
             status.eq(SDCARD_STREAM_STATUS_OK),

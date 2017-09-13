@@ -62,6 +62,7 @@ class SDTester(Module):
         self.sync += counter.eq(counter + 1)
         self.sync += [
             core.command.re.eq(0),
+            core.blocksize.re.eq(0),
             If(counter == 512*1,
                 # cmd0
                 Display("cmd0 | MMC_CMD_GO_IDLE_STATE"),
@@ -134,17 +135,19 @@ class SDTester(Module):
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
-            ).Elif(counter == 512*14, 
+            ).Elif(counter == 512*14,
+                core.blocksize.storage.eq(8-1),
+                core.blockcount.storage.eq(0),
+                core.blocksize.re.eq(1),
+                ramwriter.address.storage.eq(sram_base//4),
+            ).Elif(counter == 512*15,
                 # acmd51
                 Display("acmd51 | SD_CMD_APP_SEND_SCR"),
                 core.argument.storage.eq(0x00000000),
-                core.blocksize.storage.eq(8-1),
-                core.blockcount.storage.eq(0),
-                ramwriter.address.storage.eq(sram_base//4),
                 core.command.storage.eq((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                 	                    (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
                 core.command.re.eq(1)
-            ).Elif(counter == 512*16,
+            ).Elif(counter == 512*32,
                 Finish()
             )
         ]
@@ -190,7 +193,7 @@ class SDSim(Module):
         self.submodules.wb_decoder = wishbone.InterconnectShared(wb_masters, wb_slaves, register=True)
 
         # Tester
-        self.submodules.sdtester = SDTester(self.sdcore, self.ramreader, self.ramwriter, self.bus)
+        self.submodules.sdtester = SDTester(self.sdcore, self.ramwriter, self.ramreader, self.bus)
 
 
 def clean():

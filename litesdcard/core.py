@@ -252,13 +252,6 @@ class SDCore(Module, AutoCSR):
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_READ),
             mode.eq(SDCARD_STREAM_XFER),
-            If(phy.sink.valid & phy.sink.ready,
-                NextState("WAIT_DATA")
-            )
-        )
-
-        fsm.act("WAIT_DATA",
-            self.debug.eq(8),
             If(phy.source.valid,
                 If(phy.source.ctrl[0] == SDCARD_STREAM_DATA, # Should be always true
                     If(status == SDCARD_STREAM_STATUS_OK,
@@ -291,7 +284,7 @@ class SDCore(Module, AutoCSR):
         )
 
         fsm.act("SEND_DATA",
-            self.debug.eq(9),
+            self.debug.eq(8),
             phy.sink.data.eq(self.crc16.source.data),
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_WRITE),
