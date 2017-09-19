@@ -1,4 +1,5 @@
 from litex.gen import *
+from litex.gen.genlib.cdc import MultiReg, PulseSynchronizer
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
@@ -27,10 +28,36 @@ class SDCore(Module, AutoCSR):
 
         # # #
 
-        for csr in ["blocksize",
-                    "datatimeout",
-                    "cmdtimeout"]:
-            self.comb += getattr(phy.cfg, csr).eq(getattr(self, csr).storage)
+        argument = Signal(32)
+        command = Signal(32)
+        response = Signal(120)
+        cmdevt = Signal(32)
+        dataevt = Signal(32)
+        blocksize = Signal(16)
+        blockcount = Signal(16)
+        datatimeout = Signal(32)
+        cmdtimeout = Signal(32)
+
+        self.specials += [
+            MultiReg(self.argument.storage, argument, "sd"),
+            MultiReg(self.command.storage, command, "sd"),
+            MultiReg(response, self.response.status, "sys"),
+            MultiReg(cmdevt, self.cmdevt.status, "sys"),
+            MultiReg(dataevt, self.dataevt.status, "sys"),
+            MultiReg(self.blocksize.storage, blocksize, "sd"),
+            MultiReg(self.blockcount.storage, blockcount, "sd"),
+            MultiReg(self.datatimeout.storage, datatimeout, "sd"),
+            MultiReg(self.cmdtimeout.storage, cmdtimeout, "sd")
+        ]
+
+        self.submodules.new_command = PulseSynchronizer("sys", "sd")
+        self.comb += self.new_command.i.eq(self.command.re)
+
+        self.comb += [
+            phy.cfg.blocksize.eq(blocksize),
+            phy.cfg.datatimeout.eq(datatimeout),
+            phy.cfg.cmdtimeout.eq(cmdtimeout)
+        ]
 
         self.submodules.crc7 = CRC(9, 7, 40)
         self.submodules.crc7checker = CRCChecker(9, 7, 120)
@@ -62,34 +89,34 @@ class SDCore(Module, AutoCSR):
         derrread_en = Signal()
 
         self.comb += [
-            waitresp.eq(self.command.storage[0:2]),
-            dataxfer.eq(self.command.storage[5:7]),
-            self.cmdevt.status.eq(Cat(cmddone,
-                                      C(0, 1),
-                                      cerrtimeout,
-                                      cerrcrc_en & ~self.crc7checker.valid)),
-            self.dataevt.status.eq(Cat(datadone,
-                                       derrwrite,
-                                       derrtimeout,
-                                       derrread_en & ~self.crc16checker.valid)),
+            waitresp.eq(command[0:2]),
+            dataxfer.eq(command[5:7]),
+            cmdevt.eq(Cat(cmddone,
+                          C(0, 1),
+                          cerrtimeout,
+                          cerrcrc_en & ~self.crc7checker.valid)),
+            dataevt.eq(Cat(datadone,
+                           derrwrite,
+                           derrtimeout,
+                           derrread_en & ~self.crc16checker.valid)),
 
             phy.sink.ctrl.eq(Cat(cmddata, rdwr)),
             status.eq(phy.source.ctrl[1:5]),
 
-            self.crc7.val.eq(Cat(self.argument.storage,
-                                 self.command.storage[8:14],
+            self.crc7.val.eq(Cat(argument,
+                                 command[8:14],
                                  1,
                                  0)),
             self.crc7.clr.eq(1),
             self.crc7.enable.eq(1),
 
-            self.crc7checker.val.eq(self.response.status)
+            self.crc7checker.val.eq(response)
         ]
 
         ccases = {} # To send command and CRC
-        ccases[0] = phy.sink.data.eq(Cat(self.command.storage[8:14], 1, 0))
+        ccases[0] = phy.sink.data.eq(Cat(command[8:14], 1, 0))
         for i in range(4):
-            ccases[i+1] = phy.sink.data.eq(self.argument.storage[24-8*i:32-8*i])
+            ccases[i+1] = phy.sink.data.eq(argument[24-8*i:32-8*i])
         ccases[5] = [
             phy.sink.data.eq(Cat(1, self.crc7.crc)),
             phy.sink.last.eq(waitresp == SDCARD_CTRL_RESPONSE_NONE)
@@ -97,7 +124,7 @@ class SDCore(Module, AutoCSR):
 
         fsm.act("IDLE",
             NextValue(pos, 0),
-            If(self.command.re,
+            If(self.new_command.o,
                 NextValue(cmddone, 0),
                 NextValue(cerrtimeout, 0),
                 NextValue(cerrcrc_en, 0),
@@ -105,7 +132,7 @@ class SDCore(Module, AutoCSR):
                 NextValue(derrtimeout, 0),
                 NextValue(derrwrite, 0),
                 NextValue(derrread_en, 0),
-                NextValue(self.response.status, 0),
+                NextValue(response, 0),
                 NextState("SEND_CMD")
             )
         )
@@ -163,8 +190,8 @@ class SDCore(Module, AutoCSR):
                             NextState("IDLE")
                         ),
                     ).Else(
-                        NextValue(self.response.status,
-                            Cat(phy.source.data, self.response.status[0:112]))
+                        NextValue(response,
+                            Cat(phy.source.data, response[0:112]))
                     )
                 )
             )
@@ -173,7 +200,7 @@ class SDCore(Module, AutoCSR):
         fsm.act("RECV_DATA",
             phy.sink.data.eq(0), # Read 1 block
             phy.sink.valid.eq(1),
-            phy.sink.last.eq(self.blockcount.storage == blkcnt),
+            phy.sink.last.eq(blockcount == blkcnt),
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_READ),
             If(phy.source.valid,
@@ -185,7 +212,7 @@ class SDCore(Module, AutoCSR):
                         phy.source.ready.eq(self.crc16checker.sink.ready),
 
                         If(phy.source.last & phy.source.ready, # End of block
-                            If(self.blockcount.storage > blkcnt,
+                            If(blockcount > blkcnt,
                                 NextValue(blkcnt, blkcnt + 1),
                                 NextState("RECV_DATA")
                             ).Else(
@@ -218,7 +245,7 @@ class SDCore(Module, AutoCSR):
             If(self.crc16.source.valid &
                self.crc16.source.last &
                self.crc16.source.ready,
-                If(self.blockcount.storage > blkcnt,
+                If(blockcount > blkcnt,
                     NextValue(blkcnt, blkcnt + 1)
                 ).Else(
                     NextValue(blkcnt, 0),
