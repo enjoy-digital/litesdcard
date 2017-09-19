@@ -11,6 +11,7 @@ from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.generic_platform import *
 
+from litex.soc.interconnect import stream
 from litex.soc.cores.uart import UARTWishboneBridge
 
 from litex.soc.integration.soc_core import *
@@ -74,7 +75,7 @@ class _CRG(Module):
                                   p_DIVIDE_BYPASS="TRUE", p_I_INVERT="FALSE",
                                   i_I=clk50a, o_DIVCLK=clk50b)
         f = Fraction(int(clk_freq), int(f0))
-        n, m, p = f.denominator, f.numerator, 32
+        n, m, p = f.denominator, f.numerator, 16
         assert f0/n*m == clk_freq
         pll_lckd = Signal()
         pll_fb = Signal()
@@ -100,14 +101,11 @@ class _CRG(Module):
                                      p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=p//1,  # sys
                                      p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=p//1,
         )
-        self.specials += Instance("BUFG", i_I=pll[4], o_O=self.cd_sys.clk)
+        self.specials += Instance("BUFG", i_I=pll[0], o_O=self.cd_sys.clk)
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd)
 
-        # XXX remove
-        self.comb += [
-            self.cd_sd.clk.eq(ClockSignal()),
-            self.cd_sd.rst.eq(ResetSignal())
-        ]
+        self.specials += Instance("BUFG", i_I=pll[1], o_O=self.cd_sd.clk)
+        self.specials += AsyncResetSynchronizer(self.cd_sd, ~pll_lckd)
 
 
 class SDSoC(SoCCore):
@@ -123,7 +121,7 @@ class SDSoC(SoCCore):
 
     def __init__(self, with_emulator=False, with_analyzer=False):
         platform = Platform()
-        clk_freq = int(12.5*1000000)
+        clk_freq = int(60*1000000)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
@@ -144,8 +142,11 @@ class SDSoC(SoCCore):
             self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
         else:
             sdcard_pads = platform.request('sdcard')
-        self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
-        self.submodules.sdcore = SDCore(self.sdphy)
+        
+        sdphy = SDPHY(sdcard_pads, platform.device)
+        self.submodules.sdphy = ClockDomainsRenamer("sd")(sdphy)
+        sdcore = SDCore(self.sdphy)
+        self.submodules.sdcore = ClockDomainsRenamer("sd")(sdcore)
 
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()
@@ -155,12 +156,19 @@ class SDSoC(SoCCore):
         self.submodules.stream32to8 = Stream32to8()
         self.submodules.stream8to32 = Stream8to32()
 
+        self.submodules.tx_fifo = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
+            stream.AsyncFIFO(self.sdcore.sink.description, 4))
+        self.submodules.rx_fifo = ClockDomainsRenamer({"write": "sd", "read": "sys"})(
+            stream.AsyncFIFO(self.sdcore.source.description, 4))
+
         self.comb += [
-            self.sdcore.source.connect(self.stream8to32.sink),
+            self.sdcore.source.connect(self.rx_fifo.sink),
+            self.rx_fifo.source.connect(self.stream8to32.sink),
             self.stream8to32.source.connect(self.ramwriter.sink),
 
             self.ramreader.source.connect(self.stream32to8.sink),
-            self.stream32to8.source.connect(self.sdcore.sink)
+            self.stream32to8.source.connect(self.tx_fifo.sink),
+            self.tx_fifo.source.connect(self.sdcore.sink)
         ]
 
         # analyzer
