@@ -307,7 +307,7 @@ def main(wb):
     # SEND IDENTIFICATION
     cmd2(wb)
 
-    # SET RELATIVE CARD CSRESS
+    # SET RELATIVE CARD ADDRESS
     r6,status = cmd3(wb)
     rca = decode_rca(r6)
 
@@ -331,10 +331,21 @@ def main(wb):
     acmd51(wb, wb.mems.sram.base)
     dumpall(wb, wb.mems.sram.base, 8)
 
-    scr = decode_scr(wb, wb.mems.sram.base)
-    if not scr.cmd_support_sbc:
-        print("Need CMD23 support")
-        return
+    # SWITCH SPEED
+    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR104, wb.mems.sram.base)
+
+    # FIXME : add speed change on FPGA
+
+    # SET BLOCKLEN
+    cmd16(wb, 512)
+
+    # READ MULTIPLE BLOCKS
+    memset(wb, wb.mems.sram.base, 0, 1024)
+    cmd23(wb, 2) # if supported in SCR
+    cmd18(wb, 0, 2, wb.mems.sram.base)
+    cmd13(wb, rca)
+    dumpall(wb, wb.mems.sram.base, 128)
+
 
 if __name__ == '__main__':
     wb = RemoteClient(port=1234, debug=False)

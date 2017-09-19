@@ -73,7 +73,7 @@ class CSD:
         r = """
     CSD Register: 0x{:016x}
     CSD Structure: {}
-    Max data transfer rate: {} MHz
+    Max data transfer rate: {} MB/s
     Max read block length: {} bytes
     Device size: {} GB
 """.format(
