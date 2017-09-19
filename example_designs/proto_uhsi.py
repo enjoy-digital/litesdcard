@@ -62,8 +62,8 @@ class Platform(XilinxPlatform):
 class _CRG(Module):
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_sd_tx = ClockDomain()
-        self.clock_domains.cd_sd_rx = ClockDomain()
+        self.clock_domains.cd_sd = ClockDomain()
+        self.clock_domains.cd_sd_fb = ClockDomain()
 
         f0 = 50*1000000
         clk50 = platform.request("clk50")
@@ -105,8 +105,8 @@ class _CRG(Module):
 
         # XXX remove
         self.comb += [
-            self.cd_sd_tx.clk.eq(ClockSignal()),
-            self.cd_sd_tx.rst.eq(ResetSignal())
+            self.cd_sd.clk.eq(ClockSignal()),
+            self.cd_sd.rst.eq(ResetSignal())
         ]
 
 

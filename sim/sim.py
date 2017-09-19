@@ -34,8 +34,8 @@ class _CRG(Module):
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.cd_por = ClockDomain(reset_less=True)
-        self.clock_domains.cd_sd_tx = ClockDomain()
-        self.clock_domains.cd_sd_rx = ClockDomain()
+        self.clock_domains.cd_sd = ClockDomain()
+        self.clock_domains.cd_sd_fb = ClockDomain()
 
         clk50 = platform.request("clk50")
         rst_done = Signal()
@@ -48,8 +48,8 @@ class _CRG(Module):
             self.cd_sys.rst.eq(~rst_done)
         ]
         self.comb += [
-            self.cd_sd_tx.clk.eq(ClockSignal()),
-            self.cd_sd_tx.rst.eq(ResetSignal())
+            self.cd_sd.clk.eq(ClockSignal()),
+            self.cd_sd.rst.eq(ResetSignal())
         ]
 
 emulator_rca    = 0x1337

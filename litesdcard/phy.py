@@ -81,8 +81,8 @@ class SDPHYCMDR(Module):
 
         cmdrfb_reset = Signal()
 
-        self.submodules.cmdrfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.cmd.i, False))
-        self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
+        self.submodules.cmdrfb = ClockDomainsRenamer("sd_fb")(SDPHYRFB(pads.cmd.i, False))
+        self.submodules.fifo = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
             stream.AsyncFIFO(self.cmdrfb.source.description, 4)
         )
         self.comb += self.cmdrfb.source.connect(self.fifo.sink)
@@ -109,7 +109,7 @@ class SDPHYCMDR(Module):
                 self.fifo.source.ready.eq(1),
             )
         )
-        self.specials += MultiReg(cmdrfb_reset, self.cmdrfb.reset, "sd_rx")
+        self.specials += MultiReg(cmdrfb_reset, self.cmdrfb.reset, "sd_fb")
 
         fsm.act("CMD_READSTART",
             pads.cmd.oe.eq(0),
@@ -252,8 +252,8 @@ class SDPHYDATAR(Module):
 
         datarfb_reset = Signal()
 
-        self.submodules.datarfb = ClockDomainsRenamer("sd_rx")(SDPHYRFB(pads.data.i, True))
-        self.submodules.fifo = ClockDomainsRenamer({"write": "sd_rx", "read": "sd_tx"})(
+        self.submodules.datarfb = ClockDomainsRenamer("sd_fb")(SDPHYRFB(pads.data.i, True))
+        self.submodules.fifo = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
             stream.AsyncFIFO(self.datarfb.source.description, 4)
         )
         self.comb += self.datarfb.source.connect(self.fifo.sink)
@@ -282,7 +282,7 @@ class SDPHYDATAR(Module):
             )
         )
 
-        self.specials += MultiReg(datarfb_reset, self.datarfb.reset, "sd_rx")
+        self.specials += MultiReg(datarfb_reset, self.datarfb.reset, "sd_fb")
 
         fsm.act("DATA_READSTART",
             pads.data.oe.eq(0),
@@ -407,20 +407,20 @@ class SDPHYIOS6(Module):
 
         # Clk domain feedback
         if hasattr(pads, "clkfb"):
-            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_rx"))
+            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_fb"))
 
         # Clk output
         self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
             p_INIT=1, p_SRTYPE="SYNC",
             i_D0=0, i_D1=sdpads.clk, i_S=0, i_R=0, i_CE=1,
-            i_C0=ClockSignal("sd_tx"), i_C1=~ClockSignal("sd_tx"),
+            i_C0=ClockSignal("sd"), i_C1=~ClockSignal("sd"),
             o_Q=pads.clk
         )
 
         # Cmd input DDR
         self.specials += Instance("IDDR2",
             p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-            i_C0=ClockSignal("sd_rx"), i_C1=~ClockSignal("sd_rx"),
+            i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
             i_CE=1, i_S=0, i_R=0,
             i_D=self.cmd_t.i, o_Q0=sdpads.cmd.i, o_Q1=Signal()
         )
@@ -429,7 +429,7 @@ class SDPHYIOS6(Module):
         for i in range(4):
             self.specials += Instance("IDDR2",
                 p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-                i_C0=ClockSignal("sd_rx"), i_C1=~ClockSignal("sd_rx"),
+                i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
                 i_CE=1, i_S=0, i_R=0,
                 i_D=self.data_t.i[i], o_Q0=sdpads.data.i[i], o_Q1=Signal()
             )
@@ -447,19 +447,19 @@ class SDPHYIOS7(Module):
 
         # Clk domain feedback
         if hasattr(pads, "clkfb"):
-            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_rx"))
+            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_fb"))
 
         # Clk output
         self.specials += Instance("ODDR",
             p_DDR_CLK_EDGE="SAME_EDGE",
-            i_C=ClockSignal("sd_tx"), i_CE=1, i_S=0, i_R=0,
+            i_C=ClockSignal("sd"), i_CE=1, i_S=0, i_R=0,
             i_D1=0, i_D2=sdpads.clk, o_Q=pads.clk
         )
 
         # Cmd input DDR
         self.specials += Instance("IDDR",
             p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-            i_C=ClockSignal("sd_rx"), i_CE=1, i_S=0, i_R=0,
+            i_C=ClockSignal("sd_fb"), i_CE=1, i_S=0, i_R=0,
             i_D=self.cmd_t.i, o_Q1=Signal(), o_Q2=sdpads.cmd.i
         )
 
@@ -467,7 +467,7 @@ class SDPHYIOS7(Module):
         for i in range(4):
             self.specials += Instance("IDDR",
                 p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-                i_C=ClockSignal("sd_rx"), i_CE=1, i_S=0, i_R=0,
+                i_C=ClockSignal("sd_fb"), i_CE=1, i_S=0, i_R=0,
                 i_D=self.data_t.i[i], o_Q1=Signal(), o_Q2=sdpads.data.i[i],
             )
 
@@ -490,13 +490,13 @@ class SDPHY(Module, AutoCSR):
         # IOs (device specific)
         if not hasattr(pads, "clkfb"):
             self.comb += [
-                ClockSignal("sd_rx").eq(ClockSignal("sd_tx")),
-                ResetSignal("sd_rx").eq(ResetSignal("sd_tx"))
+                ClockSignal("sd_fb").eq(ClockSignal("sd")),
+                ResetSignal("sd_fb").eq(ResetSignal("sd"))
             ]
         if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
             # emulator phy
             self.comb += [
-                If(sdpads.clk, pads.clk.eq(~ClockSignal("sd_tx"))),
+                If(sdpads.clk, pads.clk.eq(~ClockSignal("sd"))),
 
                 pads.cmd_i.eq(1),
                 If(sdpads.cmd.oe, pads.cmd_i.eq(sdpads.cmd.o)),
