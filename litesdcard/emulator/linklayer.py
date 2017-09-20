@@ -31,13 +31,13 @@ class SDLinkLayer(Module):
             "sd_common.v", "sd_link.v", "sd_phy.v")
 
         # The external SD clock drives a separate clock domain
-        self.clock_domains.cd_sd = ClockDomain(reset_less=True)
-        self.comb += self.cd_sd.clk.eq(pads.clk)
+        self.clock_domains.cd_sd_ll = ClockDomain(reset_less=True)
+        self.comb += self.cd_sd_ll.clk.eq(pads.clk)
 
         self.specials.rd_buffer = Memory(32, self.block_size//4)
         self.specials.wr_buffer = Memory(32, self.block_size//4)
-        self.specials.internal_rd_port = self.rd_buffer.get_port(clock_domain="sd")
-        self.specials.internal_wr_port = self.wr_buffer.get_port(write_capable=True, clock_domain="sd")
+        self.specials.internal_rd_port = self.rd_buffer.get_port(clock_domain="sd_ll")
+        self.specials.internal_wr_port = self.wr_buffer.get_port(write_capable=True, clock_domain="sd_ll")
 
         # Communication between PHY and Link layers
         self.card_state = Signal(4)
@@ -108,7 +108,7 @@ class SDLinkLayer(Module):
         self.specials += Instance("sd_phy",
             i_clk_50 = ClockSignal(),
             i_reset_n = ~ResetSignal(),
-            i_sd_clk = ClockSignal("sd"),
+            i_sd_clk = ClockSignal("sd_ll"),
             i_sd_cmd_i = pads.cmd_i,
             o_sd_cmd_o = pads.cmd_o,
             o_sd_cmd_t = pads.cmd_t,

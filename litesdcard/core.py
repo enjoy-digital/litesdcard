@@ -59,16 +59,16 @@ class SDCore(Module, AutoCSR):
             phy.cfg.cmdtimeout.eq(cmdtimeout)
         ]
 
-        self.submodules.crc7 = CRC(9, 7, 40)
-        self.submodules.crc7checker = CRCChecker(9, 7, 120)
-        self.submodules.crc16 = CRCUpstreamInserter()
-        self.submodules.crc16checker = CRCDownstreamChecker()
+        self.submodules.crc7 = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
+        self.submodules.crc7checker = ClockDomainsRenamer("sd")(CRCChecker(9, 7, 120))
+        self.submodules.crc16 = ClockDomainsRenamer("sd")(CRCUpstreamInserter())
+        self.submodules.crc16checker = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
         self.comb += [
             self.sink.connect(self.crc16.sink),
             self.crc16checker.source.connect(self.source)
         ]
 
-        self.submodules.fsm = fsm = FSM()
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
 
         csel = Signal(max=6)
         waitresp = Signal(2)

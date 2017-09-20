@@ -94,11 +94,11 @@ class _CRG(Module):
                                      o_CLKOUT3=pll[3], p_CLKOUT3_DUTY_CYCLE=.5,
                                      o_CLKOUT4=pll[4], p_CLKOUT4_DUTY_CYCLE=.5,
                                      o_CLKOUT5=pll[5], p_CLKOUT5_DUTY_CYCLE=.5,
-                                     p_CLKOUT0_PHASE=0., p_CLKOUT0_DIVIDE=p//1,
-                                     p_CLKOUT1_PHASE=0., p_CLKOUT1_DIVIDE=p//1,
-                                     p_CLKOUT2_PHASE=0., p_CLKOUT2_DIVIDE=p//1,
+                                     p_CLKOUT0_PHASE=0., p_CLKOUT0_DIVIDE=p//1,   # sys
+                                     p_CLKOUT1_PHASE=0., p_CLKOUT1_DIVIDE=8*p//1, # sd
+                                     p_CLKOUT2_PHASE=0., p_CLKOUT2_DIVIDE=p//1,   
                                      p_CLKOUT3_PHASE=0., p_CLKOUT3_DIVIDE=p//1,
-                                     p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=p//1,  # sys
+                                     p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=p//1,
                                      p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=p//1,
         )
         self.specials += Instance("BUFG", i_I=pll[0], o_O=self.cd_sys.clk)
@@ -119,7 +119,7 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_emulator=False, with_analyzer=False):
+    def __init__(self, with_emulator=False, with_analyzer=True):
         platform = Platform()
         clk_freq = int(60*1000000)
         SoCCore.__init__(self, platform,
@@ -143,10 +143,8 @@ class SDSoC(SoCCore):
         else:
             sdcard_pads = platform.request('sdcard')
         
-        sdphy = SDPHY(sdcard_pads, platform.device)
-        self.submodules.sdphy = ClockDomainsRenamer("sd")(sdphy)
-        sdcore = SDCore(self.sdphy)
-        self.submodules.sdcore = ClockDomainsRenamer("sd")(sdcore)
+        self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
+        self.submodules.sdcore = SDCore(self.sdphy)
 
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()
@@ -192,7 +190,10 @@ class SDSoC(SoCCore):
                 0 : phy_group,
                 1 : dummy_group
             }
-            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, cd="sys")
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, cd="sd")
+
+        platform.add_platform_command(
+            """PIN "BUFG_1.O" CLOCK_DEDICATED_ROUTE = FALSE;""")
 
     def do_exit(self, vns):
         if hasattr(self, "analyzer"):

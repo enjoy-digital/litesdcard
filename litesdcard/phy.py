@@ -45,7 +45,7 @@ class SDPHYRFB(Module):
         sel = Signal(max=n)
         data = Signal(8)
 
-        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd_fb")(FSM(reset_state="IDLE"))
 
         fsm.act("IDLE",
             If(idata == 0,
@@ -81,7 +81,7 @@ class SDPHYCMDR(Module):
 
         cmdrfb_reset = Signal()
 
-        self.submodules.cmdrfb = ClockDomainsRenamer("sd_fb")(SDPHYRFB(pads.cmd.i, False))
+        self.submodules.cmdrfb = SDPHYRFB(pads.cmd.i, False)
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
             stream.AsyncFIFO(self.cmdrfb.source.description, 4)
         )
@@ -96,7 +96,7 @@ class SDPHYCMDR(Module):
         status = Signal(4)
         self.comb += source.ctrl.eq(Cat(SDCARD_STREAM_CMD, status))
 
-        self.submodules.fsm = fsm = FSM()
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
         fsm.act("IDLE",
             If(sink.valid,
@@ -183,7 +183,7 @@ class SDPHYCMDW(Module):
         for i in range(8):
             wrcases[i] =  pads.cmd.o.eq(wrtmpdata[7-i])
 
-        self.submodules.fsm = fsm = FSM()
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
         fsm.act("IDLE",
             If(sink.valid,
@@ -252,7 +252,7 @@ class SDPHYDATAR(Module):
 
         datarfb_reset = Signal()
 
-        self.submodules.datarfb = ClockDomainsRenamer("sd_fb")(SDPHYRFB(pads.data.i, True))
+        self.submodules.datarfb = SDPHYRFB(pads.data.i, True)
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
             stream.AsyncFIFO(self.datarfb.source.description, 4)
         )
@@ -267,7 +267,7 @@ class SDPHYDATAR(Module):
         status = Signal(4)
         self.comb += source.ctrl.eq(Cat(SDCARD_STREAM_DATA, status))
 
-        self.submodules.fsm = fsm = FSM()
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
         fsm.act("IDLE",
             If(sink.valid,
@@ -350,7 +350,7 @@ class SDPHYDATAW(Module):
 
         wrstarted = Signal()
 
-        self.submodules.fsm = fsm = FSM()
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
         fsm.act("IDLE",
             If(sink.valid,
