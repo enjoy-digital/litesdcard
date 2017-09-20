@@ -282,17 +282,7 @@ def main(wb):
 
     # RESET CARD
     cmd0(wb)
-
-    from litescope.software.driver.analyzer import LiteScopeAnalyzerDriver
-    analyzer = LiteScopeAnalyzerDriver(wb.regs, "analyzer", debug=True)
-    analyzer.configure_trigger(cond={"sdsoc_sdphy_sdpads_sdpads_clk" : 1})
-    analyzer.run(offset=32, length=256)
-
     cmd8(wb)
-
-    analyzer.wait_done()
-    analyzer.upload()
-    analyzer.save("dump.vcd")
 
     # WAIT FOR CARD READY
     s18r = hasattr(wb.regs, "sdphy_voltage_sel")

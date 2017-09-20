@@ -422,7 +422,7 @@ class SDPHYIOS6(Module):
             p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
             i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
             i_CE=1, i_S=0, i_R=0,
-            i_D=self.cmd_t.i, o_Q0=sdpads.cmd.i, o_Q1=Signal()
+            i_D=self.cmd_t.i, o_Q0=Signal(), o_Q1=sdpads.cmd.i
         )
 
         # Data input DDR
@@ -431,7 +431,7 @@ class SDPHYIOS6(Module):
                 p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
                 i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
                 i_CE=1, i_S=0, i_R=0,
-                i_D=self.data_t.i[i], o_Q0=sdpads.data.i[i], o_Q1=Signal()
+                i_D=self.data_t.i[i], o_Q0=Signal(), o_Q1=sdpads.data.i[i]
             )
 
 
