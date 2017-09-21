@@ -65,7 +65,7 @@ class Platform(XilinxPlatform):
 
 
 class SDCRG(Module, AutoCSR):
-    def __init__(self, max_sd_clk=104e6):
+    def __init__(self, max_sd_clk=100e6):
             self._cmd_data = CSRStorage(10)
             self._send_cmd_data = CSR()
             self._send_go = CSR()
@@ -165,6 +165,7 @@ class SDSoC(SoCCore):
     def __init__(self, with_emulator=False, with_analyzer=True):
         platform = Platform()
         clk_freq = int(50e6)
+        sd_freq = int(100e6)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
@@ -176,7 +177,7 @@ class SDSoC(SoCCore):
                          integrated_sram_size=1024)
 
         self.submodules.crg = CRG(platform.request("clk50"))
-        
+
         self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
         self.add_wb_master(self.cpu_or_bridge.wishbone)
 
@@ -185,7 +186,7 @@ class SDSoC(SoCCore):
             self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
         else:
             sdcard_pads = platform.request('sdcard')
-        
+
         self.submodules.sdcrg = SDCRG()
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
@@ -218,11 +219,11 @@ class SDSoC(SoCCore):
             i_D0=0, i_D1=1, i_S=0, i_R=0, i_CE=1,
             i_C0=ClockSignal("sd"), i_C1=~ClockSignal("sd"),
             o_Q=platform.request("debug")
-        )  
+        )
 
-        self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/50e6)
-        self.platform.add_period_constraint(self.sdcrg.cd_sd.clk, 1e9/104e6)
-        self.platform.add_period_constraint(self.sdcrg.cd_sd_fb.clk, 1e9/104e6)
+        self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
+        self.platform.add_period_constraint(self.sdcrg.cd_sd.clk, 1e9/sd_freq)
+        self.platform.add_period_constraint(self.sdcrg.cd_sd_fb.clk, 1e9/sd_freq)
 
         self.crg.cd_sys.clk.attr.add("keep")
         self.sdcrg.cd_sd.clk.attr.add("keep")

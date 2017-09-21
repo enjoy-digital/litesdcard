@@ -7,6 +7,7 @@ from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.generic_platform import *
 
+from litex.soc.interconnect import stream
 from litex.soc.cores.uart import UARTWishboneBridge
 
 from litex.soc.integration.soc_core import *
@@ -20,6 +21,9 @@ from litesdcard.convert import Stream32to8, Stream8to32
 from litesdcard.emulator import SDEmulator, _sdemulator_pads
 
 from litex.boards.platforms import arty
+
+from litescope import LiteScopeAnalyzer
+
 
 _sd_io = [
     ("sdcard", 0,
@@ -73,14 +77,16 @@ class SDSoC(SoCCore):
         "sdcore":     21,
         "sdemulator": 22,
         "ramreader":  23,
-        "ramwriter":  24
+        "ramwriter":  24,
+        "analyzer":   30
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_emulator=False):
+    def __init__(self, with_emulator=False, with_analyzer=True):
         platform = arty.Platform()
         platform.add_extension(_sd_io)
-        clk_freq = 25*1000000
+        clk_freq = int(25e6)
+        sd_freq = int(25e6)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
@@ -101,6 +107,7 @@ class SDSoC(SoCCore):
             self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
         else:
             sdcard_pads = platform.request('sdcard')
+
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
 
@@ -112,13 +119,60 @@ class SDSoC(SoCCore):
         self.submodules.stream32to8 = Stream32to8()
         self.submodules.stream8to32 = Stream8to32()
 
+        self.submodules.tx_fifo = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
+            stream.AsyncFIFO(self.sdcore.sink.description, 4))
+        self.submodules.rx_fifo = ClockDomainsRenamer({"write": "sd", "read": "sys"})(
+            stream.AsyncFIFO(self.sdcore.source.description, 4))
+
         self.comb += [
-            self.sdcore.source.connect(self.stream8to32.sink),
+            self.sdcore.source.connect(self.rx_fifo.sink),
+            self.rx_fifo.source.connect(self.stream8to32.sink),
             self.stream8to32.source.connect(self.ramwriter.sink),
 
             self.ramreader.source.connect(self.stream32to8.sink),
-            self.stream32to8.source.connect(self.sdcore.sink)
+            self.stream32to8.source.connect(self.tx_fifo.sink),
+            self.tx_fifo.source.connect(self.sdcore.sink)
         ]
+
+
+        self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
+        self.platform.add_period_constraint(self.crg.cd_sd.clk, 1e9/sd_freq)
+        self.platform.add_period_constraint(self.crg.cd_sd_fb.clk, 1e9/sd_freq)
+
+        self.crg.cd_sys.clk.attr.add("keep")
+        self.crg.cd_sd.clk.attr.add("keep")
+        self.crg.cd_sd_fb.clk.attr.add("keep")
+        self.platform.add_false_path_constraints(
+            self.crg.cd_sys.clk,
+            self.crg.cd_sd.clk,
+            self.crg.cd_sd_fb.clk)
+
+        # analyzer
+        if with_analyzer:
+            phy_group = [
+                self.sdphy.sdpads,
+                self.sdphy.cmdw.sink,
+                self.sdphy.cmdr.sink,
+                self.sdphy.cmdr.source,
+                self.sdphy.dataw.sink,
+                self.sdphy.datar.sink,
+                self.sdphy.datar.source
+            ]
+
+            dummy_group = [
+                Signal(),
+                Signal()
+            ]
+
+            analyzer_signals = {
+                0 : phy_group,
+                1 : dummy_group
+            }
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, cd="sd", cd_ratio=4)
+
+    def do_exit(self, vns):
+        if hasattr(self, "analyzer"):
+            self.analyzer.export_csv(vns, "../test/analyzer.csv")
 
 
 def main():
@@ -130,7 +184,8 @@ def main():
     else:
         soc = soc = SDSoC()
     builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
-    builder.build()
+    vns = builder.build()
+    soc.do_exit(vns)
 
 
 if __name__ == "__main__":
