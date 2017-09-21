@@ -14,7 +14,7 @@ CLKGEN_STATUS_LOCKED = 0x4
 
 def get_clock_md(sd_clock):
     ideal_m = sd_clock
-    ideal_d = 10000
+    ideal_d = 5000
 
     best_m = 1
     best_d = 0
