@@ -340,9 +340,9 @@ def main(wb):
         return
 
     # SWITCH SPEED
-    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR50, wb.mems.sram.base)
+    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR104, wb.mems.sram.base)
 
-    clkfreq = 70e6
+    clkfreq = 60e6
     clkgen_set(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
     time.sleep(1)
