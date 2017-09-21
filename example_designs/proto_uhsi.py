@@ -41,7 +41,7 @@ _io = [
     ),
 
     ("sdcard", 0,
-        Subsignal("data", Pins("K16 J13 M16 K12")),
+        Subsignal("data", Pins("K16 J13 M16 K12"), Misc("PULLUP")),
         Subsignal("cmd", Pins("L14"), Misc("PULLUP")),
         Subsignal("clk", Pins("J12")),
         Subsignal("clkfb", Pins("J16")),
@@ -65,7 +65,7 @@ class Platform(XilinxPlatform):
 
 
 class SDCRG(Module, AutoCSR):
-    def __init__(self, max_sd_clk=80e6):
+    def __init__(self, max_sd_clk=104e6):
             self._cmd_data = CSRStorage(10)
             self._send_cmd_data = CSR()
             self._send_go = CSR()
@@ -216,6 +216,18 @@ class SDSoC(SoCCore):
         sd_clk_div2 = Signal()
         self.sync.sd += sd_clk_div2.eq(~sd_clk_div2)
         self.comb += platform.request("debug").eq(sd_clk_div2)
+
+        self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/50e6)
+        self.platform.add_period_constraint(self.sdcrg.cd_sd.clk, 1e9/104e6)
+        self.platform.add_period_constraint(self.sdcrg.cd_sd_fb.clk, 1e9/104e6)
+
+        self.crg.cd_sys.clk.attr.add("keep")
+        self.sdcrg.cd_sd.clk.attr.add("keep")
+        self.sdcrg.cd_sd_fb.clk.attr.add("keep")
+        self.platform.add_false_path_constraints(
+            self.crg.cd_sys.clk,
+            self.sdcrg.cd_sd.clk,
+            self.sdcrg.cd_sd_fb.clk)
 
         # analyzer
         if with_analyzer:
