@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 
 from litex.soc.tools.remote import RemoteClient
 
@@ -49,7 +50,7 @@ def clkgen_set(wb, freq):
         pass
 
 
-clkgen_set(wb, 10e6)
+#clkgen_set(wb, int(sys.argv[1])*1e6)
 
 # # #
 

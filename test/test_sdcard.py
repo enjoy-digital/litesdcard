@@ -84,6 +84,7 @@ def cmd6(wb, mode, group, value, destaddr):
     arg = (mode << 31) | 0xffffff
     arg &= ~(0xf << (group * 4))
     arg |= value << (group * 4)
+    print("{:8x}".format(arg))
     wb.regs.sdcore_argument.write(arg)
     wb.regs.sdcore_blocksize.write(64-1)
     wb.regs.sdcore_blockcount.write(0)
@@ -330,6 +331,12 @@ def main(wb):
     cmd55(wb, rca)
     acmd6(wb)
 
+    # SWITCH SPEED
+    cmd6(wb, SD_SWITCH_SWITCH, SD_GROUP_ACCESSMODE, SD_SPEED_SDR50, wb.mems.sram.base)
+
+    # SWITCH DRIVER STRENGH
+    cmd6(wb, SD_SWITCH_SWITCH, SD_GROUP_DRIVERSTRENGTH, SD_DRIVER_STRENGTH_D, wb.mems.sram.base)
+
     # SEND SCR
     cmd55(wb, rca)
     acmd51(wb, wb.mems.sram.base)
@@ -339,16 +346,24 @@ def main(wb):
         print("Need CMD23 support")
         return
 
-    # SWITCH SPEED
-    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR104, wb.mems.sram.base)
-
-    clkfreq = 60e6
+    clkfreq = 85e6
     clkgen_set(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
     time.sleep(1)
 
+    from litescope.software.driver.analyzer import LiteScopeAnalyzerDriver
+    analyzer = LiteScopeAnalyzerDriver(wb.regs, "analyzer", debug=True)
+    analyzer.configure_trigger(cond={"sdsoc_sdphy_sdpads_sdpads_clk" : 1})
+    analyzer.run(offset=8, length=256)
+
+    input()
+
     # SET BLOCKLEN
     cmd16(wb, 512)
+	
+    analyzer.wait_done()
+#    analyzer.upload()
+    analyzer.save("dump.vcd")
 
     # READ MULTIPLE BLOCKS
     memset(wb, wb.mems.sram.base, 0, 1024)

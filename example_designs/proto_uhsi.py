@@ -162,7 +162,7 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_emulator=False, with_analyzer=False):
+    def __init__(self, with_emulator=False, with_analyzer=True):
         platform = Platform()
         clk_freq = int(50e6)
         SoCCore.__init__(self, platform,
@@ -213,9 +213,12 @@ class SDSoC(SoCCore):
             self.tx_fifo.source.connect(self.sdcore.sink)
         ]
 
-        sd_clk_div2 = Signal()
-        self.sync.sd += sd_clk_div2.eq(~sd_clk_div2)
-        self.comb += platform.request("debug").eq(sd_clk_div2)
+        self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
+            p_INIT=1, p_SRTYPE="SYNC",
+            i_D0=0, i_D1=1, i_S=0, i_R=0, i_CE=1,
+            i_C0=ClockSignal("sd"), i_C1=~ClockSignal("sd"),
+            o_Q=platform.request("debug")
+        )  
 
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/50e6)
         self.platform.add_period_constraint(self.sdcrg.cd_sd.clk, 1e9/104e6)
@@ -250,7 +253,7 @@ class SDSoC(SoCCore):
                 0 : phy_group,
                 1 : dummy_group
             }
-            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, cd="sd")
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, cd="sd", cd_ratio=4)
 
     def do_exit(self, vns):
         if hasattr(self, "analyzer"):
