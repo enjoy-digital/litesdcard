@@ -142,12 +142,11 @@ class SDCRG(Module, AutoCSR):
                     busy_counter.eq(busy_counter - 1)
                 )
 
-            mult_locked = Signal()
-            self.comb += self._status.status.eq(Cat(busy, sd_progdone, sd_locked, mult_locked))
+            self.comb += self._status.status.eq(Cat(busy, sd_progdone, sd_locked))
 
             self.specials += [
                 Instance("BUFG", i_I=clk_sd_unbuffered, o_O=self.cd_sd.clk),
-                AsyncResetSynchronizer(self.cd_sd, ~mult_locked)
+                AsyncResetSynchronizer(self.cd_sd, ~sd_locked)
             ]
 
 
