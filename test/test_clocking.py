@@ -29,7 +29,7 @@ def get_clock_md(sd_clock):
     return best_m, best_d
 
 
-def clkgen_write(cmd, data):
+def clkgen_write(wb, cmd, data):
     word = (data << 2) | cmd
     wb.regs.sdcrg_cmd_data.write(word)
     wb.regs.sdcrg_send_cmd_data.write(1)
@@ -39,8 +39,8 @@ def clkgen_write(cmd, data):
 
 def clkgen_set(wb, freq):
     clock_m, clock_d = get_clock_md(freq//10000)
-    clkgen_write(0x1, clock_d-1)
-    clkgen_write(0x3, clock_m-1)
+    clkgen_write(wb, 0x1, clock_d-1)
+    clkgen_write(wb, 0x3, clock_m-1)
 
     wb.regs.sdcrg_send_go.write(1)
     while( not (wb.regs.sdcrg_status.read() & CLKGEN_STATUS_PROGDONE)):

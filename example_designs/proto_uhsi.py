@@ -65,7 +65,7 @@ class Platform(XilinxPlatform):
 
 
 class SDCRG(Module, AutoCSR):
-    def __init__(self, max_sd_clk=60e6):
+    def __init__(self, max_sd_clk=80e6):
             self._cmd_data = CSRStorage(10)
             self._send_cmd_data = CSR()
             self._send_go = CSR()

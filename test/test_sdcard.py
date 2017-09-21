@@ -12,6 +12,8 @@ from litesdcard.software.libsdcard import *
 
 from litescope.software.driver.analyzer import LiteScopeAnalyzerDriver
 
+from test_clocking import clkgen_set
+
 
 def wait_cmd_done(wb):
     while True:
@@ -277,8 +279,10 @@ def incremental(wb, addr):
         wb.write(addr + 4*i, dw & 0xffffffff)
 
 def main(wb):
-    clkfreq = 50000000
+    clkfreq = 10e6
+    clkgen_set(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
+    time.sleep(1)
 
     # RESET CARD
     cmd0(wb)
@@ -336,9 +340,12 @@ def main(wb):
         return
 
     # SWITCH SPEED
-    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR104, wb.mems.sram.base)
+    cmd6(wb, SD_SWITCH_CHECK, SD_GROUP_ACCESSMODE, SD_SPEED_SDR50, wb.mems.sram.base)
 
-    # FIXME : add speed change on FPGA
+    clkfreq = 70e6
+    clkgen_set(wb, clkfreq)
+    settimeout(wb, clkfreq, 0.1)
+    time.sleep(1)
 
     # SET BLOCKLEN
     cmd16(wb, 512)
