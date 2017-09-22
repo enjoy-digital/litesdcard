@@ -27,7 +27,7 @@ from litescope import LiteScopeAnalyzer
 
 _sd_io = [
     ("sdcard", 0,
-        Subsignal("data", Pins("V11 T13 U13 U12")),
+        Subsignal("data", Pins("V11 T13 U13 U12"), Misc("PULLUP")),
         Subsignal("cmd", Pins("V10"), Misc("PULLUP")),
         Subsignal("clk", Pins("V12")),
         IOStandard("LVCMOS33"), Misc("SLEW=FAST")
@@ -133,7 +133,6 @@ class SDSoC(SoCCore):
             self.stream32to8.source.connect(self.tx_fifo.sink),
             self.tx_fifo.source.connect(self.sdcore.sink)
         ]
-
 
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
         self.platform.add_period_constraint(self.crg.cd_sd.clk, 1e9/sd_freq)
