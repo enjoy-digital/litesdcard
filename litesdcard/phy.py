@@ -519,7 +519,7 @@ class SDPHY(Module, AutoCSR):
                 self.submodules.io = io = SDPHYIOS7(sdpads, pads)
             else:
                 raise NotImplementedError
-            self.comb += [
+            self.sync.sd += [
                 io.cmd_t.oe.eq(sdpads.cmd.oe),
                 io.cmd_t.o.eq(sdpads.cmd.o),
 
