@@ -22,7 +22,6 @@ class SDLinkLayer(Module):
        for single 512 byte blocks.
        """
     block_size = 512
-
     def  __init__(self, platform, pads):
         self.pads = pads
 
@@ -34,8 +33,8 @@ class SDLinkLayer(Module):
         self.clock_domains.cd_sd_ll = ClockDomain(reset_less=True)
         self.comb += self.cd_sd_ll.clk.eq(pads.clk)
 
-        self.specials.rd_buffer = Memory(32, self.block_size//4)
-        self.specials.wr_buffer = Memory(32, self.block_size//4)
+        self.specials.rd_buffer = Memory(32, self.block_size//4, init=[i for i in range(self.block_size//4)])
+        self.specials.wr_buffer = Memory(32, self.block_size//4, init=[i for i in range(self.block_size//4)])
         self.specials.internal_rd_port = self.rd_buffer.get_port(clock_domain="sd_ll")
         self.specials.internal_wr_port = self.wr_buffer.get_port(write_capable=True, clock_domain="sd_ll")
 

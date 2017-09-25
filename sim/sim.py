@@ -28,7 +28,7 @@ sdemulator_base = 0x20000000
 
 
 class SDTester(Module):
-    def __init__(self, core, ramwriter, ramreader, bus):
+    def __init__(self, core, emulator, ramwriter, ramreader, bus):
         counter = Signal(32)
         self.sync += counter.eq(counter + 1)
         self.sync += [
@@ -126,6 +126,10 @@ class SDTester(Module):
                 core.command.storage.eq((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
                 core.command.re.eq(1)
+            ).Elif(counter == 2048*17,
+                emulator.ev.read.clear.eq(1),
+            ).Elif(counter == 2048*18,
+                emulator.ev.read.clear.eq(0),
             ).Elif(counter == 2048*64,
                 Finish()
             )
@@ -207,7 +211,7 @@ class SDSim(Module):
         self.submodules.wb_decoder = wishbone.InterconnectShared(wb_masters, wb_slaves, register=True)
 
         # Tester
-        self.submodules.sdtester = SDTester(self.sdcore, self.ramwriter, self.ramreader, self.bus)
+        self.submodules.sdtester = SDTester(self.sdcore, self.sdemulator, self.ramwriter, self.ramreader, self.bus)
 
 
 def clean():
