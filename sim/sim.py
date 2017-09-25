@@ -110,13 +110,23 @@ class SDTester(Module):
                 # acmd51
                 Display("APP_SEND_SCR (acmd51)"),
                 core.argument.storage.eq(0x00000000),
-                core.blocksize.storage.eq(8-1),
-                core.blockcount.storage.eq(0),
+                core.blocksize.storage.eq(8),
+                core.blockcount.storage.eq(1),
                 ramwriter.address.storage.eq(sram_base//4),
                 core.command.storage.eq((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
                 core.command.re.eq(1)
-            ).Elif(counter == 2048*32,
+            ).Elif(counter == 2048*16,
+                # cmd17
+                Display("READ_SINGLE_BLOCK (cmd17)"),
+                core.argument.storage.eq(0x00000000),
+                core.blocksize.storage.eq(512),
+                core.blockcount.storage.eq(1),
+                ramwriter.address.storage.eq(sram_base//4),
+                core.command.storage.eq((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                        (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
+                core.command.re.eq(1)
+            ).Elif(counter == 2048*64,
                 Finish()
             )
         ]

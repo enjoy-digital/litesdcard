@@ -301,11 +301,11 @@ class SDPHYDATAR(Module):
             source.valid.eq(self.fifo.source.valid),
             source.data.eq(self.fifo.source.data),
             status.eq(SDCARD_STREAM_STATUS_OK),
-            source.last.eq(read == toread),
+            source.last.eq(read == (toread - 1)),
             self.fifo.source.ready.eq(source.ready),
             If(source.valid & source.ready,
                 NextValue(read, read + 1),
-                If(read == toread,
+                If(read == (toread - 1),
                     If(sink.last,
                         NextState("DATA_CLK40")
                     ).Else(

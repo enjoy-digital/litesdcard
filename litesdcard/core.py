@@ -215,7 +215,7 @@ class SDCore(Module, AutoCSR):
         fsm.act("RECV_DATA",
             phy.sink.data.eq(0), # Read 1 block
             phy.sink.valid.eq(1),
-            phy.sink.last.eq(blockcount == blkcnt),
+            phy.sink.last.eq(blkcnt == (blockcount - 1)),
             cmddata.eq(SDCARD_STREAM_DATA),
             rdwr.eq(SDCARD_STREAM_READ),
             If(phy.source.valid,
@@ -227,7 +227,7 @@ class SDCore(Module, AutoCSR):
                         phy.source.ready.eq(self.crc16checker.sink.ready),
 
                         If(phy.source.last & phy.source.ready, # End of block
-                            If(blockcount > blkcnt,
+                            If(blkcnt < blockcount,
                                 NextValue(blkcnt, blkcnt + 1),
                                 NextState("RECV_DATA")
                             ).Else(
@@ -260,7 +260,7 @@ class SDCore(Module, AutoCSR):
             If(self.crc16inserter.source.valid &
                self.crc16inserter.source.last &
                self.crc16inserter.source.ready,
-                If(blockcount > blkcnt,
+                If(blkcnt < blockcount,
                     NextValue(blkcnt, blkcnt + 1)
                 ).Else(
                     NextValue(blkcnt, 0),
