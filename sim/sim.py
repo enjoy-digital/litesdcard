@@ -18,7 +18,6 @@ from litesdcard.common import *
 from litesdcard.phy import SDPHY
 from litesdcard.core import SDCore
 from litesdcard.ram import RAMReader, RAMWriter
-from litesdcard.convert import Stream32to8, Stream8to32
 
 from litesdcard.emulator import SDEmulator, _sdemulator_pads
 
@@ -178,22 +177,10 @@ class SDSim(Module):
 
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()
-        self.submodules.stream32to8 = Stream32to8()
-        self.submodules.stream8to32 = Stream8to32()
-
-        self.submodules.tx_fifo = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
-            stream.AsyncFIFO(self.sdcore.sink.description, 4))
-        self.submodules.rx_fifo = ClockDomainsRenamer({"write": "sd", "read": "sys"})(
-            stream.AsyncFIFO(self.sdcore.source.description, 4))
 
         self.comb += [
-            self.sdcore.source.connect(self.rx_fifo.sink),
-            self.rx_fifo.source.connect(self.stream8to32.sink),
-            self.stream8to32.source.connect(self.ramwriter.sink),
-
-            self.ramreader.source.connect(self.stream32to8.sink),
-            self.stream32to8.source.connect(self.tx_fifo.sink),
-            self.tx_fifo.source.connect(self.sdcore.sink)
+            self.sdcore.source.connect(self.ramwriter.sink),
+            self.ramreader.source.connect(self.sdcore.sink)
         ]
 
         # Wishbone
