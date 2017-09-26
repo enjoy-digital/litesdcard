@@ -65,22 +65,22 @@ class SDCore(Module, AutoCSR):
         self.submodules.crc16inserter = ClockDomainsRenamer("sd")(CRCUpstreamInserter())
         self.submodules.crc16checker = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
 
-        self.submodules.upstream_fifo = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
+        self.submodules.upstream_cdc = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
             stream.AsyncFIFO(self.sink.description, 4))
-        self.submodules.downstream_fifo = ClockDomainsRenamer({"write": "sd", "read": "sys"})(
+        self.submodules.downstream_cdc = ClockDomainsRenamer({"write": "sd", "read": "sys"})(
             stream.AsyncFIFO(self.source.description, 4))
 
-        self.submodules.upstream_converter = Stream32to8()
-        self.submodules.downstream_converter = Stream8to32()
+        self.submodules.upstream_converter = ClockDomainsRenamer("sd")(Stream32to8())
+        self.submodules.downstream_converter = ClockDomainsRenamer("sd")(Stream8to32())
 
         self.comb += [
-            self.sink.connect(self.upstream_fifo.sink),
-            self.upstream_fifo.source.connect(self.upstream_converter.sink),
+            self.sink.connect(self.upstream_cdc.sink),
+            self.upstream_cdc.source.connect(self.upstream_converter.sink),
             self.upstream_converter.source.connect(self.crc16inserter.sink),
 
             self.crc16checker.source.connect(self.downstream_converter.sink),
-            self.downstream_converter.source.connect(self.downstream_fifo.sink),
-            self.downstream_fifo.source.connect(self.source)
+            self.downstream_converter.source.connect(self.downstream_cdc.sink),
+            self.downstream_cdc.source.connect(self.source)
         ]
 
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
@@ -227,7 +227,7 @@ class SDCore(Module, AutoCSR):
                         phy.source.ready.eq(self.crc16checker.sink.ready),
 
                         If(phy.source.last & phy.source.ready, # End of block
-                            If(blkcnt < blockcount,
+                            If(blkcnt < (blockcount - 1),
                                 NextValue(blkcnt, blkcnt + 1),
                                 NextState("RECV_DATA")
                             ).Else(
@@ -260,7 +260,7 @@ class SDCore(Module, AutoCSR):
             If(self.crc16inserter.source.valid &
                self.crc16inserter.source.last &
                self.crc16inserter.source.ready,
-                If(blkcnt < blockcount,
+                If(blkcnt < (blockcount - 1),
                     NextValue(blkcnt, blkcnt + 1)
                 ).Else(
                     NextValue(blkcnt, 0),

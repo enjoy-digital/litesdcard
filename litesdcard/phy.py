@@ -89,8 +89,8 @@ class SDPHYCMDR(Module):
 
         ctimeout = Signal(32)
 
-        cread = Signal(8)
-        ctoread = Signal(8)
+        cread = Signal(10)
+        ctoread = Signal(10)
         cnt = Signal(8)
 
         status = Signal(4)
@@ -260,8 +260,8 @@ class SDPHYDATAR(Module):
 
         dtimeout = Signal(32)
 
-        read = Signal(8)
-        toread = Signal(8)
+        read = Signal(10)
+        toread = Signal(10)
         cnt = Signal(8)
 
         status = Signal(4)
