@@ -34,6 +34,7 @@ class SDTester(Module):
         self.sync += [
             core.command.re.eq(0),
             core.blocksize.re.eq(0),
+            ramreader.length.re.eq(0),
             If(counter == 2048*1,
                 # cmd0
                 Display("GO_IDLE_STATE (cmd0)"),
@@ -130,6 +131,22 @@ class SDTester(Module):
                 emulator.ev.read.clear.eq(1),
             ).Elif(counter == 2048*18,
                 emulator.ev.read.clear.eq(0),
+            ).Elif(counter == 2048*20,
+                # cmd17
+                Display("WRITE_SINGLE_BLOCK (cmd18)"),
+                core.argument.storage.eq(0x00000000),
+                core.blocksize.storage.eq(512),
+                core.blockcount.storage.eq(1),
+                ramreader.address.storage.eq(sram_base//4),
+                ramreader.length.storage.eq(512),
+                ramreader.length.re.eq(1),
+                core.command.storage.eq((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                        (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5)),
+                core.command.re.eq(1)
+            ).Elif(counter == 2048*21,
+                emulator.ev.write.clear.eq(1),
+            ).Elif(counter == 2048*22,
+                emulator.ev.write.clear.eq(0),
             ).Elif(counter == 2048*64,
                 Finish()
             )

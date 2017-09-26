@@ -25,7 +25,7 @@ class RAMReader(Module, AutoCSR):
             bus.adr.eq(self.address.storage + word_counter),
 
             If(self.length.storage & 0x3,
-               to_count.eq((self.length.storage >> 2) +1)
+               to_count.eq((self.length.storage >> 2) + 1)
             ).Else(
                 to_count.eq(self.length.storage >> 2)
             ),

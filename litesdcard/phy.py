@@ -378,10 +378,10 @@ class SDPHYDATAW(Module):
             pads.clk.eq(1),
             pads.data.oe.eq(1),
             pads.data.o.eq(sink.data[0:4]),
+            sink.ready.eq(1),
             If(sink.last,
                 NextState("DATA_WRITESTOP")
             ).Else(
-                sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
@@ -391,7 +391,7 @@ class SDPHYDATAW(Module):
             pads.data.oe.eq(1),
             pads.data.o.eq(0xf),
             NextValue(wrstarted, 0),
-            NextState("IDLE") # XXX not implemented
+            NextState("IDLE")
         )
 
 
