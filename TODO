@@ -1,4 +1,3 @@
-- rewrite phy to be able to use clk feedback, configurable clock frequency.
-- add simulation of phy
-- refactor core is needed (user interface?)
-- add bist test to verify fonctionnality and maximum bandwidth
+- handle retuned write crc.
+- test multiple read/write multiple blocks.
+- add bist test to verify fonctionnality and maximum bandwidth.
