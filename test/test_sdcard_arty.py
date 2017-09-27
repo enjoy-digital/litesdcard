@@ -280,11 +280,30 @@ def dumpall(wb, addr, length):
     for i in range(length//4):
         print('0x{:08x}: 0x{:08x}'.format(addr + 4*i, wb.read(addr + 4*i)))
 
-def incremental(wb, addr):
-    for i in range(512//4):
-        k = (4*i) & 0xff
-        dw = k | ((k+1)<<8) | ((k+2)<<16) | ((k+3)<<24)
-        wb.write(addr + 4*i, dw & 0xffffffff)
+def seed_to_data(seed, random=True):
+    if random:
+        return (1664525*seed + 1013904223) & 0xffffffff
+    else:
+        return seed
+
+def write_pattern(base, length, offset=0):
+    for i in range(offset, offset + length):
+        wb.write(base + 4*i, seed_to_data(i))
+
+def check_pattern(base, length, offset=0, debug=False):
+    errors = 0
+    for i in range(offset, length + offset):
+        error = 0
+        if wb.read(base + 4*i) != seed_to_data(i):
+            error = 1
+            if debug:
+                print("{}: 0x{:08x}, 0x{:08x} KO".format(i, wb.read(base + 4*i), seed_to_data(i)))
+        else:
+            if debug:
+                print("{}: 0x{:08x}, 0x{:08x} OK".format(i, wb.read(base + 4*i), seed_to_data(i)))
+        errors += error
+    return errors
+
 
 def main(wb):
     clkfreq = 25e6
@@ -350,17 +369,19 @@ def main(wb):
     # SET BLOCKLEN
     cmd16(wb, 512)
 
+    errors = 0
     for i in range(8):
         # WRITE SINGLE BLOCK
-        memset(wb, wb.mems.sram.base, i, 512)
+        write_pattern(wb.mems.sram.base, 512//4, 128*i)
         cmd24(wb)
         ramread(wb, wb.mems.sram.base)
 
         # READ SINGLE BLOCK
         memset(wb, wb.mems.sram.base, 0, 512)
         cmd17(wb, 0, wb.mems.sram.base)
-        dumpall(wb, wb.mems.sram.base, 512)
+        errors += check_pattern(wb.mems.sram.base, 512//4, 128*i, debug=False)
 
+    print("errors: {:d}".format(errors))
 
 if __name__ == '__main__':
     wb = RemoteClient(port=1234, debug=False)
