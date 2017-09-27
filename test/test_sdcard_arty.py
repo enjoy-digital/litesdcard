@@ -39,7 +39,7 @@ def sdcrg_mmcm_write(adr, data):
 
 
 def clkgen_set(wb, freq):
-    clock_m, clock_d = get_clock_md(freq//10000)
+    clock_m, clock_d = get_clock_md(freq//1000)
     # clkfbout_mult = clock_m
     if(clock_m%2):
         sdcrg_mmcm_write(0x14, 0x1000 | ((clock_m//2)<<6) | (clock_m//2 + 1))
@@ -349,7 +349,7 @@ def check_pattern(base, length, offset=0, debug=False):
 
 
 def main(wb):
-    clkfreq = 1*100e6 # FIXME
+    clkfreq = 10e6
     clkgen_set(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
 
@@ -409,6 +409,10 @@ def main(wb):
     if not scr.cmd_support_sbc:
         print("Need CMD23 support")
         return
+
+    clkfreq = 40e6
+    clkgen_set(wb, clkfreq)
+    settimeout(wb, clkfreq, 0.1)
 
     # SET BLOCKLEN
     cmd16(wb, 512)

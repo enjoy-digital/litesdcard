@@ -77,7 +77,6 @@ class SDCRG(Module, AutoCSR):
         mmcm_locked = Signal()
         mmcm_fb = Signal()
         mmcm_clk0 = Signal()
-        mmcm_clk1 = Signal()
         mmcm_drdy = Signal()
 
         self.specials += [
