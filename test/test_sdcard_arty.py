@@ -13,6 +13,49 @@ from litesdcard.software.libsdcard import *
 from litescope.software.driver.analyzer import LiteScopeAnalyzerDriver
 
 
+def get_clock_md(sd_clock):
+    ideal_m = sd_clock
+    ideal_d = 10000
+
+    best_m = 1
+    best_d = 0
+    for d in range(1, 128):
+        for m in range(2, 128):
+            # common denominator is d*bd*ideal_d
+            diff_current = abs(d*ideal_d*best_m - d*best_d*ideal_m)
+            diff_tested = abs(best_d*ideal_d*m - d*best_d*ideal_m)
+            if diff_tested < diff_current:
+                best_m = m
+                best_d = d
+    return best_m, best_d
+
+
+def sdcrg_mmcm_write(adr, data):
+    wb.regs.sdcrg_mmcm_adr.write(adr)
+    wb.regs.sdcrg_mmcm_dat_w.write(data)
+    wb.regs.sdcrg_mmcm_write.write(1)
+    while((wb.regs.sdcrg_mmcm_drdy.read() & 0x1) == 0):
+        pass
+
+
+def clkgen_set(wb, freq):
+    clock_m, clock_d = get_clock_md(freq//10000)
+    # clkfbout_mult = clock_m
+    if(clock_m%2):
+        sdcrg_mmcm_write(0x14, 0x1000 | ((clock_m//2)<<6) | (clock_m//2 + 1))
+    else:
+        sdcrg_mmcm_write(0x14, 0x1000 | ((clock_m//2)<<6) | clock_m//2)
+    # divclk_divide = clock_d
+    if (clock_d == 1):
+        sdcrg_mmcm_write(0x16, 0x1000)
+    elif(clock_d%2):
+        sdcrg_mmcm_write(0x16, ((clock_d//2)<<6) | (clock_d//2 + 1))
+    else:
+        sdcrg_mmcm_write(0x16, ((clock_d//2)<<6) | clock_d//2)
+    # clkout0_divide = 10
+    sdcrg_mmcm_write(0x8, 0x1000 | (5<<6) | 5)
+
+
 def wait_cmd_done(wb):
     while True:
         cmdevt = wb.regs.sdcore_cmdevt.read()
@@ -306,7 +349,8 @@ def check_pattern(base, length, offset=0, debug=False):
 
 
 def main(wb):
-    clkfreq = 25e6
+    clkfreq = 1*100e6 # FIXME
+    clkgen_set(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
 
     # RESET CARD

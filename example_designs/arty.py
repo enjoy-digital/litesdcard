@@ -10,6 +10,7 @@ from litex.build.generic_platform import *
 from litex.soc.interconnect import stream
 from litex.soc.cores.uart import UARTWishboneBridge
 
+from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 
@@ -34,11 +35,21 @@ _sd_io = [
 ]
 
 
-class _CRG(Module):
+class SDCRG(Module, AutoCSR):
     def __init__(self, platform):
         self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.cd_sd = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
+
+        self._mmcm_reset = CSRStorage()
+        self._mmcm_read = CSR()
+        self._mmcm_write = CSR()
+        self._mmcm_drdy = CSRStatus()
+        self._mmcm_adr = CSRStorage(7)
+        self._mmcm_dat_w = CSRStorage(16)
+        self._mmcm_dat_r = CSRStatus(16)
+
+        # # #
 
         clk100 = platform.request("clk100")
         rst = ~platform.request("cpu_reset")
@@ -63,20 +74,54 @@ class _CRG(Module):
             AsyncResetSynchronizer(self.cd_sys, ~pll_locked | rst),
         ]
 
-        # XXX remove
-        self.comb += [
-            self.cd_sd.clk.eq(ClockSignal()),
-            self.cd_sd.rst.eq(ResetSignal())
+        mmcm_locked = Signal()
+        mmcm_fb = Signal()
+        mmcm_clk0 = Signal()
+        mmcm_clk1 = Signal()
+        mmcm_drdy = Signal()
+
+        self.specials += [
+            Instance("MMCME2_ADV",
+                p_BANDWIDTH="OPTIMIZED",
+                i_RST=self._mmcm_reset.storage, o_LOCKED=mmcm_locked,
+
+                # VCO
+                p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=10.0,
+                p_CLKFBOUT_MULT_F=30.0, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=2,
+                i_CLKIN1=clk100, i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
+
+                # CLK0
+                p_CLKOUT0_DIVIDE_F=10.0, p_CLKOUT0_PHASE=0.000, o_CLKOUT0=mmcm_clk0,
+
+                # DRP
+                i_DCLK=ClockSignal(),
+                i_DWE=self._mmcm_write.re,
+                i_DEN=self._mmcm_read.re | self._mmcm_write.re,
+                o_DRDY=mmcm_drdy,
+                i_DADDR=self._mmcm_adr.storage,
+                i_DI=self._mmcm_dat_w.storage,
+                o_DO=self._mmcm_dat_r.status
+            ),
+            Instance("BUFG", i_I=mmcm_clk0, o_O=self.cd_sd.clk),
         ]
+        self.sync += [
+            If(self._mmcm_read.re | self._mmcm_write.re,
+                self._mmcm_drdy.status.eq(0)
+            ).Elif(mmcm_drdy,
+                self._mmcm_drdy.status.eq(1)
+            )
+        ]
+        self.comb += self.cd_sd.rst.eq(~mmcm_locked)
 
 
 class SDSoC(SoCCore):
     csr_map = {
-        "sdphy":      20,
-        "sdcore":     21,
-        "sdemulator": 22,
-        "ramreader":  23,
-        "ramwriter":  24,
+        "sdcrg":      20,
+        "sdphy":      21,
+        "sdcore":     22,
+        "sdemulator": 23,
+        "ramreader":  24,
+        "ramwriter":  25,
         "analyzer":   30
     }
     csr_map.update(SoCCore.csr_map)
@@ -85,7 +130,7 @@ class SDSoC(SoCCore):
         platform = arty.Platform()
         platform.add_extension(_sd_io)
         clk_freq = int(25e6)
-        sd_freq = int(25e6)
+        sd_freq = int(50e6)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type=None,
@@ -96,8 +141,6 @@ class SDSoC(SoCCore):
                          ident_version=True,
                          integrated_sram_size=1024)
 
-        self.submodules.crg = _CRG(platform)
-
         self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
         self.add_wb_master(self.cpu_or_bridge.wishbone)
 
@@ -107,6 +150,7 @@ class SDSoC(SoCCore):
         else:
             sdcard_pads = platform.request('sdcard')
 
+        self.submodules.sdcrg = SDCRG(platform)
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
 
@@ -120,17 +164,22 @@ class SDSoC(SoCCore):
             self.ramreader.source.connect(self.sdcore.sink)
         ]
 
-        self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
-        self.platform.add_period_constraint(self.crg.cd_sd.clk, 1e9/sd_freq)
-        self.platform.add_period_constraint(self.crg.cd_sd_fb.clk, 1e9/sd_freq)
+        self.platform.add_period_constraint(self.sdcrg.cd_sys.clk, 1e9/clk_freq)
+        self.platform.add_period_constraint(self.sdcrg.cd_sd.clk, 1e9/sd_freq)
+        self.platform.add_period_constraint(self.sdcrg.cd_sd_fb.clk, 1e9/sd_freq)
 
-        self.crg.cd_sys.clk.attr.add("keep")
-        self.crg.cd_sd.clk.attr.add("keep")
-        self.crg.cd_sd_fb.clk.attr.add("keep")
+        self.sdcrg.cd_sys.clk.attr.add("keep")
+        self.sdcrg.cd_sd.clk.attr.add("keep")
+        self.sdcrg.cd_sd_fb.clk.attr.add("keep")
         self.platform.add_false_path_constraints(
-            self.crg.cd_sys.clk,
-            self.crg.cd_sd.clk,
-            self.crg.cd_sd_fb.clk)
+            self.sdcrg.cd_sys.clk,
+            self.sdcrg.cd_sd.clk,
+            self.sdcrg.cd_sd_fb.clk)
+
+
+        led_counter = Signal(32)
+        self.sync.sd += led_counter.eq(led_counter + 1)
+        self.comb += platform.request("user_led", 0).eq(led_counter[26])
 
         # analyzer
         if with_analyzer:
