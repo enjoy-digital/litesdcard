@@ -36,79 +36,66 @@ class SDTester(Module):
             core.blocksize.re.eq(0),
             ramreader.length.re.eq(0),
             If(counter == 2048*1,
-                # cmd0
                 Display("GO_IDLE_STATE (cmd0)"),
                 core.argument.storage.eq(0x00000000),
                 core.command.storage.eq((0 << 8) | SDCARD_CTRL_RESPONSE_NONE),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*2,
-                # cmd8
                 Display("SEND_EXT_CSD (cmd8)"),
                 core.argument.storage.eq(0x000001aa),
                 core.command.storage.eq((8 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*3,
-                # cmd55
                 Display("APP_CMD (cmd55)"),
                 core.argument.storage.eq(0x00000000),
                 core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*4,
-                # acmd41
                 Display("APP_SEND_OP_COND (acmd41)"),
                 core.argument.storage.eq(0x10ff8000 | 0x60000000),
                 core.command.storage.eq((41 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*5,
-                # cmd2
                 Display("ALL_SEND_CID (cmd2)"),
                 core.argument.storage.eq(0x00000000),
                 core.command.storage.eq((2 << 8) | SDCARD_CTRL_RESPONSE_LONG),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*6,
-                # cmd3
                 Display("SET_RELATIVE_CSR (cmd3)"),
                 core.argument.storage.eq(0x00000000),
                 core.command.storage.eq((3 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*7,
-                # cmd10
                 Display("SET_RELATIVE_CSR (cmd10)"),
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((10 << 8) | SDCARD_CTRL_RESPONSE_LONG),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*8,
-                # cmd9
                 Display("SET_RELATIVE_CSR (cmd9)"),
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((9 << 8) | SDCARD_CTRL_RESPONSE_LONG),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*9,
-                # cmd7
                 Display("SELECT_CARD (cmd7)"),
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((7 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*10,
-                # cmd55
                 Display("APP_CMD (cmd55)"),
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*11,
-                # acmd6
                 Display("APP_SET_BUS_WIDTH (acmd6)"),
                 core.argument.storage.eq(0x00000002),
                 core.command.storage.eq((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*12,
-                # cmd55
                 Display("APP_CMD (cmd55)"),
                 core.argument.storage.eq(emulator_rca << 16),
                 core.command.storage.eq((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*13,
-                # acmd51
                 Display("APP_SEND_SCR (acmd51)"),
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(8),
@@ -118,7 +105,6 @@ class SDTester(Module):
                                         (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
                 core.command.re.eq(1)
             ).Elif(counter == 2048*16,
-                # cmd17
                 Display("READ_SINGLE_BLOCK (cmd17)"),
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(512),
@@ -132,20 +118,47 @@ class SDTester(Module):
             ).Elif(counter == 2048*18,
                 emulator.ev.read.clear.eq(0),
             ).Elif(counter == 2048*20,
-                # cmd17
-                Display("WRITE_SINGLE_BLOCK (cmd18)"),
+                Display("WRITE_SINGLE_BLOCK (cmd24)"),
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(512),
                 core.blockcount.storage.eq(1),
                 ramreader.address.storage.eq(sram_base//4),
                 ramreader.length.storage.eq(512),
                 ramreader.length.re.eq(1),
-                core.command.storage.eq((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                core.command.storage.eq((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5)),
                 core.command.re.eq(1)
-            ).Elif(counter == 2048*21,
+            ).Elif(counter == 2048*24,
                 emulator.ev.write.clear.eq(1),
-            ).Elif(counter == 2048*22,
+            ).Elif(counter == 2048*25,
+                emulator.ev.write.clear.eq(0),
+            ).Elif(counter == 2048*28,
+                Display("READ_SINGLE_BLOCK (cmd17)"),
+                core.argument.storage.eq(0x00000000),
+                core.blocksize.storage.eq(512),
+                core.blockcount.storage.eq(1),
+                ramwriter.address.storage.eq(sram_base//4),
+                core.command.storage.eq((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                        (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
+                core.command.re.eq(1)
+            ).Elif(counter == 2048*29,
+                emulator.ev.read.clear.eq(1),
+            ).Elif(counter == 2048*30,
+                emulator.ev.read.clear.eq(0),
+            ).Elif(counter == 2048*32,
+                Display("WRITE_SINGLE_BLOCK (cmd24)"),
+                core.argument.storage.eq(0x00000000),
+                core.blocksize.storage.eq(512),
+                core.blockcount.storage.eq(1),
+                ramreader.address.storage.eq(sram_base//4),
+                ramreader.length.storage.eq(512),
+                ramreader.length.re.eq(1),
+                core.command.storage.eq((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                        (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5)),
+                core.command.re.eq(1)
+            ).Elif(counter == 2048*33,
+                emulator.ev.write.clear.eq(1),
+            ).Elif(counter == 2048*34,
                 emulator.ev.write.clear.eq(0),
             ).Elif(counter == 2048*64,
                 Finish()

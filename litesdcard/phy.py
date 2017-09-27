@@ -349,6 +349,7 @@ class SDPHYDATAW(Module):
         # # #
 
         wrstarted = Signal()
+        cnt = Signal(8)
 
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
@@ -378,10 +379,10 @@ class SDPHYDATAW(Module):
             pads.clk.eq(1),
             pads.data.oe.eq(1),
             pads.data.o.eq(sink.data[0:4]),
-            sink.ready.eq(1),
             If(sink.last,
                 NextState("DATA_WRITESTOP")
             ).Else(
+                sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
@@ -391,7 +392,22 @@ class SDPHYDATAW(Module):
             pads.data.oe.eq(1),
             pads.data.o.eq(0xf),
             NextValue(wrstarted, 0),
-            NextState("IDLE")
+            NextState("DATA_RESPONSE")
+        )
+
+        # XXX; should check CRC and be handled by core
+        fsm.act("DATA_RESPONSE",
+            pads.clk.eq(1),
+            pads.data.oe.eq(0),
+            If(cnt < 32,
+                NextValue(cnt, cnt + 1),
+                pads.clk.eq(1)
+            ).Else(
+                NextValue(cnt, 0),
+                sink.ready.eq(1),
+                NextState("IDLE")
+            )
+
         )
 
 

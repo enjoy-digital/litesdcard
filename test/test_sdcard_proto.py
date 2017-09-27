@@ -129,7 +129,8 @@ def cmd6(wb, mode, group, value, destaddr):
     wb.regs.sdcore_blocksize.write(64)
     wb.regs.sdcore_blockcount.write(1)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdcore_command.write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
@@ -188,7 +189,8 @@ def cmd17(wb, blkaddr, destaddr):
     wb.regs.sdcore_blocksize.write(512)
     wb.regs.sdcore_blockcount.write(1)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdcore_command.write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
@@ -199,7 +201,8 @@ def cmd18(wb, blkaddr, blkcnt, destaddr):
     wb.regs.sdcore_blocksize.write(512)
     wb.regs.sdcore_blockcount.write(blkcnt)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdcore_command.write((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
@@ -208,7 +211,8 @@ def cmd19(wb, destaddr):
     print("19: MMC_CMD_SEND_TUNING_BLOCK")
     wb.regs.sdcore_argument.write(0x00000000)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdcore_command.write((19 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((19 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
@@ -224,7 +228,8 @@ def cmd24(wb):
     wb.regs.sdcore_argument.write(0x00000000)
     wb.regs.sdcore_blocksize.write(512)
     wb.regs.sdcore_blockcount.write(1)
-    wb.regs.sdcore_command.write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
+    wb.regs.sdcore_command.write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd25(wb, blkaddr, blkcnt):
@@ -232,7 +237,8 @@ def cmd25(wb, blkaddr, blkcnt):
     wb.regs.sdcore_argument.write(blkaddr)
     wb.regs.sdcore_blocksize.write(512)
     wb.regs.sdcore_blockcount.write(blkcnt)
-    wb.regs.sdcore_command.write((25 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
+    wb.regs.sdcore_command.write((25 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5))
     return response(wb, SDCARD_CTRL_RESPONSE_SHORT)
 
 def cmd55(wb, rca=0):
@@ -253,7 +259,8 @@ def acmd13(wb, destaddr):
     wb.regs.sdcore_blocksize.write(64)
     wb.regs.sdcore_blockcount.write(1)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdcore_command.write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
@@ -275,7 +282,8 @@ def acmd51(wb, destaddr):
     wb.regs.sdcore_blocksize.write(8)
     wb.regs.sdcore_blockcount.write(1)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdcore_command.write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
@@ -286,7 +294,8 @@ def acmd22(wb, destaddr):
     wb.regs.sdcore_blocksize.write(4)
     wb.regs.sdcore_blockcount.write(1)
     wb.regs.ramwriter_address.write(destaddr//4)
-    wb.regs.sdcore_command.write((22 << 8) | SDCARD_CTRL_RESPONSE_SHORT | (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
+    wb.regs.sdcore_command.write((22 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+                                 (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
     r = response(wb, SDCARD_CTRL_RESPONSE_SHORT)
     wait_data_done(wb)
     return r
