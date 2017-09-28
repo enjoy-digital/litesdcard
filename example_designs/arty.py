@@ -6,6 +6,7 @@ from litex.gen import *
 from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.generic_platform import *
+from litex.build.xilinx import VivadoProgrammer
 
 from litex.soc.interconnect import stream
 from litex.soc.cores.uart import UARTWishboneBridge
@@ -125,23 +126,26 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
-    def __init__(self, with_emulator=False, with_analyzer=True):
+    def __init__(self, with_cpu, with_emulator, with_analyzer):
         platform = arty.Platform()
         platform.add_extension(_sd_io)
         clk_freq = int(25e6)
         sd_freq = int(50e6)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
-                         cpu_type=None,
+                         cpu_type="lm32" if with_cpu else None,
                          csr_data_width=32,
-                         with_uart=False,
-                         with_timer=False,
+                         with_uart=with_cpu,
+                         with_timer=with_cpu,
                          ident="SDCard Test SoC",
                          ident_version=True,
-                         integrated_sram_size=1024)
+                         integrated_rom_size=0x8000 if with_cpu else 0,
+                         integrated_sram_size=0x1000,
+                         integrated_main_ram_size=0x8000 if with_cpu else 0)
 
-        self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
-        self.add_wb_master(self.cpu_or_bridge.wishbone)
+        if not with_cpu:
+            self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
+            self.add_wb_master(self.cpu_or_bridge.wishbone)
 
         if with_emulator:
             sdcard_pads = _sdemulator_pads()
@@ -174,7 +178,6 @@ class SDSoC(SoCCore):
             self.sdcrg.cd_sys.clk,
             self.sdcrg.cd_sd.clk,
             self.sdcrg.cd_sd_fb.clk)
-
 
         led_counter = Signal(32)
         self.sync.sd += led_counter.eq(led_counter + 1)
@@ -209,16 +212,24 @@ class SDSoC(SoCCore):
 
 
 def main():
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "emulator":
-            soc = SDSoC(with_emulator=True)
-        else:
-            raise ValueError
-    else:
-        soc = soc = SDSoC()
-    builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
-    vns = builder.build()
-    soc.do_exit(vns)
+    args = sys.argv[1:]
+    load = "load" in args
+    build = not "load" in args
+
+    if build:
+        with_cpu = "cpu" in args
+        with_emulator = "emulator" in args
+        with_analyzer = "analyzer" in args
+        print("[building]... cpu: {}, emulator: {}, analyzer: {}".format(
+            with_cpu, with_emulator, with_analyzer))
+        soc = SDSoC(with_cpu, with_emulator, with_analyzer)
+        builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
+        vns = builder.build()
+        soc.do_exit(vns)
+    elif load:
+        print("[loading]...")
+        prog = VivadoProgrammer()
+        prog.load_bitstream("build/gateware/top.bit")
 
 
 if __name__ == "__main__":
