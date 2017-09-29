@@ -183,6 +183,13 @@ class SDSoC(SoCCore):
         self.sync.sd += led_counter.eq(led_counter + 1)
         self.comb += platform.request("user_led", 0).eq(led_counter[26])
 
+        self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
+            p_INIT=1, p_SRTYPE="SYNC",
+            i_D0=0, i_D1=1, i_S=0, i_R=0, i_CE=1,
+            i_C0=ClockSignal("sd"), i_C1=~ClockSignal("sd"),
+            o_Q=platform.request("pmoda")[0]
+        )
+
         # analyzer
         if with_analyzer:
             phy_group = [

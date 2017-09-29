@@ -1,4 +1,3 @@
-- measure generated sd frequency on Arty.
 - get commands working with cpu.
 - get data working with cpu.
 - add bist test to verify fonctionnality and maximum bandwidth.
