@@ -363,7 +363,7 @@ def main(wb):
     s18a = False
     while True:
         cmd55(wb)
-        r3,status = acmd41(wb, hcs=True, s18r=s18r)
+        r3, status = acmd41(wb, hcs=True, s18r=s18r)
         if r3[3] & 0x80:
             print("SDCard ready | ", end="")
             s18a = r3[3] & 0x01
@@ -377,7 +377,7 @@ def main(wb):
     cmd2(wb)
 
     # SET RELATIVE CARD ADDRESS
-    r6,status = cmd3(wb)
+    r6, status = cmd3(wb)
     rca = decode_rca(r6)
 
     # SEND CID

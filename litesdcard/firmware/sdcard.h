@@ -54,12 +54,19 @@ void sdcrg_set_clk(unsigned int freq);
 
 int sdcard_wait_cmd_done(void);
 int sdcard_wait_data_done(void);
-int sdcard_wait_response(int length);
+int sdcard_wait_response(void);
 
 void sdcard_go_idle(void);
 int sdcard_send_ext_csd(void);
 int sdcard_app_cmd(int rca);
 int sdcard_app_send_op_cond(int hcc, int s18r);
+int sdcard_all_send_cid(void);
+int sdcard_set_relative_address(void);
+
+int sdcard_send_cid(unsigned int rca);
+int sdcard_send_csd(unsigned int rca);
+int sdcard_select_card(unsigned int rca);
+int sdcard_app_set_bus_width(void);
 
 int sdcard_init(void);
 
