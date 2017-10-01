@@ -109,6 +109,7 @@ int main(void)
 	uart_init();
 
 	puts("\nLiteSDCard CPU testing software built "__DATE__" "__TIME__);
+	help();
 	prompt();
 
 	while(1) {
