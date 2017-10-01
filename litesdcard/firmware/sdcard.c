@@ -202,6 +202,45 @@ int sdcard_app_set_bus_width(void) {
 	return sdcard_wait_response();
 }
 
+int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int destaddr) {
+	unsigned int arg;
+
+	printf("CMD6: SWITCH_FUNC\n");
+	arg = (mode << 31) | 0xffffff;
+	arg &= ~(0xf << (group * 4));
+	arg |= value << (group * 4);
+	printf("0x%8x\n", arg);
+
+	sdcore_argument_write(arg);
+	sdcore_blocksize_write(64);
+	sdcore_blockcount_write(1);
+	ramwriter_address_write(destaddr/4);
+	sdcore_command_write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	sdcard_wait_response();
+	return sdcard_wait_data_done();
+}
+
+int sdcard_app_send_scr(unsigned int destaddr) {
+	printf("CMD51: APP_SEND_SCR\n");
+	sdcore_argument_write(0x00000000);
+	sdcore_blocksize_write(8);
+	sdcore_blockcount_write(1);
+	ramwriter_address_write(destaddr/4);
+	sdcore_command_write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	sdcard_wait_response();
+	return sdcard_wait_data_done();
+}
+
+
+int sdcard_app_set_blocklen(unsigned int blocklen) {
+	printf("CMD16: SET_BLOCKLEN\n");
+	sdcore_argument_write(blocklen);
+	sdcore_command_write((16 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	return sdcard_wait_response();
+}
+
 /* user */
 
 static void busy_wait(unsigned int ds)
@@ -214,16 +253,17 @@ static void busy_wait(unsigned int ds)
 	while(timer0_value_read()) timer0_update_value_write(1);
 }
 
-int sdcard_init(void) {
+int sdcard_init(unsigned int freq) {
 	unsigned short rca;
 
 	/* low speed clock */
 	sdcrg_set_clk(10);
+	busy_wait(2);
 
 	/* reset card */
 	sdcard_go_idle();
 	sdcard_send_ext_csd();
-	busy_wait(1);
+	busy_wait(2);
 
 	/* wait for card to be ready */
 	/* FIXME: 1.8v support */
@@ -259,16 +299,22 @@ int sdcard_init(void) {
 	sdcard_app_set_bus_width();
 
 	/* switch speed */
-	/* FIXME */
+	sdcard_switch(SD_SWITCH_SWITCH, SD_GROUP_ACCESSMODE, SD_SPEED_SDR50, SRAM_BASE);
 
 	/* switch driver strength */
-	/* FIXME */
+	sdcard_switch(SD_SWITCH_SWITCH, SD_GROUP_DRIVERSTRENGTH, SD_DRIVER_STRENGTH_D, SRAM_BASE);
+
+	/* full speed clock */
+	sdcrg_set_clk(freq);
+	busy_wait(2);
 
 	/* send scr */
-	/* FIXME */
+	/* FIXME: add csr decoding (optional) */
+	sdcard_app_cmd(rca);
+	sdcard_app_send_scr(SRAM_BASE);
 
 	/* set block length */
-	/* FIXME */
+	sdcard_app_set_blocklen(512);
 
 	return 0;
 }
