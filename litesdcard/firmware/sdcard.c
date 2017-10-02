@@ -354,7 +354,7 @@ static void busy_wait(unsigned int ds)
 	while(timer0_value_read()) timer0_update_value_write(1);
 }
 
-int sdcard_init(unsigned int freq) {
+int sdcard_init(void) {
 	unsigned short rca;
 
 	/* low speed clock */
@@ -401,14 +401,10 @@ int sdcard_init(unsigned int freq) {
 	sdcard_app_set_bus_width();
 
 	/* switch speed */
-	sdcard_switch(SD_SWITCH_SWITCH, SD_GROUP_ACCESSMODE, SD_SPEED_SDR50, SRAM_BASE);
+	sdcard_switch(SD_SWITCH_SWITCH, SD_GROUP_ACCESSMODE, SD_SPEED_SDR104, SRAM_BASE);
 
 	/* switch driver strength */
 	sdcard_switch(SD_SWITCH_SWITCH, SD_GROUP_DRIVERSTRENGTH, SD_DRIVER_STRENGTH_D, SRAM_BASE);
-
-	/* full speed clock */
-	sdcrg_set_clk(freq);
-	busy_wait(2);
 
 	/* send scr */
 	/* FIXME: add scr decoding (optional) */

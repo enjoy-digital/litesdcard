@@ -100,7 +100,7 @@ static void console_service(void)
 		sdcrg_set_clk(atoi(token));
 	}
 	else if(strcmp(token, "sdinit") == 0)
-		sdcard_init(10);
+		sdcard_init();
 	else if(strcmp(token, "sdtest") == 0)
 		sdcard_test();
 	prompt();

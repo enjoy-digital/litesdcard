@@ -75,7 +75,7 @@ int sdcard_app_set_blocklen(unsigned int blocklen);
 int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr);
 int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr);
 
-int sdcard_init(unsigned int freq);
+int sdcard_init(void);
 int sdcard_test(void);
 
 #endif /* __SDCARD_H */
