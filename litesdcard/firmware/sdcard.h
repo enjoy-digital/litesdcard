@@ -66,6 +66,7 @@ int sdcard_set_relative_address(void);
 int sdcard_send_cid(unsigned int rca);
 void sdcard_decode_cid(void);
 int sdcard_send_csd(unsigned int rca);
+void sdcard_decode_csd(void);
 int sdcard_select_card(unsigned int rca);
 int sdcard_app_set_bus_width(void);
 int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int destaddr);

@@ -243,7 +243,7 @@ int sdcard_app_set_blocklen(unsigned int blocklen) {
 
 void sdcard_decode_cid(void) {
 	printf(
-		"CID Register: 0x%x%8x%8x%8x\n"
+		"CID Register: 0x%08x%08x%08x%08x\n"
 		"Manufacturer ID: 0x%x\n"
 		"Application ID 0x%x\n"
 		"Product name: %c%c%c%c%c\n",
@@ -251,14 +251,37 @@ void sdcard_decode_cid(void) {
 			sdcard_response[1],
 			sdcard_response[2],
 			sdcard_response[3],
+
 			(sdcard_response[0] >> 16) & 0xffff,
+
 			sdcard_response[0] & 0xffff,
+
 			(sdcard_response[1] >> 24) & 0xff,
 			(sdcard_response[1] >> 16) & 0xff,
 			(sdcard_response[1] >>  8) & 0xff,
 			(sdcard_response[1] >>  0) & 0xff,
 			(sdcard_response[2] >> 24) & 0xff
 		);
+}
+
+void sdcard_decode_csd(void) {
+	/* FIXME: only support CSR structure version 2.0 */
+	printf(
+		"CSD Register: 0x%x%08x%08x%08x\n"
+		"Max data transfer rate: %d MB/s\n"
+		"Max read block length: %d bytes\n"
+		"Device size: %d GB\n",
+			sdcard_response[0],
+			sdcard_response[1],
+			sdcard_response[2],
+			sdcard_response[3],
+
+			(sdcard_response[1] >> 24) & 0xff,
+
+			(1 << ((sdcard_response[1] >> 8) & 0xf)),
+
+			((sdcard_response[2] >> 8) & 0x3fffff)*512/(1024*1024)
+	);
 }
 
 /* user */
@@ -309,8 +332,8 @@ int sdcard_init(unsigned int freq) {
 	sdcard_send_cid(rca);
 
 	/* set csd */
-	/* FIXME: add csd decoding (optional) */
 	sdcard_send_csd(rca);
+	sdcard_decode_csd();
 
 	/* select card */
 	sdcard_select_card(rca);
