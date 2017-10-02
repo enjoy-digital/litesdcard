@@ -68,8 +68,8 @@ class SDCRG(Module, AutoCSR):
                      p_CLKFBOUT_MULT=16, p_DIVCLK_DIVIDE=1,
                      i_CLKIN1=clk100, i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb,
 
-                     # 25 MHz
-                     p_CLKOUT0_DIVIDE=64, p_CLKOUT0_PHASE=0.0,
+                     # 50 MHz
+                     p_CLKOUT0_DIVIDE=32, p_CLKOUT0_PHASE=0.0,
                      o_CLKOUT0=pll_sys
             ),
             Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
@@ -135,8 +135,8 @@ class SDSoC(SoCCore):
     def __init__(self, with_cpu, with_emulator, with_analyzer):
         platform = arty.Platform()
         platform.add_extension(_sd_io)
-        clk_freq = int(25e6)
-        sd_freq = int(50e6)
+        clk_freq = int(50e6)
+        sd_freq = int(100e6)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type="lm32" if with_cpu else None,
