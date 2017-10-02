@@ -241,6 +241,26 @@ int sdcard_app_set_blocklen(unsigned int blocklen) {
 	return sdcard_wait_response();
 }
 
+void sdcard_decode_cid(void) {
+	printf(
+		"CID Register: 0x%x%8x%8x%8x\n"
+		"Manufacturer ID: 0x%x\n"
+		"Application ID 0x%x\n"
+		"Product name: %c%c%c%c%c\n",
+			sdcard_response[0],
+			sdcard_response[1],
+			sdcard_response[2],
+			sdcard_response[3],
+			(sdcard_response[0] >> 16) & 0xffff,
+			sdcard_response[0] & 0xffff,
+			(sdcard_response[1] >> 24) & 0xff,
+			(sdcard_response[1] >> 16) & 0xff,
+			(sdcard_response[1] >>  8) & 0xff,
+			(sdcard_response[1] >>  0) & 0xff,
+			(sdcard_response[2] >> 24) & 0xff
+		);
+}
+
 /* user */
 
 static void busy_wait(unsigned int ds)
@@ -278,6 +298,7 @@ int sdcard_init(unsigned int freq) {
 
 	/* send identification */
 	sdcard_all_send_cid();
+	sdcard_decode_cid();
 
 	/* set relative card address */
 	sdcard_set_relative_address();
