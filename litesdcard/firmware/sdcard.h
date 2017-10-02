@@ -69,10 +69,13 @@ int sdcard_send_csd(unsigned int rca);
 void sdcard_decode_csd(void);
 int sdcard_select_card(unsigned int rca);
 int sdcard_app_set_bus_width(void);
-int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int destaddr);
-int sdcard_app_send_scr(unsigned int destaddr);
+int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int dstaddr);
+int sdcard_app_send_scr(unsigned int dstaddr);
 int sdcard_app_set_blocklen(unsigned int blocklen);
+int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr);
+int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr);
 
 int sdcard_init(unsigned int freq);
+int sdcard_test(void);
 
 #endif /* __SDCARD_H */

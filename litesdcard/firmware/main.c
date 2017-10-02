@@ -72,8 +72,10 @@ static void help(void)
 	puts("Available commands:");
 	puts("help         - this command");
 	puts("reboot       - reboot CPU");
-	puts("sdinit       - SDCard initialization");
 	puts("sdclk <freq> - SDCard set clk frequency (Mhz)");
+	puts("sdinit       - SDCard initialization");
+	puts("sdtest       - SDCard test");
+
 }
 
 static void reboot(void)
@@ -93,12 +95,14 @@ static void console_service(void)
 		help();
 	else if(strcmp(token, "reboot") == 0)
 		reboot();
-	else if(strcmp(token, "sdinit") == 0)
-		sdcard_init(10);
 	else if(strcmp(token, "sdclk") == 0) {
 		token = get_token(&str);
 		sdcrg_set_clk(atoi(token));
 	}
+	else if(strcmp(token, "sdinit") == 0)
+		sdcard_init(10);
+	else if(strcmp(token, "sdtest") == 0)
+		sdcard_test();
 	prompt();
 }
 

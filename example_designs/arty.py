@@ -14,6 +14,7 @@ from litex.soc.cores.uart import UARTWishboneBridge
 from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
+from litex.soc.interconnect import wishbone
 
 from litesdcard.phy import SDPHY
 from litesdcard.core import SDCore
@@ -126,6 +127,11 @@ class SDSoC(SoCCore):
     }
     csr_map.update(SoCCore.csr_map)
 
+    mem_map = {
+        "sdsram": 0x20000000,
+    }
+    mem_map.update(SoCCore.mem_map)
+
     def __init__(self, with_cpu, with_emulator, with_analyzer):
         platform = arty.Platform()
         platform.add_extension(_sd_io)
@@ -157,10 +163,14 @@ class SDSoC(SoCCore):
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
 
+        self.submodules.sdsram = wishbone.SRAM(2048)
+        self.register_mem("sdsram", self.mem_map["sdsram"], self.sdsram.bus, 2048)
+
         self.submodules.ramreader = RAMReader()
         self.submodules.ramwriter = RAMWriter()
         self.add_wb_master(self.ramreader.bus)
         self.add_wb_master(self.ramwriter.bus)
+
 
         self.comb += [
             self.sdcore.source.connect(self.ramwriter.sink),

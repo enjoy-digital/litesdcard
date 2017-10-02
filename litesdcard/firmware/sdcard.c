@@ -202,7 +202,7 @@ int sdcard_app_set_bus_width(void) {
 	return sdcard_wait_response();
 }
 
-int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int destaddr) {
+int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int dstaddr) {
 	unsigned int arg;
 
 	printf("CMD6: SWITCH_FUNC\n");
@@ -214,19 +214,19 @@ int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, uns
 	sdcore_argument_write(arg);
 	sdcore_blocksize_write(64);
 	sdcore_blockcount_write(1);
-	ramwriter_address_write(destaddr/4);
+	ramwriter_address_write(dstaddr/4);
 	sdcore_command_write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
 	sdcard_wait_response();
 	return sdcard_wait_data_done();
 }
 
-int sdcard_app_send_scr(unsigned int destaddr) {
+int sdcard_app_send_scr(unsigned int dstaddr) {
 	printf("CMD51: APP_SEND_SCR\n");
 	sdcore_argument_write(0x00000000);
 	sdcore_blocksize_write(8);
 	sdcore_blockcount_write(1);
-	ramwriter_address_write(destaddr/4);
+	ramwriter_address_write(dstaddr/4);
 	sdcore_command_write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
 	sdcard_wait_response();
@@ -239,6 +239,34 @@ int sdcard_app_set_blocklen(unsigned int blocklen) {
 	sdcore_argument_write(blocklen);
 	sdcore_command_write((16 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
 	return sdcard_wait_response();
+}
+
+int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr) {
+	printf("CMD24: WRITE_SINGLE_BLOCK\n");
+	sdcore_argument_write(blockaddr);
+	sdcore_blocksize_write(512);
+	sdcore_blockcount_write(1);
+	sdcore_command_write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+						 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
+	sdcard_wait_response();
+
+	ramreader_address_write(srcaddr/4);
+	ramreader_length_write(512);
+	while ((ramreader_done_read() & 0x01) == 0);
+
+	return 0;
+}
+
+int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr) {
+	printf("CMD17: READ_SINGLE_BLOCK\n");
+	sdcore_argument_write(blockaddr);
+	sdcore_blocksize_write(512);
+	sdcore_blockcount_write(1);
+	ramwriter_address_write(dstaddr/4);
+	sdcore_command_write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	sdcard_wait_response();
+	return sdcard_wait_data_done();
 }
 
 void sdcard_decode_cid(void) {
@@ -283,6 +311,36 @@ void sdcard_decode_csd(void) {
 			((sdcard_response[2] >> 8) & 0x3fffff)*512/(1024*1024)
 	);
 }
+
+static unsigned int seed_to_data(unsigned int seed, unsigned char random) {
+	if (random)
+		return (1664525*seed + 1013904223) & 0xffffffff;
+	else
+		return seed;
+}
+
+static void write_pattern(unsigned int baseaddr, unsigned int length, unsigned int offset) {
+	unsigned int i;
+	volatile unsigned int *buffer = (unsigned int *)baseaddr;
+
+	for(i=offset; i<length+offset; i++) {
+		buffer[i] = seed_to_data(i, 0);
+	}
+}
+
+static unsigned int check_pattern(unsigned int baseaddr, unsigned int length, unsigned int offset) {
+	unsigned int i;
+	unsigned int errors;
+	volatile unsigned int *buffer = (unsigned int *)baseaddr;
+
+	for(i=offset; i<length+offset; i++) {
+		if (buffer[i] != seed_to_data(i, 0))
+			errors++;
+	}
+
+	return errors;
+}
+
 
 /* user */
 
@@ -353,12 +411,33 @@ int sdcard_init(unsigned int freq) {
 	busy_wait(2);
 
 	/* send scr */
-	/* FIXME: add csr decoding (optional) */
+	/* FIXME: add scr decoding (optional) */
 	sdcard_app_cmd(rca);
 	sdcard_app_send_scr(SRAM_BASE);
 
 	/* set block length */
 	sdcard_app_set_blocklen(512);
+
+	return 0;
+}
+
+int sdcard_test(void) {
+	unsigned int i;
+	unsigned int errors;
+
+	errors = 0;
+
+	for(i=0; i<8; i++) {
+		/* write */
+		write_pattern(SDSRAM_BASE, 512/4, 0);
+		sdcard_write_single_block(0, SDSRAM_BASE);
+
+		/* read */
+		sdcard_read_single_block(0, SDSRAM_BASE);
+		errors += check_pattern(SDSRAM_BASE, 512/4, 0);
+	}
+
+	printf("errors : %d\n", errors);
 
 	return 0;
 }
