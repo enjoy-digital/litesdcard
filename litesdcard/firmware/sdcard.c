@@ -11,35 +11,35 @@
 
 /* clocking */
 
-static void sdcrg_mmcm_write(unsigned int adr, unsigned int data) {
-	sdcrg_mmcm_adr_write(adr);
-	sdcrg_mmcm_dat_w_write(data);
-	sdcrg_mmcm_write_write(1);
-	while(!sdcrg_mmcm_drdy_read());
+static void sdclk_mmcm_write(unsigned int adr, unsigned int data) {
+	sdclk_mmcm_adr_write(adr);
+	sdclk_mmcm_dat_w_write(data);
+	sdclk_mmcm_write_write(1);
+	while(!sdclk_mmcm_drdy_read());
 }
 
 
-static void sdcrg_set_config(unsigned int m, unsigned int d) {
+static void sdclk_set_config(unsigned int m, unsigned int d) {
 	/* clkfbout_mult = m */
 	if(m%2)
-		sdcrg_mmcm_write(0x14, 0x1000 | ((m/2)<<6) | (m/2 + 1));
+		sdclk_mmcm_write(0x14, 0x1000 | ((m/2)<<6) | (m/2 + 1));
 	else
-		sdcrg_mmcm_write(0x14, 0x1000 | ((m/2)<<6) | m/2);
+		sdclk_mmcm_write(0x14, 0x1000 | ((m/2)<<6) | m/2);
 	/* divclk_divide = d */
 	if (d == 1)
-		sdcrg_mmcm_write(0x16, 0x1000);
+		sdclk_mmcm_write(0x16, 0x1000);
 	else if(d%2)
-		sdcrg_mmcm_write(0x16, ((d/2)<<6) | (d/2 + 1));
+		sdclk_mmcm_write(0x16, ((d/2)<<6) | (d/2 + 1));
 	else
-		sdcrg_mmcm_write(0x16, ((d/2)<<6) | d/2);
+		sdclk_mmcm_write(0x16, ((d/2)<<6) | d/2);
 	/* clkout0_divide = 10 */
-	sdcrg_mmcm_write(0x8, 0x1000 | (5<<6) | 5);
+	sdclk_mmcm_write(0x8, 0x1000 | (5<<6) | 5);
 	/* clkout1_divide = 2 */
-	sdcrg_mmcm_write(0xa, 0x1000 | (1<<6) | 1);
+	sdclk_mmcm_write(0xa, 0x1000 | (1<<6) | 1);
 }
 
 /* FIXME: add vco frequency check */
-static void sdcrg_get_config(unsigned int freq, unsigned int *best_m, unsigned int *best_d) {
+static void sdclk_get_config(unsigned int freq, unsigned int *best_m, unsigned int *best_d) {
 	unsigned int ideal_m, ideal_d;
 	unsigned int bm, bd;
 	unsigned int m, d;
@@ -65,11 +65,11 @@ static void sdcrg_get_config(unsigned int freq, unsigned int *best_m, unsigned i
 	*best_d = bd;
 }
 
-void sdcrg_set_clk(unsigned int freq) {
+void sdclk_set_clk(unsigned int freq) {
 	unsigned int clk_m, clk_d;
 
-	sdcrg_get_config(1000*freq, &clk_m, &clk_d);
-	sdcrg_set_config(clk_m, clk_d);
+	sdclk_get_config(1000*freq, &clk_m, &clk_d);
+	sdclk_set_config(clk_m, clk_d);
 }
 
 /* command utils */
@@ -358,7 +358,7 @@ int sdcard_init(void) {
 	unsigned short rca;
 
 	/* low speed clock */
-	sdcrg_set_clk(10);
+	sdclk_set_clk(10);
 	busy_wait(2);
 
 	/* reset card */

@@ -97,7 +97,7 @@ static void console_service(void)
 		reboot();
 	else if(strcmp(token, "sdclk") == 0) {
 		token = get_token(&str);
-		sdcrg_set_clk(atoi(token));
+		sdclk_set_clk(atoi(token));
 	}
 	else if(strcmp(token, "sdinit") == 0)
 		sdcard_init();

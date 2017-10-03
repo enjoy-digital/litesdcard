@@ -50,7 +50,7 @@
 #define SDCARD_CTRL_RESPONSE_LONG  2
 
 
-void sdcrg_set_clk(unsigned int freq);
+void sdclk_set_clk(unsigned int freq);
 
 int sdcard_wait_cmd_done(void);
 int sdcard_wait_data_done(void);

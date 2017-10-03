@@ -17,6 +17,7 @@ from litex.soc.integration.builder import *
 from litex.soc.interconnect import wishbone
 
 from litesdcard.phy import SDPHY
+from litesdcard.clocker import SDClockerS7
 from litesdcard.core import SDCore
 from litesdcard.ram import RAMReader, RAMWriter
 
@@ -37,87 +38,9 @@ _sd_io = [
 ]
 
 
-class SDCRG(Module, AutoCSR):
-    def __init__(self, platform):
-        self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_sd = ClockDomain()
-        self.clock_domains.cd_sd_fb = ClockDomain()
-
-        self._mmcm_reset = CSRStorage()
-        self._mmcm_read = CSR()
-        self._mmcm_write = CSR()
-        self._mmcm_drdy = CSRStatus()
-        self._mmcm_adr = CSRStorage(7)
-        self._mmcm_dat_w = CSRStorage(16)
-        self._mmcm_dat_r = CSRStatus(16)
-
-        # # #
-
-        clk100 = platform.request("clk100")
-        rst = ~platform.request("cpu_reset")
-
-        pll_locked = Signal()
-        pll_fb = Signal()
-        pll_sys = Signal()
-        self.specials += [
-            Instance("PLLE2_BASE",
-                     p_STARTUP_WAIT="FALSE", o_LOCKED=pll_locked,
-
-                     # VCO @ 1600 MHz
-                     p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=10.0,
-                     p_CLKFBOUT_MULT=16, p_DIVCLK_DIVIDE=1,
-                     i_CLKIN1=clk100, i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb,
-
-                     # 50 MHz
-                     p_CLKOUT0_DIVIDE=32, p_CLKOUT0_PHASE=0.0,
-                     o_CLKOUT0=pll_sys
-            ),
-            Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
-            AsyncResetSynchronizer(self.cd_sys, ~pll_locked | rst),
-        ]
-
-        mmcm_locked = Signal()
-        mmcm_fb = Signal()
-        mmcm_clk0 = Signal()
-        mmcm_drdy = Signal()
-
-        self.specials += [
-            Instance("MMCME2_ADV",
-                p_BANDWIDTH="OPTIMIZED",
-                i_RST=self._mmcm_reset.storage, o_LOCKED=mmcm_locked,
-
-                # VCO
-                p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=10.0,
-                p_CLKFBOUT_MULT_F=30.0, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=2,
-                i_CLKIN1=clk100, i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
-
-                # CLK0
-                p_CLKOUT0_DIVIDE_F=10.0, p_CLKOUT0_PHASE=0.000, o_CLKOUT0=mmcm_clk0,
-
-                # DRP
-                i_DCLK=ClockSignal(),
-                i_DWE=self._mmcm_write.re,
-                i_DEN=self._mmcm_read.re | self._mmcm_write.re,
-                o_DRDY=mmcm_drdy,
-                i_DADDR=self._mmcm_adr.storage,
-                i_DI=self._mmcm_dat_w.storage,
-                o_DO=self._mmcm_dat_r.status
-            ),
-            Instance("BUFG", i_I=mmcm_clk0, o_O=self.cd_sd.clk),
-        ]
-        self.sync += [
-            If(self._mmcm_read.re | self._mmcm_write.re,
-                self._mmcm_drdy.status.eq(0)
-            ).Elif(mmcm_drdy,
-                self._mmcm_drdy.status.eq(1)
-            )
-        ]
-        self.comb += self.cd_sd.rst.eq(~mmcm_locked)
-
-
 class SDSoC(SoCCore):
     csr_map = {
-        "sdcrg":      20,
+        "sdclk":      20,
         "sdphy":      21,
         "sdcore":     22,
         "sdemulator": 23,
@@ -159,7 +82,7 @@ class SDSoC(SoCCore):
         else:
             sdcard_pads = platform.request('sdcard')
 
-        self.submodules.sdcrg = SDCRG(platform)
+        self.submodules.sdclk = SDClockerS7(platform)
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
 
@@ -177,17 +100,17 @@ class SDSoC(SoCCore):
             self.ramreader.source.connect(self.sdcore.sink)
         ]
 
-        self.platform.add_period_constraint(self.sdcrg.cd_sys.clk, 1e9/clk_freq)
-        self.platform.add_period_constraint(self.sdcrg.cd_sd.clk, 1e9/sd_freq)
-        self.platform.add_period_constraint(self.sdcrg.cd_sd_fb.clk, 1e9/sd_freq)
+        self.platform.add_period_constraint(self.sdclk.cd_sys.clk, 1e9/clk_freq)
+        self.platform.add_period_constraint(self.sdclk.cd_sd.clk, 1e9/sd_freq)
+        self.platform.add_period_constraint(self.sdclk.cd_sd_fb.clk, 1e9/sd_freq)
 
-        self.sdcrg.cd_sys.clk.attr.add("keep")
-        self.sdcrg.cd_sd.clk.attr.add("keep")
-        self.sdcrg.cd_sd_fb.clk.attr.add("keep")
+        self.sdclk.cd_sys.clk.attr.add("keep")
+        self.sdclk.cd_sd.clk.attr.add("keep")
+        self.sdclk.cd_sd_fb.clk.attr.add("keep")
         self.platform.add_false_path_constraints(
-            self.sdcrg.cd_sys.clk,
-            self.sdcrg.cd_sd.clk,
-            self.sdcrg.cd_sd_fb.clk)
+            self.sdclk.cd_sys.clk,
+            self.sdclk.cd_sd.clk,
+            self.sdclk.cd_sd_fb.clk)
 
         led_counter = Signal(32)
         self.sync.sd += led_counter.eq(led_counter + 1)
