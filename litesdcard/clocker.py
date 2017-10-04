@@ -3,7 +3,7 @@ from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 from litex.soc.interconnect.csr import *
 
 
-class SDClocker(Module, AutoCSR):
+class SDClockerS6(Module, AutoCSR):
     def __init__(self, max_sd_clk=100e6):
             self._cmd_data = CSRStorage(10)
             self._send_cmd_data = CSR()
