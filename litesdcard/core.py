@@ -6,13 +6,12 @@ from litex.soc.interconnect.csr import *
 from litesdcard.common import *
 from litesdcard.crc import CRC, CRCChecker
 from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
-from litesdcard.convert import Stream32to8, Stream8to32
 
 
 class SDCore(Module, AutoCSR):
     def __init__(self, phy):
-        self.sink = stream.Endpoint([("data", 32), ("cnt", 2)])
-        self.source = stream.Endpoint([("data", 32), ('cnt', 2)])
+        self.sink = stream.Endpoint([("data", 32)])
+        self.source = stream.Endpoint([("data", 32)])
 
         self.argument = CSRStorage(32)
         self.command = CSRStorage(32)
@@ -70,8 +69,10 @@ class SDCore(Module, AutoCSR):
         self.submodules.downstream_cdc = ClockDomainsRenamer({"write": "sd", "read": "sys"})(
             stream.AsyncFIFO(self.source.description, 4))
 
-        self.submodules.upstream_converter = ClockDomainsRenamer("sd")(Stream32to8())
-        self.submodules.downstream_converter = ClockDomainsRenamer("sd")(Stream8to32())
+        self.submodules.upstream_converter = ClockDomainsRenamer("sd")(
+            stream.StrideConverter([('data', 32)], [('data', 8)]))
+        self.submodules.downstream_converter = ClockDomainsRenamer("sd")(
+            stream.StrideConverter([('data', 8)], [('data', 32)]))
 
         self.comb += [
             self.sink.connect(self.upstream_cdc.sink),

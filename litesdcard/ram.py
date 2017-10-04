@@ -6,7 +6,7 @@ from litex.soc.interconnect.csr import *
 class RAMReader(Module, AutoCSR):
     def __init__(self, data_width=32):
         self.bus = bus = wishbone.Interface(data_width)
-        self.source = source = stream.Endpoint([('data', data_width), ('cnt', 2)])
+        self.source = source = stream.Endpoint([('data', data_width)])
 
         self.address = CSRStorage(32)
         self.length = CSRStorage(32)
@@ -34,10 +34,7 @@ class RAMReader(Module, AutoCSR):
             fifo.sink.valid.eq(bus.ack),
 
             If(word_counter == to_count -1,
-               fifo.sink.last.eq(1),
-               fifo.sink.cnt.eq((self.length.storage & 0x3) - 1)
-            ).Else(
-                fifo.sink.cnt.eq(3)
+               fifo.sink.last.eq(1)
             ),
             fifo.source.connect(source),
 
@@ -63,7 +60,7 @@ class RAMReader(Module, AutoCSR):
 
 class RAMWriter(Module, AutoCSR):
     def __init__(self, data_width=32):
-        self.sink = sink = stream.Endpoint([('data', 32), ('cnt', 2)])
+        self.sink = sink = stream.Endpoint([('data', 32)])
         self.bus = bus = wishbone.Interface(data_width)
 
         self.address = CSRStorage(32)
