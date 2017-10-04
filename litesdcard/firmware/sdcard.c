@@ -9,6 +9,8 @@
 
 #include "sdcard.h"
 
+//#define SDCARD_DEBUG
+
 /* clocking */
 
 static void sdclk_mmcm_write(unsigned int adr, unsigned int data) {
@@ -74,21 +76,37 @@ void sdclk_set_clk(unsigned int freq) {
 
 /* command utils */
 
+static void busy_wait(unsigned int ms)
+{
+	timer0_en_write(0);
+	timer0_reload_write(0);
+	timer0_load_write(SYSTEM_CLOCK_FREQUENCY/1000*ms);
+	timer0_en_write(1);
+	timer0_update_value_write(1);
+	while(timer0_value_read()) timer0_update_value_write(1);
+}
+
 unsigned int sdcard_response[4];
 
 int sdcard_wait_cmd_done(void) {
 	unsigned int cmdevt;
 	while (1) {
 		cmdevt = sdcore_cmdevt_read();
+#ifdef SDCARD_DEBUG
 		printf("cmdevt: %08x\n", cmdevt);
+#endif
 		if (cmdevt & 0x1) {
 			if (cmdevt & 0x4) {
+#ifdef SDCARD_DEBUG
 				printf("cmdevt: SD_TIMEOUT\n");
+#endif
 				return SD_TIMEOUT;
 			}
 			else if (cmdevt & 0x8) {
+#ifdef SDCARD_DEBUG
 				printf("cmdevt: SD_CRCERROR\n");
 				return SD_CRCERROR;
+#endif
 			}
 			return SD_OK;
 		}
@@ -99,7 +117,9 @@ int sdcard_wait_data_done(void) {
 	unsigned int dataevt;
 	while (1) {
 		dataevt = sdcore_dataevt_read();
+#ifdef SDCARD_DEBUG
 		printf("dataevt: %08x\n", dataevt);
+#endif
 		if (dataevt & 0x1) {
 			if (dataevt & 0x4)
 				return SD_TIMEOUT;
@@ -118,7 +138,9 @@ int sdcard_wait_response(void) {
 	status = sdcard_wait_cmd_done();
 
 	for(i=0; i<4; i++) {
+#ifdef SDCARD_DEBUG
 		printf("%08x\n", buffer[i]);
+#endif
 		sdcard_response[i] = buffer[i];
 	}
 
@@ -128,28 +150,38 @@ int sdcard_wait_response(void) {
 /* commands */
 
 void sdcard_go_idle(void) {
+#ifdef SDCARD_DEBUG
 	printf("CMD0: GO_IDLE\n");
+#endif
 	sdcore_argument_write(0x00000000);
 	sdcore_command_write((0 << 8) | SDCARD_CTRL_RESPONSE_NONE);
 }
 
 int sdcard_send_ext_csd(void) {
+#ifdef SDCARD_DEBUG
 	printf("CMD8: SEND_EXT_CSD\n");
+#endif
 	sdcore_argument_write(0x000001aa);
 	sdcore_command_write((8 << 8) | SDCARD_CTRL_RESPONSE_NONE);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_app_cmd(int rca) {
+#ifdef SDCARD_DEBUG
 	printf("CMD55: APP_CMD\n");
+#endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_app_send_op_cond(int hcs, int s18r) {
 	unsigned int arg;
+#ifdef SDCARD_DEBUG
 	printf("ACMD41: APP_SEND_OP_COND\n");
+#endif
 	arg = 0x10ff8000;
 	if (hcs)
 		arg |= 0x60000000;
@@ -157,59 +189,79 @@ int sdcard_app_send_op_cond(int hcs, int s18r) {
 		arg |= 0x01000000;
 	sdcore_argument_write(arg);
 	sdcore_command_write((41 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_all_send_cid(void) {
+#ifdef SDCARD_DEBUG
 	printf("CMD2: ALL_SEND_CID\n");
+#endif
 	sdcore_argument_write(0x00000000);
 	sdcore_command_write((2 << 8) | SDCARD_CTRL_RESPONSE_LONG);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_set_relative_address(void) {
+#ifdef SDCARD_DEBUG
 	printf("CMD3: SET_RELATIVE_ADDRESS\n");
+#endif
 	sdcore_argument_write(0x00000000);
 	sdcore_command_write((3 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_send_cid(unsigned int rca) {
+#ifdef SDCARD_DEBUG
 	printf("CMD10: SEND_CID\n");
+#endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((10 << 8) | SDCARD_CTRL_RESPONSE_LONG);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_send_csd(unsigned int rca) {
+#ifdef SDCARD_DEBUG
 	printf("CMD9: SEND_CSD\n");
+#endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((9 << 8) | SDCARD_CTRL_RESPONSE_LONG);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_select_card(unsigned int rca) {
+#ifdef SDCARD_DEBUG
 	printf("CMD7: SELECT_CARD\n");
+#endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((7 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_app_set_bus_width(void) {
+#ifdef SDCARD_DEBUG
 	printf("ACMD6: SET_BUS_WIDTH\n");
+#endif
 	sdcore_argument_write(0x00000002);
 	sdcore_command_write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int dstaddr) {
 	unsigned int arg;
 
+#ifdef SDCARD_DEBUG
 	printf("CMD6: SWITCH_FUNC\n");
+#endif
 	arg = (mode << 31) | 0xffffff;
 	arg &= ~(0xf << (group * 4));
 	arg |= value << (group * 4);
-	printf("0x%8x\n", arg);
 
 	sdcore_argument_write(arg);
 	sdcore_blocksize_write(64);
@@ -217,37 +269,49 @@ int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, uns
 	ramwriter_address_write(dstaddr/4);
 	sdcore_command_write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	busy_wait(1);
 	sdcard_wait_response();
+	busy_wait(1);
 	return sdcard_wait_data_done();
 }
 
 int sdcard_app_send_scr(unsigned int dstaddr) {
+#ifdef SDCARD_DEBUG
 	printf("CMD51: APP_SEND_SCR\n");
+#endif
 	sdcore_argument_write(0x00000000);
 	sdcore_blocksize_write(8);
 	sdcore_blockcount_write(1);
 	ramwriter_address_write(dstaddr/4);
 	sdcore_command_write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	busy_wait(1);
 	sdcard_wait_response();
+	busy_wait(1);
 	return sdcard_wait_data_done();
 }
 
 
 int sdcard_app_set_blocklen(unsigned int blocklen) {
+#ifdef SDCARD_DEBUG
 	printf("CMD16: SET_BLOCKLEN\n");
+#endif
 	sdcore_argument_write(blocklen);
 	sdcore_command_write((16 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
 	return sdcard_wait_response();
 }
 
 int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr) {
+#ifdef SDCARD_DEBUG
 	printf("CMD24: WRITE_SINGLE_BLOCK\n");
+#endif
 	sdcore_argument_write(blockaddr);
 	sdcore_blocksize_write(512);
 	sdcore_blockcount_write(1);
 	sdcore_command_write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
+	busy_wait(1);
 	sdcard_wait_response();
 
 	ramreader_address_write(srcaddr/4);
@@ -258,14 +322,18 @@ int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr) {
 }
 
 int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr) {
+#ifdef SDCARD_DEBUG
 	printf("CMD17: READ_SINGLE_BLOCK\n");
+#endif
 	sdcore_argument_write(blockaddr);
 	sdcore_blocksize_write(512);
 	sdcore_blockcount_write(1);
 	ramwriter_address_write(dstaddr/4);
 	sdcore_command_write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	busy_wait(1);
 	sdcard_wait_response();
+	busy_wait(1);
 	return sdcard_wait_data_done();
 }
 
@@ -344,27 +412,16 @@ static unsigned int check_pattern(unsigned int baseaddr, unsigned int length, un
 
 /* user */
 
-static void busy_wait(unsigned int ds)
-{
-	timer0_en_write(0);
-	timer0_reload_write(0);
-	timer0_load_write(SYSTEM_CLOCK_FREQUENCY/10*ds);
-	timer0_en_write(1);
-	timer0_update_value_write(1);
-	while(timer0_value_read()) timer0_update_value_write(1);
-}
-
 int sdcard_init(void) {
 	unsigned short rca;
 
 	/* low speed clock */
 	sdclk_set_clk(10);
-	busy_wait(2);
 
 	/* reset card */
 	sdcard_go_idle();
+	busy_wait(1);
 	sdcard_send_ext_csd();
-	busy_wait(2);
 
 	/* wait for card to be ready */
 	/* FIXME: 1.8v support */
@@ -379,19 +436,25 @@ int sdcard_init(void) {
 
 	/* send identification */
 	sdcard_all_send_cid();
+#ifdef SDCARD_DEBUG
 	sdcard_decode_cid();
+#endif
 
 	/* set relative card address */
 	sdcard_set_relative_address();
 	rca = (sdcard_response[3] >> 16) & 0xffff;
 
 	/* set cid */
-	/* FIXME: add cid decoding (optional) */
 	sdcard_send_cid(rca);
+#ifdef SDCARD_DEBUG
+	/* FIXME: add cid decoding (optional) */
+#endif
 
 	/* set csd */
 	sdcard_send_csd(rca);
+#ifdef SDCARD_DEBUG
 	sdcard_decode_csd();
+#endif
 
 	/* select card */
 	sdcard_select_card(rca);
