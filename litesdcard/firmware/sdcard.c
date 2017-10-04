@@ -86,6 +86,20 @@ static void busy_wait(unsigned int ms)
 	while(timer0_value_read()) timer0_update_value_write(1);
 }
 
+static void sdtimer_init(void)
+{
+	sdtimer_en_write(0);
+	sdtimer_load_write(0xffffffff);
+	sdtimer_reload_write(0xffffffff);
+	sdtimer_en_write(1);
+}
+
+static unsigned int sdtimer_get(void)
+{
+	sdtimer_update_value_write(1);
+	return sdtimer_value_read();
+}
+
 unsigned int sdcard_response[4];
 
 int sdcard_wait_cmd_done(void) {
@@ -311,7 +325,7 @@ int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr) {
 	sdcore_blockcount_write(1);
 	sdcore_command_write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
-	busy_wait(1);
+	busy_wait(5); /* FIXME */
 	sdcard_wait_response();
 
 	ramreader_address_write(srcaddr/4);
@@ -331,9 +345,8 @@ int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr) {
 	ramwriter_address_write(dstaddr/4);
 	sdcore_command_write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
-	busy_wait(1);
+	busy_wait(5); /* FIXME */
 	sdcard_wait_response();
-	busy_wait(1);
 	return sdcard_wait_data_done();
 }
 
@@ -415,9 +428,6 @@ static unsigned int check_pattern(unsigned int baseaddr, unsigned int length, un
 int sdcard_init(void) {
 	unsigned short rca;
 
-	/* low speed clock */
-	sdclk_set_clk(10);
-
 	/* reset card */
 	sdcard_go_idle();
 	busy_wait(1);
@@ -497,6 +507,34 @@ int sdcard_test(void) {
 	}
 
 	printf("errors : %d\n", errors);
+
+	return 0;
+}
+
+int sdcard_speed(void) {
+	unsigned int i;
+	unsigned int length;
+	unsigned int start;
+	unsigned int end;
+	unsigned long speed;
+
+	sdtimer_init();
+
+	length = 32*1024;
+
+	start = sdtimer_get();
+	for(i=0; i<length/512; i++) {
+		/* write */
+		sdcard_write_single_block(i, SDSRAM_BASE);
+
+		/* read */
+		sdcard_read_single_block(i, SDSRAM_BASE);
+	}
+	end = sdtimer_get();
+
+	speed = length*(SYSTEM_CLOCK_FREQUENCY/1000)/((start - end)/1000);
+
+	printf("%d KB/s\n", speed/1024);
 
 	return 0;
 }

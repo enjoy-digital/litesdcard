@@ -75,6 +75,7 @@ static void help(void)
 	puts("sdclk <freq> - SDCard set clk frequency (Mhz)");
 	puts("sdinit       - SDCard initialization");
 	puts("sdtest       - SDCard test");
+	puts("sdspeed      - SDCard speed");
 
 }
 
@@ -103,6 +104,8 @@ static void console_service(void)
 		sdcard_init();
 	else if(strcmp(token, "sdtest") == 0)
 		sdcard_test();
+	else if(strcmp(token, "sdspeed") == 0)
+		sdcard_speed();
 	prompt();
 }
 

@@ -10,6 +10,7 @@ from litex.build.xilinx import VivadoProgrammer
 
 from litex.soc.interconnect import stream
 from litex.soc.cores.uart import UARTWishboneBridge
+from litex.soc.cores.timer import Timer
 
 from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_core import *
@@ -43,9 +44,10 @@ class SDSoC(SoCCore):
         "sdclk":      20,
         "sdphy":      21,
         "sdcore":     22,
-        "sdemulator": 23,
-        "ramreader":  24,
-        "ramwriter":  25,
+        "sdtimer":    23,
+        "sdemulator": 24,
+        "ramreader":  25,
+        "ramwriter":  26,
         "analyzer":   30
     }
     csr_map.update(SoCCore.csr_map)
@@ -85,6 +87,7 @@ class SDSoC(SoCCore):
         self.submodules.sdclk = SDClockerS7(platform)
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
+        self.submodules.sdtimer = Timer()
 
         self.submodules.sdsram = wishbone.SRAM(2048)
         self.register_mem("sdsram", self.mem_map["sdsram"], self.sdsram.bus, 2048)

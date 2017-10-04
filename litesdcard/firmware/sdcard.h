@@ -77,5 +77,6 @@ int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr);
 
 int sdcard_init(void);
 int sdcard_test(void);
+int sdcard_speed(void);
 
 #endif /* __SDCARD_H */
