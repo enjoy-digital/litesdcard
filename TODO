@@ -1,4 +1,3 @@
-- move s6/a7 clocking to a clocker module.
 - add option to select stream or wishbone interface.
 - add irq to read/writes.
 - add bist test to verify fonctionnality and maximum bandwidth.
