@@ -91,7 +91,6 @@ class SDClockerS6(Module, AutoCSR):
 
 class SDClockerS7(Module, AutoCSR):
     def __init__(self, platform):
-        self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.cd_sd = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
 
@@ -104,29 +103,6 @@ class SDClockerS7(Module, AutoCSR):
         self._mmcm_dat_r = CSRStatus(16)
 
         # # #
-
-        clk100 = platform.request("clk100")
-        rst = ~platform.request("cpu_reset")
-
-        pll_locked = Signal()
-        pll_fb = Signal()
-        pll_sys = Signal()
-        self.specials += [
-            Instance("PLLE2_BASE",
-                     p_STARTUP_WAIT="FALSE", o_LOCKED=pll_locked,
-
-                     # VCO @ 1600 MHz
-                     p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=10.0,
-                     p_CLKFBOUT_MULT=16, p_DIVCLK_DIVIDE=1,
-                     i_CLKIN1=clk100, i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb,
-
-                     # 50 MHz
-                     p_CLKOUT0_DIVIDE=32, p_CLKOUT0_PHASE=0.0,
-                     o_CLKOUT0=pll_sys
-            ),
-            Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
-            AsyncResetSynchronizer(self.cd_sys, ~pll_locked | rst),
-        ]
 
         mmcm_locked = Signal()
         mmcm_fb = Signal()
@@ -141,7 +117,7 @@ class SDClockerS7(Module, AutoCSR):
                 # VCO
                 p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=10.0,
                 p_CLKFBOUT_MULT_F=30.0, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=2,
-                i_CLKIN1=clk100, i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
+                i_CLKIN1=ClockSignal(), i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
 
                 # CLK0
                 p_CLKOUT0_DIVIDE_F=10.0, p_CLKOUT0_PHASE=0.000, o_CLKOUT0=mmcm_clk0,
