@@ -329,8 +329,7 @@ int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr) {
 	sdcore_command_write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
     sdcard_wait_response();
-
-	while ((ramreader_done_read() & 0x01) == 0);
+    sdcard_wait_data_done();
 	return 0;
 }
 
