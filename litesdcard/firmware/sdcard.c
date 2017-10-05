@@ -320,7 +320,7 @@ int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr) {
 #ifdef SDCARD_DEBUG
 	printf("CMD24: WRITE_SINGLE_BLOCK\n");
 #endif
-	ramreader_address_write(srcaddr/4);
+	ramreader_address_write(srcaddr);
 	ramreader_length_write(512);
 
 	sdcore_argument_write(blockaddr);
@@ -336,7 +336,7 @@ int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr) {
 #ifdef SDCARD_DEBUG
 	printf("CMD17: READ_SINGLE_BLOCK\n");
 #endif
-	ramwriter_address_write(dstaddr/4);
+	ramwriter_address_write(dstaddr);
 
 	sdcore_argument_write(blockaddr);
 	sdcore_blocksize_write(512);
@@ -401,7 +401,7 @@ static void write_pattern(unsigned int baseaddr, unsigned int length, unsigned i
 	unsigned int i;
 	volatile unsigned int *buffer = (unsigned int *)baseaddr;
 
-	for(i=0; i<length; i++) {
+	for(i=0; i<length/4; i++) {
 		buffer[i+offset] = seed_to_data(i, 0);
 	}
 }
@@ -411,7 +411,7 @@ static unsigned int check_pattern(unsigned int baseaddr, unsigned int length, un
 	unsigned int errors;
 	volatile unsigned int *buffer = (unsigned int *)baseaddr;
 
-	for(i=0; i<length; i++) {
+	for(i=0; i<length/4; i++) {
 		if (buffer[i+offset] != seed_to_data(i, 0))
 			errors++;
 	}
@@ -498,15 +498,15 @@ int sdcard_test(void) {
 
 	for(i=0; i<length/512; i++) {
 		/* write */
-		write_pattern(SDSRAM_BASE, 512/4, 0);
+		write_pattern(SDSRAM_BASE, 512, 0);
 		sdcard_write_single_block(i, SDSRAM_BASE);
 
 		/* corrupt sram */
-		write_pattern(SDSRAM_BASE, 512/4, 4);
+		write_pattern(SDSRAM_BASE, 512, 4);
 
 		/* read */
 		sdcard_read_single_block(i, SDSRAM_BASE);
-		errors += check_pattern(SDSRAM_BASE, 512/4, 0);
+		errors += check_pattern(SDSRAM_BASE, 512, 0);
 	}
 
 	printf("errors: %d\n", errors);
