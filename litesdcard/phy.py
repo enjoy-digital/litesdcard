@@ -399,15 +399,17 @@ class SDPHYDATAW(Module):
         fsm.act("DATA_RESPONSE",
             pads.clk.eq(1),
             pads.data.oe.eq(0),
-            If(cnt < 32,
+            If(cnt < 16,
                 NextValue(cnt, cnt + 1),
                 pads.clk.eq(1)
             ).Else(
-                NextValue(cnt, 0),
-                sink.ready.eq(1),
-                NextState("IDLE")
+                # wait while busy
+                If(pads.data.i[0],
+                    NextValue(cnt, 0),
+                    sink.ready.eq(1),
+                    NextState("IDLE")
+                )
             )
-
         )
 
 
