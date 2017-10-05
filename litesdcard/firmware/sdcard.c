@@ -402,8 +402,8 @@ static void write_pattern(unsigned int baseaddr, unsigned int length, unsigned i
 	unsigned int i;
 	volatile unsigned int *buffer = (unsigned int *)baseaddr;
 
-	for(i=offset; i<length+offset; i++) {
-		buffer[i] = seed_to_data(i, 0);
+	for(i=0; i<length; i++) {
+		buffer[i+offset] = seed_to_data(i, 0);
 	}
 }
 
@@ -412,8 +412,8 @@ static unsigned int check_pattern(unsigned int baseaddr, unsigned int length, un
 	unsigned int errors;
 	volatile unsigned int *buffer = (unsigned int *)baseaddr;
 
-	for(i=offset; i<length+offset; i++) {
-		if (buffer[i] != seed_to_data(i, 0))
+	for(i=0; i<length; i++) {
+		if (buffer[i+offset] != seed_to_data(i, 0))
 			errors++;
 	}
 
@@ -491,20 +491,26 @@ int sdcard_init(void) {
 int sdcard_test(void) {
 	unsigned int i;
 	unsigned int errors;
+	unsigned int length;
 
 	errors = 0;
 
-	for(i=0; i<8; i++) {
+	length = 512*1024;
+
+	for(i=0; i<length/512; i++) {
 		/* write */
 		write_pattern(SDSRAM_BASE, 512/4, 0);
-		sdcard_write_single_block(0, SDSRAM_BASE);
+		sdcard_write_single_block(i, SDSRAM_BASE);
+
+		/* corrupt sram */
+		write_pattern(SDSRAM_BASE, 512/4, 4);
 
 		/* read */
-		sdcard_read_single_block(0, SDSRAM_BASE);
+		sdcard_read_single_block(i, SDSRAM_BASE);
 		errors += check_pattern(SDSRAM_BASE, 512/4, 0);
 	}
 
-	printf("errors : %d\n", errors);
+	printf("errors: %d\n", errors);
 
 	return 0;
 }
@@ -518,7 +524,7 @@ int sdcard_speed(void) {
 
 	sdtimer_init();
 
-	length = 32*1024;
+	length = 512*1024;
 
 	start = sdtimer_get();
 	for(i=0; i<length/512; i++) {
@@ -530,9 +536,9 @@ int sdcard_speed(void) {
 	}
 	end = sdtimer_get();
 
-	speed = length*(SYSTEM_CLOCK_FREQUENCY/1000)/((start - end)/1000);
+    speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 
-	printf("%d KB/s\n", speed/1024);
+	printf("speed: %d KB/s\n", speed/1024);
 
 	return 0;
 }
