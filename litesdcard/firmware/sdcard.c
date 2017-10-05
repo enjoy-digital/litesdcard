@@ -320,18 +320,17 @@ int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr) {
 #ifdef SDCARD_DEBUG
 	printf("CMD24: WRITE_SINGLE_BLOCK\n");
 #endif
+	ramreader_address_write(srcaddr/4);
+	ramreader_length_write(512);
+
 	sdcore_argument_write(blockaddr);
 	sdcore_blocksize_write(512);
 	sdcore_blockcount_write(1);
 	sdcore_command_write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
-	busy_wait(5); /* FIXME */
-	sdcard_wait_response();
+    sdcard_wait_response();
 
-	ramreader_address_write(srcaddr/4);
-	ramreader_length_write(512);
 	while ((ramreader_done_read() & 0x01) == 0);
-
 	return 0;
 }
 
@@ -339,13 +338,13 @@ int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr) {
 #ifdef SDCARD_DEBUG
 	printf("CMD17: READ_SINGLE_BLOCK\n");
 #endif
+	ramwriter_address_write(dstaddr/4);
+
 	sdcore_argument_write(blockaddr);
 	sdcore_blocksize_write(512);
 	sdcore_blockcount_write(1);
-	ramwriter_address_write(dstaddr/4);
 	sdcore_command_write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
-	busy_wait(5); /* FIXME */
 	sdcard_wait_response();
 	return sdcard_wait_data_done();
 }
