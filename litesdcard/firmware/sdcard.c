@@ -525,19 +525,21 @@ int sdcard_speed(void) {
 
 	length = 512*1024;
 
+	/* write */
 	start = sdtimer_get();
-	for(i=0; i<length/512; i++) {
-		/* write */
+	for(i=0; i<length/512; i++)
 		sdcard_write_single_block(i, SDSRAM_BASE);
-
-		/* read */
-		sdcard_read_single_block(i, SDSRAM_BASE);
-	}
 	end = sdtimer_get();
+	speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
+	printf("write speed: %d KB/s\n", speed/1024);
 
+	/* read */
+	start = sdtimer_get();
+	for(i=0; i<length/512; i++)
+		sdcard_read_single_block(i, SDSRAM_BASE);
+	end = sdtimer_get();
     speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
-
-	printf("speed: %d KB/s\n", speed/1024);
+	printf("read speed: %d KB/s\n", speed/1024);
 
 	return 0;
 }
