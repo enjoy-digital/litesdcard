@@ -49,6 +49,7 @@
 #define SDCARD_CTRL_RESPONSE_SHORT 1
 #define SDCARD_CTRL_RESPONSE_LONG  2
 
+unsigned short rca;
 
 void sdclk_set_clk(unsigned int freq);
 
@@ -75,7 +76,10 @@ int sdcard_app_set_blocklen(unsigned int blocklen);
 int sdcard_write_single_block(unsigned int blockaddr);
 int sdcard_write_multiple_block(unsigned int blockaddr, unsigned int blockcnt);
 int sdcard_read_single_block(unsigned int blockaddr);
+int sdcard_read_multiple_block(unsigned int blockaddr, unsigned int blockcnt);
 int sdcard_stop_transmission(void);
+int sdcard_send_status(unsigned int rca);
+int sdcard_set_block_count(unsigned int blockcnt);
 void sdcard_bist_generator_start(void);
 void sdcard_bist_generator_wait(void);
 void sdcard_bist_checker_start(void);

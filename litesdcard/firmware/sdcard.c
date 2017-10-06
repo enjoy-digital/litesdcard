@@ -362,12 +362,48 @@ int cmd_response = -1;
 	return sdcard_wait_data_done();
 }
 
+int sdcard_read_multiple_block(unsigned int blockaddr, unsigned int blockcnt) {
+#ifdef SDCARD_DEBUG
+	printf("CMD18: READ_MULTIPLE_BLOCK\n");
+#endif
+int cmd_response = -1;
+	while (cmd_response != SD_OK) {
+		sdcore_argument_write(blockaddr);
+		sdcore_blocksize_write(512);
+		sdcore_blockcount_write(blockcnt);
+		sdcore_command_write((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+							 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+		cmd_response = sdcard_wait_response();
+	}
+	return cmd_response;
+}
+
 int sdcard_stop_transmission(void) {
 #ifdef SDCARD_DEBUG
 	printf("CMD12: STOP_TRANSMISSION\n");
 #endif
 	sdcore_argument_write(0x0000000);
 	sdcore_command_write((12 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
+	return sdcard_wait_response();
+}
+
+int sdcard_send_status(unsigned int rca) {
+#ifdef SDCARD_DEBUG
+	printf("CMD13: SEND_STATUS\n");
+#endif
+	sdcore_argument_write(rca << 16);
+	sdcore_command_write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
+	return sdcard_wait_response();
+}
+
+int sdcard_set_block_count(unsigned int blockcnt) {
+#ifdef SDCARD_DEBUG
+	printf("CMD23: SET_BLOCK_COUNT\n");
+#endif
+	sdcore_argument_write(blockcnt);
+	sdcore_command_write((23 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -437,8 +473,6 @@ void sdcard_decode_csd(void) {
 /* user */
 
 int sdcard_init(void) {
-	unsigned short rca;
-
 	/* reset card */
 	sdcard_go_idle();
 	busy_wait(1);
@@ -550,6 +584,7 @@ int sdcard_speed(void) {
 
 	/* write */
 	start = sdtimer_get();
+	sdcard_set_block_count(blocks);
 	sdcard_bist_generator_start();
 	sdcard_write_multiple_block(0, blocks);
 	for(i=0; i<blocks-1; i++) {
@@ -564,11 +599,15 @@ int sdcard_speed(void) {
 
 	/* read */
 	start = sdtimer_get();
-	for(i=0; i<blocks; i++) {
-		sdcard_bist_checker_start();
-		sdcard_read_single_block(i);
+	sdcard_set_block_count(blocks);
+	sdcard_bist_checker_start();
+	sdcard_read_multiple_block(0, blocks);
+	for(i=0; i<blocks-1; i++) {
 		sdcard_bist_checker_wait();
+		sdcard_bist_checker_start();
 	}
+	sdcard_bist_checker_wait();
+	sdcard_send_status(rca);
 	end = sdtimer_get();
 	speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 	printf("read speed: %d KB/s\n", speed/1024);
