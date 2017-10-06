@@ -325,9 +325,25 @@ int sdcard_write_single_block(unsigned int blockaddr) {
 		sdcore_blockcount_write(1);
 		sdcore_command_write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 							 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
-    	cmd_response = sdcard_wait_response();
-    }
-    return sdcard_wait_data_done();
+		cmd_response = sdcard_wait_response();
+	}
+	return cmd_response;
+}
+
+int sdcard_write_multiple_block(unsigned int blockaddr, unsigned int blockcnt) {
+#ifdef SDCARD_DEBUG
+	printf("CMD25: WRITE_MULTIPLE_BLOCK\n");
+#endif
+	int cmd_response = -1;
+	while (cmd_response != SD_OK) {
+		sdcore_argument_write(blockaddr);
+		sdcore_blocksize_write(512);
+		sdcore_blockcount_write(blockcnt);
+		sdcore_command_write((25 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
+							 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
+		cmd_response = sdcard_wait_response();
+	}
+	return cmd_response;
 }
 
 int sdcard_read_single_block(unsigned int blockaddr) {
@@ -344,6 +360,16 @@ int cmd_response = -1;
 		cmd_response = sdcard_wait_response();
 	}
 	return sdcard_wait_data_done();
+}
+
+int sdcard_stop_transmission(void) {
+#ifdef SDCARD_DEBUG
+	printf("CMD12: STOP_TRANSMISSION\n");
+#endif
+	sdcore_argument_write(0x0000000);
+	sdcore_command_write((12 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	busy_wait(1);
+	return sdcard_wait_response();
 }
 
 void sdcard_bist_generator_start(void) {
@@ -479,15 +505,17 @@ int sdcard_test(void) {
 	unsigned int i;
 	unsigned int errors;
 	unsigned int length;
+	unsigned int blocks;
 
 	sdcore_cmdtimeout_write(1<<15);
 	sdcore_datatimeout_write(1<<15);
 
 	errors = 0;
 
-	length = 2*1024;
+	length = 512*1024;
+	blocks = length/512;
 
-	for(i=0; i<length/512; i++) {
+	for(i=0; i<blocks; i++) {
 		/* write */
 		sdcard_bist_generator_start();
 		sdcard_write_single_block(i);
@@ -507,6 +535,7 @@ int sdcard_test(void) {
 int sdcard_speed(void) {
 	unsigned int i;
 	unsigned int length;
+	unsigned int blocks;
 	unsigned int start;
 	unsigned int end;
 	unsigned long speed;
@@ -516,28 +545,32 @@ int sdcard_speed(void) {
 
 	sdtimer_init();
 
-	length = 2*1024;
+	length = 512*1024;
+	blocks = length/512;
 
 	/* write */
 	start = sdtimer_get();
-	for(i=0; i<length/512; i++) {
-		sdcard_bist_generator_start();
-		sdcard_write_single_block(i);
+	sdcard_bist_generator_start();
+	sdcard_write_multiple_block(0, blocks);
+	for(i=0; i<blocks-1; i++) {
 		sdcard_bist_generator_wait();
+		sdcard_bist_generator_start();
 	}
+	sdcard_bist_generator_wait();
+	sdcard_stop_transmission();
 	end = sdtimer_get();
 	speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 	printf("write speed: %d KB/s\n", speed/1024);
 
 	/* read */
 	start = sdtimer_get();
-	for(i=0; i<length/512; i++) {
+	for(i=0; i<blocks; i++) {
 		sdcard_bist_checker_start();
 		sdcard_read_single_block(i);
 		sdcard_bist_checker_wait();
 	}
 	end = sdtimer_get();
-    speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
+	speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 	printf("read speed: %d KB/s\n", speed/1024);
 
 	return 0;

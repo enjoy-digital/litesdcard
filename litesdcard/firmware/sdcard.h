@@ -73,7 +73,9 @@ int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, uns
 int sdcard_app_send_scr(void);
 int sdcard_app_set_blocklen(unsigned int blocklen);
 int sdcard_write_single_block(unsigned int blockaddr);
+int sdcard_write_multiple_block(unsigned int blockaddr, unsigned int blockcnt);
 int sdcard_read_single_block(unsigned int blockaddr);
+int sdcard_stop_transmission(void);
 void sdcard_bist_generator_start(void);
 void sdcard_bist_generator_wait(void);
 void sdcard_bist_checker_start(void);
