@@ -1,5 +1,5 @@
-- add option to select stream or wishbone interface.
-- add irq to read/writes.
-- add bist test to verify fonctionnality and maximum bandwidth.
 - handle retuned write crc.
-- test multiple read/write multiple blocks.
+- create read/write test to verify data integrity and measure performance.
+- add spartan6 example (minispartan6?)
+- global cleanup.
+- fill README.
