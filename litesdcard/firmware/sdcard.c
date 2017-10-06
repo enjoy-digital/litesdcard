@@ -584,6 +584,8 @@ int sdcard_speed(void) {
 
 	/* write */
 	start = sdtimer_get();
+	sdcore_datawcrcclear_write(1);
+	sdcore_datawcrcclear_write(0);
 	sdcard_set_block_count(blocks);
 	sdcard_bist_generator_start();
 	sdcard_write_multiple_block(0, blocks);
@@ -595,7 +597,10 @@ int sdcard_speed(void) {
 	sdcard_stop_transmission();
 	end = sdtimer_get();
 	speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
-	printf("write speed: %d KB/s\n", speed/1024);
+	printf("write speed: %d KB/s (valids: %d / errors: %d)\n",
+		speed/1024,
+		sdcore_datawcrcvalids_read(),
+		sdcore_datawcrcerrors_read);
 
 	/* read */
 	start = sdtimer_get();

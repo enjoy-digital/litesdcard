@@ -1,5 +1,5 @@
 from litex.gen import *
-from litex.gen.genlib.cdc import MultiReg
+from litex.gen.genlib.cdc import MultiReg, PulseSynchronizer
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
@@ -341,15 +341,96 @@ class SDPHYDATAR(Module):
         )
 
 
+class SDPHYCRCRFB(Module):
+    def __init__(self, idata):
+        self.start = Signal()
+        self.valid = Signal()
+        self.error = Signal()
+
+        # # #
+
+        counter = Signal(2)
+        shift = Signal()
+        data = Signal(3)
+
+        valid = Signal()
+        error = Signal()
+
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd_fb")(FSM(reset_state="IDLE"))
+
+        self.sync.sd_fb += If(shift, data.eq(Cat(idata, data)))
+
+        self.submodules.pulse_start = PulseSynchronizer("sd", "sd_fb")
+        self.comb += self.pulse_start.i.eq(self.start)
+
+        fsm.act("IDLE",
+            If(self.pulse_start.o,
+                NextState("START")
+            )
+        )
+        fsm.act("START",
+            If(idata == 0,
+                NextValue(counter, 0),
+                NextState("RECEIVE")
+            )
+        )
+        fsm.act("RECEIVE",
+            shift.eq(1),
+            If(counter == 2,
+                NextState("CHECK")
+            ).Else(
+                NextValue(counter, counter + 1)
+            )
+        )
+        fsm.act("CHECK",
+            If(data == 0b010,
+                valid.eq(1),
+                error.eq(0),
+            ).Else(
+                valid.eq(0),
+                error.eq(1)
+            ),
+            NextState("IDLE")
+        )
+
+        self.submodules.pulse_valid = PulseSynchronizer("sd_fb", "sd")
+        self.submodules.pulse_error = PulseSynchronizer("sd_fb", "sd")
+        self.comb += [
+            self.pulse_valid.i.eq(valid),
+            self.valid.eq(self.pulse_valid.o),
+            self.pulse_error.i.eq(error),
+            self.error.eq(self.pulse_error.o)
+        ]
+
+
 class SDPHYDATAW(Module):
     def __init__(self):
         self.pads = pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8), ("ctrl", 2)])
 
+        self.crc_clear = Signal()
+        self.crc_valids = Signal(32)
+        self.crc_errors = Signal(32)
+
         # # #
+
 
         wrstarted = Signal()
         cnt = Signal(8)
+
+        self.submodules.crcfb = SDPHYCRCRFB(pads.data.i[0])
+        self.sync.sd += [
+            If(self.crc_clear,
+                self.crc_valids.eq(0),
+                self.crc_errors.eq(0)
+            ),
+            If(self.crcfb.valid,
+                self.crc_valids.eq(self.crc_valids + 1)
+            ),
+            If(self.crcfb.error,
+                self.crc_errors.eq(self.crc_errors + 1)
+            )
+        ]
 
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
@@ -392,10 +473,10 @@ class SDPHYDATAW(Module):
             pads.data.oe.eq(1),
             pads.data.o.eq(0xf),
             NextValue(wrstarted, 0),
+            self.crcfb.start.eq(1),
             NextState("DATA_RESPONSE")
         )
 
-        # XXX; should check CRC and be handled by core
         fsm.act("DATA_RESPONSE",
             pads.clk.eq(1),
             pads.data.oe.eq(0),

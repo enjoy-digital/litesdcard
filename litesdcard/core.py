@@ -26,6 +26,10 @@ class SDCore(Module, AutoCSR):
         self.datatimeout = CSRStorage(32, reset=2**16)
         self.cmdtimeout = CSRStorage(32, reset=2**16)
 
+        self.datawcrcclear = CSRStorage()
+        self.datawcrcvalids = CSRStatus(32)
+        self.datawcrcerrors = CSRStatus(32)
+
         # # #
 
         argument = Signal(32)
@@ -37,6 +41,7 @@ class SDCore(Module, AutoCSR):
         blockcount = Signal(16)
         datatimeout = Signal(32)
         cmdtimeout = Signal(32)
+
 
         self.specials += [
             MultiReg(self.argument.storage, argument, "sd"),
@@ -56,7 +61,10 @@ class SDCore(Module, AutoCSR):
         self.comb += [
             phy.cfg.blocksize.eq(blocksize),
             phy.cfg.datatimeout.eq(datatimeout),
-            phy.cfg.cmdtimeout.eq(cmdtimeout)
+            phy.cfg.cmdtimeout.eq(cmdtimeout),
+            phy.dataw.crc_clear.eq(self.datawcrcclear.storage),
+            self.datawcrcvalids.status.eq(phy.dataw.crc_valids),
+            self.datawcrcerrors.status.eq(phy.dataw.crc_errors)
         ]
 
         self.submodules.crc7inserter = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
