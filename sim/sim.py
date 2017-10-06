@@ -17,7 +17,7 @@ from litex.soc.integration.soc_core import *
 from litesdcard.common import *
 from litesdcard.phy import SDPHY
 from litesdcard.core import SDCore
-from litesdcard.ram import RAMReader, RAMWriter
+from litesdcard.bist import BISTBlockGenerator, BISTBlockChecker
 
 from litesdcard.emulator import SDEmulator, _sdemulator_pads
 
@@ -28,13 +28,16 @@ sdemulator_base = 0x20000000
 
 
 class SDTester(Module):
-    def __init__(self, core, emulator, ramwriter, ramreader, bus):
+    def __init__(self, core, emulator, bist_generator, bist_checker, bus):
         counter = Signal(32)
         self.sync += counter.eq(counter + 1)
         self.sync += [
             core.command.re.eq(0),
             core.blocksize.re.eq(0),
-            ramreader.length.re.eq(0),
+            bist_generator.reset.re.eq(0),
+            bist_generator.start.re.eq(0),
+            bist_checker.reset.re.eq(0),
+            bist_checker.start.re.eq(0),
             If(counter == 2048*1,
                 Display("GO_IDLE_STATE (cmd0)"),
                 core.argument.storage.eq(0x00000000),
@@ -100,7 +103,6 @@ class SDTester(Module):
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(8),
                 core.blockcount.storage.eq(1),
-                ramwriter.address.storage.eq(sram_base//4),
                 core.command.storage.eq((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
                 core.command.re.eq(1)
@@ -109,57 +111,57 @@ class SDTester(Module):
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(512),
                 core.blockcount.storage.eq(1),
-                ramwriter.address.storage.eq(sram_base//4),
                 core.command.storage.eq((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
-                core.command.re.eq(1)
+                core.command.re.eq(1),
+                bist_checker.start.re.eq(1),
             ).Elif(counter == 2048*17,
                 emulator.ev.read.clear.eq(1),
             ).Elif(counter == 2048*18,
                 emulator.ev.read.clear.eq(0),
+                bist_checker.reset.re.eq(1),
             ).Elif(counter == 2048*20,
                 Display("WRITE_SINGLE_BLOCK (cmd24)"),
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(512),
                 core.blockcount.storage.eq(1),
-                ramreader.address.storage.eq(sram_base//4),
-                ramreader.length.storage.eq(512),
-                ramreader.length.re.eq(1),
                 core.command.storage.eq((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5)),
-                core.command.re.eq(1)
+                core.command.re.eq(1),
+                bist_generator.start.re.eq(1),
             ).Elif(counter == 2048*24,
                 emulator.ev.write.clear.eq(1),
             ).Elif(counter == 2048*25,
                 emulator.ev.write.clear.eq(0),
+                 bist_generator.reset.re.eq(1),
             ).Elif(counter == 2048*28,
                 Display("READ_SINGLE_BLOCK (cmd17)"),
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(512),
                 core.blockcount.storage.eq(1),
-                ramwriter.address.storage.eq(sram_base//4),
                 core.command.storage.eq((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_READ << 5)),
-                core.command.re.eq(1)
+                core.command.re.eq(1),
+                bist_checker.start.re.eq(1),
             ).Elif(counter == 2048*29,
                 emulator.ev.read.clear.eq(1),
             ).Elif(counter == 2048*30,
                 emulator.ev.read.clear.eq(0),
+                bist_checker.reset.re.eq(1),
             ).Elif(counter == 2048*32,
                 Display("WRITE_SINGLE_BLOCK (cmd24)"),
                 core.argument.storage.eq(0x00000000),
                 core.blocksize.storage.eq(512),
                 core.blockcount.storage.eq(1),
-                ramreader.address.storage.eq(sram_base//4),
-                ramreader.length.storage.eq(512),
-                ramreader.length.re.eq(1),
                 core.command.storage.eq((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                         (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5)),
-                core.command.re.eq(1)
-            ).Elif(counter == 2048*33,
+                core.command.re.eq(1),
+                bist_generator.start.re.eq(1),
+            ).Elif(counter == 2048*36,
                 emulator.ev.write.clear.eq(1),
-            ).Elif(counter == 2048*34,
+            ).Elif(counter == 2048*37,
                 emulator.ev.write.clear.eq(0),
+                bist_generator.reset.re.eq(1),
             ).Elif(counter == 2048*64,
                 Finish()
             )
@@ -219,20 +221,18 @@ class SDSim(Module):
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
 
-        self.submodules.ramreader = RAMReader()
-        self.submodules.ramwriter = RAMWriter()
+        self.submodules.bist_generator = BISTBlockGenerator(random=False)
+        self.submodules.bist_checker = BISTBlockChecker(random=False)
 
         self.comb += [
-            self.sdcore.source.connect(self.ramwriter.sink),
-            self.ramreader.source.connect(self.sdcore.sink)
+            self.sdcore.source.connect(self.bist_checker.sink),
+            self.bist_generator.source.connect(self.sdcore.sink)
         ]
 
         # Wishbone
         self.bus = wishbone.Interface()
         wb_masters = [
-            self.bus,
-            self.ramreader.bus,
-            self.ramwriter.bus
+            self.bus
         ]
         wb_slaves = [
             (mem_decoder(sram_base), self.sram.bus),
@@ -241,7 +241,7 @@ class SDSim(Module):
         self.submodules.wb_decoder = wishbone.InterconnectShared(wb_masters, wb_slaves, register=True)
 
         # Tester
-        self.submodules.sdtester = SDTester(self.sdcore, self.sdemulator, self.ramwriter, self.ramreader, self.bus)
+        self.submodules.sdtester = SDTester(self.sdcore, self.sdemulator, self.bist_generator, self.bist_checker, self.bus)
 
 
 def clean():

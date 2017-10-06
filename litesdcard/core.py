@@ -70,9 +70,9 @@ class SDCore(Module, AutoCSR):
             stream.AsyncFIFO(self.source.description, 4))
 
         self.submodules.upstream_converter = ClockDomainsRenamer("sd")(
-            stream.StrideConverter([('data', 32)], [('data', 8)]))
+            stream.StrideConverter([('data', 32)], [('data', 8)], reverse=True))
         self.submodules.downstream_converter = ClockDomainsRenamer("sd")(
-            stream.StrideConverter([('data', 8)], [('data', 32)]))
+            stream.StrideConverter([('data', 8)], [('data', 32)], reverse=True))
 
         self.comb += [
             self.sink.connect(self.upstream_cdc.sink),

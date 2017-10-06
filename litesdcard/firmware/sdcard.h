@@ -70,10 +70,14 @@ void sdcard_decode_csd(void);
 int sdcard_select_card(unsigned int rca);
 int sdcard_app_set_bus_width(void);
 int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, unsigned int dstaddr);
-int sdcard_app_send_scr(unsigned int dstaddr);
+int sdcard_app_send_scr(void);
 int sdcard_app_set_blocklen(unsigned int blocklen);
-int sdcard_write_single_block(unsigned int blockaddr, unsigned int srcaddr);
-int sdcard_read_single_block(unsigned int blockaddr, unsigned int dstaddr);
+int sdcard_write_single_block(unsigned int blockaddr);
+int sdcard_read_single_block(unsigned int blockaddr);
+void sdcard_bist_generator_start(void);
+void sdcard_bist_generator_wait(void);
+void sdcard_bist_checker_start(void);
+void sdcard_bist_checker_wait(void);
 
 int sdcard_init(void);
 int sdcard_test(void);

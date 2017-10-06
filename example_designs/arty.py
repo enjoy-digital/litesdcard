@@ -20,7 +20,7 @@ from litex.soc.interconnect import wishbone
 from litesdcard.phy import SDPHY
 from litesdcard.clocker import SDClockerS7
 from litesdcard.core import SDCore
-from litesdcard.ram import RAMReader, RAMWriter
+from litesdcard.bist import BISTBlockGenerator, BISTBlockChecker
 
 from litesdcard.emulator import SDEmulator, _sdemulator_pads
 
@@ -71,21 +71,16 @@ class _CRG(Module):
 
 class SDSoC(SoCCore):
     csr_map = {
-        "sdclk":      20,
-        "sdphy":      21,
-        "sdcore":     22,
-        "sdtimer":    23,
-        "sdemulator": 24,
-        "ramreader":  25,
-        "ramwriter":  26,
-        "analyzer":   30
+        "sdclk":          20,
+        "sdphy":          21,
+        "sdcore":         22,
+        "sdtimer":        23,
+        "sdemulator":     24,
+        "bist_generator": 25,
+        "bist_checker":   26,
+        "analyzer":       30
     }
     csr_map.update(SoCCore.csr_map)
-
-    mem_map = {
-        "sdsram": 0x20000000,
-    }
-    mem_map.update(SoCCore.mem_map)
 
     def __init__(self, with_cpu, with_emulator, with_analyzer):
         platform = arty.Platform()
@@ -121,18 +116,12 @@ class SDSoC(SoCCore):
         self.submodules.sdcore = SDCore(self.sdphy)
         self.submodules.sdtimer = Timer()
 
-        self.submodules.sdsram = wishbone.SRAM(2048)
-        self.register_mem("sdsram", self.mem_map["sdsram"], self.sdsram.bus, 2048)
-
-        self.submodules.ramreader = RAMReader()
-        self.submodules.ramwriter = RAMWriter()
-        self.add_wb_master(self.ramreader.bus)
-        self.add_wb_master(self.ramwriter.bus)
-
+        self.submodules.bist_generator = BISTBlockGenerator(random=False)
+        self.submodules.bist_checker = BISTBlockChecker(random=False)
 
         self.comb += [
-            self.sdcore.source.connect(self.ramwriter.sink),
-            self.ramreader.source.connect(self.sdcore.sink)
+            self.sdcore.source.connect(self.bist_checker.sink),
+            self.bist_generator.source.connect(self.sdcore.sink)
         ]
 
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
