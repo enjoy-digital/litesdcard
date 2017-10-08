@@ -51,11 +51,17 @@
 
 unsigned short rca;
 
+/* clocking */
+
 void sdclk_set_clk(unsigned int freq);
+
+/* command utils */
 
 int sdcard_wait_cmd_done(void);
 int sdcard_wait_data_done(void);
 int sdcard_wait_response(void);
+
+/* commands */
 
 void sdcard_go_idle(void);
 int sdcard_send_ext_csd(void);
@@ -80,10 +86,15 @@ int sdcard_read_multiple_block(unsigned int blockaddr, unsigned int blockcnt);
 int sdcard_stop_transmission(void);
 int sdcard_send_status(unsigned int rca);
 int sdcard_set_block_count(unsigned int blockcnt);
+
+/* bist */
+
 void sdcard_bist_generator_start(void);
 void sdcard_bist_generator_wait(void);
 void sdcard_bist_checker_start(void);
 void sdcard_bist_checker_wait(void);
+
+/* user */
 
 int sdcard_init(void);
 int sdcard_test(void);

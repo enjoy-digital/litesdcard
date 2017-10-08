@@ -408,25 +408,6 @@ int sdcard_set_block_count(unsigned int blockcnt) {
 	return sdcard_wait_response();
 }
 
-void sdcard_bist_generator_start(void) {
-	bist_generator_reset_write(1);
-	bist_generator_start_write(1);
-}
-
-void sdcard_bist_generator_wait(void) {
-	while((bist_generator_done_read() & 0x1) == 0);
-}
-
-
-void sdcard_bist_checker_start(void) {
-	bist_checker_reset_write(1);
-	bist_checker_start_write(1);
-}
-
-void sdcard_bist_checker_wait(void) {
-	while((bist_checker_done_read() & 0x1) == 0);
-}
-
 void sdcard_decode_cid(void) {
 	printf(
 		"CID Register: 0x%08x%08x%08x%08x\n"
@@ -468,6 +449,27 @@ void sdcard_decode_csd(void) {
 
 			((sdcard_response[2] >> 8) & 0x3fffff)*512/(1024*1024)
 	);
+}
+
+/* bist */
+
+void sdcard_bist_generator_start(void) {
+	bist_generator_reset_write(1);
+	bist_generator_start_write(1);
+}
+
+void sdcard_bist_generator_wait(void) {
+	while((bist_generator_done_read() & 0x1) == 0);
+}
+
+
+void sdcard_bist_checker_start(void) {
+	bist_checker_reset_write(1);
+	bist_checker_start_write(1);
+}
+
+void sdcard_bist_checker_wait(void) {
+	while((bist_checker_done_read() & 0x1) == 0);
 }
 
 /* user */
