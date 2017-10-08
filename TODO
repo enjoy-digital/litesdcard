@@ -1,4 +1,3 @@
-- handle retuned write crc.
 - create read/write test to verify data integrity and measure performance.
 - add spartan6 example (minispartan6?)
 - global cleanup.
