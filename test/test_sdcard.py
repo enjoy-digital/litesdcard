@@ -316,8 +316,9 @@ def sdcard_bist_generator_wait(wb):
     while((wb.regs.bist_generator_done.read() & 0x1) == 0):
         pass
 
-def sdcard_bist_checker_start(wb):
+def sdcard_bist_checker_start(wb, blkcnt):
     wb.regs.bist_checker_reset.write(1)
+    wb.regs.bist_checker_count.write(blkcnt)
     wb.regs.bist_checker_start.write(1)
 
 def sdcard_bist_checker_wait(wb):
@@ -388,7 +389,7 @@ def main(wb):
     sdcard_app_cmd(wb, rca)
     sdcard_app_send_scr(wb)
 
-    clkfreq = 10e6
+    clkfreq = 100e6
     sdclk_set_config(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
 
@@ -406,12 +407,13 @@ def main(wb):
         sdcard_bist_generator_wait(wb)
 
         # READ
-        sdcard_bist_checker_start(wb)
-        sdcard_read_single_block(wb, i+32)
+        sdcard_bist_checker_start(wb, 1)
+        sdcard_read_single_block(wb, i)
         sdcard_bist_checker_wait(wb)
 
-    print("datawcrcvalids : {:d}".format(wb.regs.sdcore_datawcrcvalids.read()))
-    print("datawcrcerrors : {:d}".format(wb.regs.sdcore_datawcrcerrors.read()))
+    print("datawcrcvalids: {:d}".format(wb.regs.sdcore_datawcrcvalids.read()))
+    print("datawcrcerrors: {:d}".format(wb.regs.sdcore_datawcrcerrors.read()))
+    print("bist errors: {:d}".format(wb.regs.bist_checker_errors.read()))
 
     wb.regs.sdcore_datawcrcclear.write(1)
     wb.regs.sdcore_datawcrcclear.write(0)
@@ -427,17 +429,15 @@ def main(wb):
     sdcard_bist_generator_wait(wb)
 
     # READ
-#    sdcard_set_block_count(wb, blocks);
-#    sdcard_bist_checker_start(wb);
-#    sdcard_read_multiple_block(wb, 0, blocks);
-#    for i in range(blocks-1):
-#        sdcard_bist_checker_wait(wb)
-#        sdcard_bist_checker_start(wb)
-#    sdcard_bist_checker_wait(wb);
-#    sdcard_send_status(wb, rca);
+    sdcard_set_block_count(wb, blocks);
+    sdcard_bist_checker_start(wb, blocks);
+    sdcard_read_multiple_block(wb, 0, blocks);
+    sdcard_bist_checker_wait(wb);
+    sdcard_send_status(wb, rca);
 
-    print("datawcrcvalids : {:d}".format(wb.regs.sdcore_datawcrcvalids.read()))
-    print("datawcrcerrors : {:d}".format(wb.regs.sdcore_datawcrcerrors.read()))
+    print("datawcrcvalids: {:d}".format(wb.regs.sdcore_datawcrcvalids.read()))
+    print("datawcrcerrors: {:d}".format(wb.regs.sdcore_datawcrcerrors.read()))
+    print("bist errors: {:d}".format(wb.regs.bist_checker_errors.read()))
 
 if __name__ == '__main__':
     wb = RemoteClient(port=1234, debug=False)

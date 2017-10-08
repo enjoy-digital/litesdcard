@@ -44,9 +44,9 @@ class Counter(Module):
 class _BISTBlockGenerator(Module):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
-        self.count = Signal(16)
         self.start = Signal()
         self.done = Signal()
+        self.count = Signal(16)
 
         # # #
 
@@ -93,9 +93,9 @@ class BISTBlockGenerator(Module, AutoCSR):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
         self.reset = CSR()
-        self.count = CSRStorage(16)
         self.start = CSR()
         self.done = CSRStatus()
+        self.count = CSRStorage(16, reset=1)
 
         # # #
 
@@ -117,7 +117,8 @@ class _BISTBlockChecker(Module):
         self.sink = sink = stream.Endpoint([("data", 32)])
         self.start = Signal()
         self.done = Signal()
-        self.errors = Signal(10)
+        self.count = Signal(16)
+        self.errors = Signal(32)
 
         # # #
 
@@ -125,7 +126,8 @@ class _BISTBlockChecker(Module):
         gen = gen_cls(32)
         self.submodules += gen
 
-        counter = Signal(9, reset_less=True)
+        blkcnt = Signal(16)
+        datcnt = Signal(9)
 
         fsm = FSM(reset_state="IDLE")
         self.submodules += fsm
@@ -133,7 +135,8 @@ class _BISTBlockChecker(Module):
             sink.ready.eq(1),
             self.done.eq(1),
             If(self.start,
-                NextValue(counter, 0),
+                NextValue(blkcnt, 0),
+                NextValue(datcnt, 0),
                 NextValue(self.errors, 0),
                 NextState("RUN")
             )
@@ -142,12 +145,17 @@ class _BISTBlockChecker(Module):
             sink.ready.eq(1),
             If(sink.valid,
                 gen.ce.eq(1),
-                NextValue(counter, counter + 1),
+                NextValue(datcnt, datcnt + 1),
                 If(sink.data != gen.o,
                     NextValue(self.errors, self.errors + 1)
                 ),
-                If(sink.last | (counter == (512//4 - 1)),
-                    NextState("DONE")
+                If(sink.last | (datcnt == (512//4 - 1)),
+                    If(blkcnt == (self.count - 1),
+                        NextState("DONE")
+                    ).Else(
+                        NextValue(blkcnt, blkcnt + 1),
+                        NextValue(datcnt, 0)
+                    ),
                 )
             )
         )
@@ -162,6 +170,7 @@ class BISTBlockChecker(Module, AutoCSR):
         self.reset = CSR()
         self.start = CSR()
         self.done = CSRStatus()
+        self.count = CSRStorage(16, reset=1)
         self.errors = CSRStatus(10)
 
         # # #
@@ -172,6 +181,7 @@ class BISTBlockChecker(Module, AutoCSR):
         self.comb += [
             sink.connect(core.sink),
             core.reset.eq(self.reset.re),
+            core.count.eq(self.count.storage),
             core.start.eq(self.start.re),
             self.done.status.eq(core.done),
             self.errors.status.eq(core.errors)
