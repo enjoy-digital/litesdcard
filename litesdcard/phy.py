@@ -480,9 +480,8 @@ class SDPHYDATAW(Module):
         fsm.act("DATA_RESPONSE",
             pads.clk.eq(1),
             pads.data.oe.eq(0),
-            If(cnt < 8,
+            If(cnt < 16,
                 NextValue(cnt, cnt + 1),
-                pads.clk.eq(1)
             ).Else(
                 # wait while busy
                 If(pads.data.i[0],

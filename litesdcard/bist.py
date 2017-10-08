@@ -44,6 +44,7 @@ class Counter(Module):
 class _BISTBlockGenerator(Module):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
+        self.count = Signal(16)
         self.start = Signal()
         self.done = Signal()
 
@@ -53,25 +54,32 @@ class _BISTBlockGenerator(Module):
         gen = gen_cls(32)
         self.submodules += gen
 
-        counter = Signal(9, reset_less=True)
+        blkcnt = Signal(16)
+        datcnt = Signal(9)
 
         fsm = FSM(reset_state="IDLE")
         self.submodules += fsm
         fsm.act("IDLE",
             If(self.start,
-                NextValue(counter, 0),
+                NextValue(blkcnt, 0),
+                NextValue(datcnt, 0),
                 NextState("RUN")
             )
         )
         fsm.act("RUN",
             source.valid.eq(1),
-            source.last.eq(counter == (512//4 - 1)),
+            source.last.eq(datcnt == (512//4 - 1)),
             If(source.ready,
                 gen.ce.eq(1),
                 If(source.last,
-                    NextState("DONE")
+                    If(blkcnt == (self.count - 1),
+                        NextState("DONE")
+                    ).Else(
+                        NextValue(blkcnt, blkcnt + 1),
+                        NextValue(datcnt, 0)
+                    ),
                 ).Else(
-                    NextValue(counter, counter + 1)
+                    NextValue(datcnt, datcnt + 1)
                 )
             )
         )
@@ -85,6 +93,7 @@ class BISTBlockGenerator(Module, AutoCSR):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
         self.reset = CSR()
+        self.count = CSRStorage(16)
         self.start = CSR()
         self.done = CSRStatus()
 
@@ -96,6 +105,7 @@ class BISTBlockGenerator(Module, AutoCSR):
         self.comb += [
             core.source.connect(source),
             core.reset.eq(self.reset.re),
+            core.count.eq(self.count.storage),
             core.start.eq(self.start.re),
             self.done.status.eq(core.done)
         ]

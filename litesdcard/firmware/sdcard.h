@@ -89,7 +89,7 @@ int sdcard_set_block_count(unsigned int blockcnt);
 
 /* bist */
 
-void sdcard_bist_generator_start(void);
+void sdcard_bist_generator_start(unsigned int blockcnt);
 void sdcard_bist_generator_wait(void);
 void sdcard_bist_checker_start(void);
 void sdcard_bist_checker_wait(void);

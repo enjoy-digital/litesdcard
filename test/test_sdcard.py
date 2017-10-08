@@ -307,8 +307,9 @@ def sdcard_app_send_num_wr_blocks(wb):
 
 # bist
 
-def sdcard_bist_generator_start(wb):
+def sdcard_bist_generator_start(wb, blkcnt):
     wb.regs.bist_generator_reset.write(1)
+    wb.regs.bist_generator_count.write(blkcnt)
     wb.regs.bist_generator_start.write(1)
 
 def sdcard_bist_generator_wait(wb):
@@ -398,9 +399,9 @@ def main(wb):
     wb.regs.sdcore_datawcrcclear.write(0)
 
     # SINGLE BLOCK TEST
-    for i in range(32):
+    for i in range(2):
         # WRITE
-        sdcard_bist_generator_start(wb)
+        sdcard_bist_generator_start(wb, 1)
         sdcard_write_single_block(wb, i)
         sdcard_bist_generator_wait(wb)
 
@@ -421,13 +422,9 @@ def main(wb):
 
     # WRITE
     sdcard_set_block_count(wb, blocks)
-    sdcard_bist_generator_start(wb)
+    sdcard_bist_generator_start(wb, blocks)
     sdcard_write_multiple_block(wb, 0, blocks)
-    for i in range(blocks-1):
-        sdcard_bist_generator_wait(wb)
-        sdcard_bist_generator_start(wb)
     sdcard_bist_generator_wait(wb)
-    sdcard_stop_transmission(wb)
 
     # READ
 #    sdcard_set_block_count(wb, blocks);

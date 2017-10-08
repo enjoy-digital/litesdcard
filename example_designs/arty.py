@@ -168,7 +168,7 @@ class SDSoC(SoCCore):
                 0 : phy_group,
                 1 : dummy_group
             }
-            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, cd="sd", cd_ratio=4)
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 2048, cd="sd", cd_ratio=4)
 
     def do_exit(self, vns):
         if hasattr(self, "analyzer"):
