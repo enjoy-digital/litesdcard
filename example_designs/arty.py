@@ -111,7 +111,7 @@ class SDSoC(SoCCore):
         else:
             sdcard_pads = platform.request('sdcard')
 
-        self.submodules.sdclk = SDClockerS7(platform)
+        self.submodules.sdclk = SDClockerS7()
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
         self.submodules.sdtimer = Timer()

@@ -4,6 +4,7 @@ from litex.soc.interconnect.csr import *
 
 
 class SDClockerS6(Module, AutoCSR):
+    # assuming 50MHz sys_clk
     def __init__(self, max_sd_clk=100e6):
             self._cmd_data = CSRStorage(10)
             self._send_cmd_data = CSR()
@@ -90,7 +91,8 @@ class SDClockerS6(Module, AutoCSR):
 
 
 class SDClockerS7(Module, AutoCSR):
-    def __init__(self, platform):
+    # assuming 100MHz sys_clk
+    def __init__(self):
         self.clock_domains.cd_sd = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
 
