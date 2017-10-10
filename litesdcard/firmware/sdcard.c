@@ -9,7 +9,7 @@
 
 #include "sdcard.h"
 
-#define SDCARD_DEBUG
+//#define SDCARD_DEBUG
 
 /* clocking */
 
@@ -539,44 +539,14 @@ int sdcard_init(void) {
 	return 0;
 }
 
-int sdcard_test(void) {
-	unsigned int i;
-	unsigned int errors;
-	unsigned int length;
-	unsigned int blocks;
-
-	sdcore_cmdtimeout_write(1<<15);
-	sdcore_datatimeout_write(1<<15);
-
-	errors = 0;
-
-	length = 512*1024;
-	blocks = length/512;
-
-	for(i=0; i<blocks; i++) {
-		/* write */
-		sdcard_bist_generator_start(1);
-		sdcard_write_single_block(i);
-		sdcard_bist_generator_wait();
-
-		/* read */
-		sdcard_bist_checker_start(1);
-		sdcard_read_single_block(i);
-		sdcard_bist_checker_wait();
-	}
-
-	printf("errors: %d\n", errors);
-
-	return 0;
-}
-
-int sdcard_speed(void) {
+int sdcard_test(unsigned int loops) {
 	unsigned int i;
 	unsigned int length;
 	unsigned int blocks;
 	unsigned int start;
 	unsigned int end;
-	unsigned long speed;
+	unsigned int errors;
+	unsigned long write_speed, read_speed;
 
 	sdcore_cmdtimeout_write(1<<15);
 	sdcore_datatimeout_write(1<<15);
@@ -586,31 +556,41 @@ int sdcard_speed(void) {
 	length = 1024*1024;
 	blocks = length/512;
 
-	/* write */
-	start = sdtimer_get();
-	sdcore_datawcrcclear_write(1);
-	sdcore_datawcrcclear_write(0);
-	sdcard_set_block_count(blocks);
-	sdcard_bist_generator_start(blocks);
-	sdcard_write_multiple_block(0, blocks);
-	sdcard_bist_generator_wait();
-	end = sdtimer_get();
-	speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
-	busy_wait(200);
-	printf("write speed: %d KB/s (valids: %d / errors: %d)\n",
-		speed/1024,
-		sdcore_datawcrcvalids_read(),
-		sdcore_datawcrcerrors_read());
+	for(i=0; i<loops; i++) {
+		/* write */
+		start = sdtimer_get();
+		sdcard_set_block_count(blocks);
+		sdcard_bist_generator_start(blocks);
+		sdcard_write_multiple_block(i, blocks);
+		sdcard_bist_generator_wait();
+		end = sdtimer_get();
+		write_speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 
-	/* read */
-	start = sdtimer_get();
-	sdcard_set_block_count(blocks);
-	sdcard_bist_checker_start(blocks);
-	sdcard_read_multiple_block(0, blocks);
-	sdcard_bist_checker_wait();
-	end = sdtimer_get();
-	speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
-	printf("read speed: %d KB/s\n", speed/1024);
+		/* delay FIXME */
+		busy_wait(200);
+
+		/* read */
+		start = sdtimer_get();
+		sdcard_set_block_count(blocks);
+		sdcard_bist_checker_start(blocks);
+		sdcard_read_multiple_block(i, blocks);
+		sdcard_bist_checker_wait();
+		end = sdtimer_get();
+		read_speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
+		
+		/* errors */
+		errors = bist_checker_errors_read();
+
+		/* infos */
+		if ((i%8) == 0)
+			printf("LOOP WRITE_SPEED  READ_SPEED ERRORS\n");
+		printf("%4d %6d MB/s %6d MB/s %6d\n",
+			i,
+			write_speed/(1024*1024),
+			read_speed/(1024*1024),
+			errors
+		);
+	}
 
 	return 0;
 }

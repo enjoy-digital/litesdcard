@@ -97,7 +97,6 @@ void sdcard_bist_checker_wait(void);
 /* user */
 
 int sdcard_init(void);
-int sdcard_test(void);
-int sdcard_speed(void);
+int sdcard_test(unsigned int loops);
 
 #endif /* __SDCARD_H */
