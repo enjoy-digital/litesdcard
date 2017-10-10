@@ -11,7 +11,7 @@ from libbase.sdcard import *
 def main(wb):
     # set low speed clock
     clkfreq = 10e6
-    sdclks7_set_config(wb, clkfreq)
+    sdclk_set_config(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
 
     # reset card
@@ -60,8 +60,8 @@ def main(wb):
     sdcard_app_cmd(wb, rca)
     sdcard_app_send_scr(wb)
 
-    clkfreq = 100e6
-    sdclks7_set_config(wb, clkfreq)
+    clkfreq = 60e6
+    sdclk_set_config(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
 
     # set blocklen

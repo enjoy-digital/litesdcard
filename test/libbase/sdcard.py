@@ -73,15 +73,21 @@ def sdclks6_get_config(freq):
     return best_m, best_d
 
 def sdclks6_set_config(wb, freq):
-    clock_m, clock_d = get_clock_md(freq//10000)
-    clkgen_write(0x1, clock_d-1)
-    clkgen_write(0x3, clock_m-1)
+    clock_m, clock_d = sdclks6_get_config(freq//10000)
+    sdclks6_dcm_write(wb, 0x1, clock_d-1)
+    sdclks6_dcm_write(wb, 0x3, clock_m-1)
     wb.regs.sdclk_send_go.write(1)
     while( not (wb.regs.sdclk_status.read() & CLKGEN_STATUS_PROGDONE)):
         pass
     while(not (wb.regs.sdclk_status.read() & CLKGEN_STATUS_LOCKED)):
         pass
 
+
+def sdclk_set_config(wb, freq):
+    if hasattr(wb.regs, "sdclk_cmd_data"):
+        sdclks6_set_config(wb, freq)
+    else:
+        sdclks7_set_config(wb, freq)
 
 # command utils
 

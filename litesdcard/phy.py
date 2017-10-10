@@ -626,17 +626,24 @@ class SDPHY(Module, AutoCSR):
             # real phy
             if device[:3] == "xc6":
                 self.submodules.io = io = SDPHYIOS6(sdpads, pads)
+                self.comb += [
+                    io.cmd_t.oe.eq(sdpads.cmd.oe),
+                    io.cmd_t.o.eq(sdpads.cmd.o),
+
+                    io.data_t.oe.eq(sdpads.data.oe),
+                    io.data_t.o.eq(sdpads.data.o)
+                ]
             elif device[:3] == "xc7":
                 self.submodules.io = io = SDPHYIOS7(sdpads, pads)
+                self.sync.sd += [
+                    io.cmd_t.oe.eq(sdpads.cmd.oe),
+                    io.cmd_t.o.eq(sdpads.cmd.o),
+
+                    io.data_t.oe.eq(sdpads.data.oe),
+                    io.data_t.o.eq(sdpads.data.o)
+                ]
             else:
                 raise NotImplementedError
-            self.sync.sd += [
-                io.cmd_t.oe.eq(sdpads.cmd.oe),
-                io.cmd_t.o.eq(sdpads.cmd.o),
-
-                io.data_t.oe.eq(sdpads.data.oe),
-                io.data_t.o.eq(sdpads.data.o)
-            ]
 
         # Stream ctrl bits
         self.comb += [
