@@ -9,10 +9,6 @@
        A small footprint and configurable SDCard core
                    powered by LiteX
 
-                 ********************
-                 * WORK IN PROGRESS *
-                 ********************
-
 [> Intro
 --------
 LiteSDCard is a small footprint and configurable SDCard core.
@@ -37,28 +33,80 @@ design flow by generating the verilog rtl that you will use as a standard core.
 
 [> Features
 -----------
-- TODO
-
-[> Proven
----------
-- TODO
+PHY:
+  - Xilinx Spartan 6 and 7-Series FPGA
+  - optional clock feedback (UHS-I)
+Core:
+  - Command & Data CRC inserters/checkers
+  - Single and multiple blocks write/read
+  - Errors detection and reporting
+  - Dynamically configurable clock speed
+Frontend:
+  - Synthetizable BIST
+  - 32 <--> 8 bits stream converters
 
 [> Possible improvements
 ------------------------
-- TODO
+- add standardized interfaces (AXI, Avalon-ST)
+- add vendor agnostic phy for low speeds
+- add support for Altera FPGAs.
+- add support for Lattice FPGAs.
+- add Zynq Linux drivers.
+- ... See below Support and consulting :)
 
+If you want to support these features, please contact us.
 
 [> Getting started
 ------------------
-- TODO
+1. Install Python3 and your vendor's software
+
+2. Obtain LiteX and install it:
+  git clone https://github.com/enjoy-digital/litex --recursive
+  cd litex
+  python3 setup.py install
+  cd ..
+
+3. Build and load Arty test design:
+  go to example_designs
+  run ./arty.py cpu
+
+4. Build firmware:
+  go to litesdcard/firmware
+  make all
+
+5. Load firmware:
+  litex_term --kernel firmware.bin <your_serial_port>
+
+6. Test firmware:
+  sdclk 10
+  sdinit
+  sdtest 8
 
 [> License
 ----------
-- TODO
+LiteSDCard is released under the very permissive two-clause BSD license. Under the
+terms of this license, you are authorized to use LiteSDCard for closed-source
+proprietary designs.
+Even though we do not require you to do so, those things are awesome, so please
+do them if possible:
+ - tell us that you are using LiteSDCard
+ - cite LiteSDCard in publications related to research it has helped
+ - send us feedback and suggestions for improvements
+ - send us bug reports when something goes wrong
+ - send us the modifications and improvements you have done to LiteSDCard.
 
 [> Support and consulting
 -------------------------
-- TODO
+We love open-source hardware and like sharing our designs with others.
+
+LiteSDCard is developed and maintained by EnjoyDigital.
+
+If you would like to know more about LiteSDCard or if you are already a happy user
+and would like to extend it for your needs, EnjoyDigital can provide standard
+commercial support as well as consulting services.
+
+So feel free to contact us, we'd love to work with you! (and eventually shorten
+the list of the possible improvements :)
 
 [> Contact
 ----------
