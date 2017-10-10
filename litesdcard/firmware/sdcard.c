@@ -13,6 +13,58 @@
 
 /* clocking */
 
+#ifdef CSR_SDCLK_CMD_DATA_ADDR
+
+static void sdclk_dcm_write(int cmd, int data)
+{
+	int word;
+	word = (data << 2) | cmd;
+	sdclk_cmd_data_write(word);
+	sdclk_send_cmd_data_write(1);
+	while(sdclk_status_read() & CLKGEN_STATUS_BUSY);
+}
+
+/* FIXME: add vco frequency check */
+static void sdclk_get_config(unsigned int freq, unsigned int *best_m, unsigned int *best_d)
+{
+	unsigned int ideal_m, ideal_d;
+	unsigned int bm, bd;
+	unsigned int m, d;
+	unsigned int diff_current;
+	unsigned int diff_tested;
+
+	ideal_m = freq;
+	ideal_d = 5000;
+
+	bm = 1;
+	bd = 0;
+	for(d=1;d<=256;d++)
+		for(m=2;m<=256;m++) {
+			/* common denominator is d*bd*ideal_d */
+			diff_current = abs(d*ideal_d*bm - d*bd*ideal_m);
+			diff_tested = abs(bd*ideal_d*m - d*bd*ideal_m);
+			if(diff_tested < diff_current) {
+				bm = m;
+				bd = d;
+			}
+		}
+	*best_m = bm;
+	*best_d = bd;
+}
+
+void sdclk_set_clk(unsigned int freq) {
+	unsigned int clk_m, clk_d;
+
+	sdclk_get_config(100*freq, &clk_m, &clk_d);
+	sdclk_dcm_write(0x1, clk_d-1);
+	sdclk_dcm_write(0x3, clk_m-1);
+	sdclk_send_go_write(1);
+	while(!(sdclk_status_read() & CLKGEN_STATUS_PROGDONE));
+	while(!(sdclk_status_read() & CLKGEN_STATUS_LOCKED));
+}
+
+#else
+
 static void sdclk_mmcm_write(unsigned int adr, unsigned int data) {
 	sdclk_mmcm_adr_write(adr);
 	sdclk_mmcm_dat_w_write(data);
@@ -73,6 +125,8 @@ void sdclk_set_clk(unsigned int freq) {
 	sdclk_get_config(1000*freq, &clk_m, &clk_d);
 	sdclk_set_config(clk_m, clk_d);
 }
+
+#endif
 
 /* command utils */
 
