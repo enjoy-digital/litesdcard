@@ -67,9 +67,6 @@ def main(wb):
     # set blocklen
     sdcard_set_blocklen(wb, 512)
 
-    wb.regs.sdcore_datawcrcclear.write(1)
-    wb.regs.sdcore_datawcrcclear.write(0)
-
     # single block test
     for i in range(2):
         # write
@@ -82,9 +79,7 @@ def main(wb):
         sdcard_read_single_block(wb, i)
         sdcard_bist_checker_wait(wb)
 
-    print("datawcrcvalids: {:d}".format(wb.regs.sdcore_datawcrcvalids.read()))
-    print("datawcrcerrors: {:d}".format(wb.regs.sdcore_datawcrcerrors.read()))
-    print("bist errors: {:d}".format(wb.regs.bist_checker_errors.read()))
+        print("bist errors: {:d}".format(wb.regs.bist_checker_errors.read()))
 
     wb.regs.sdcore_datawcrcclear.write(1)
     wb.regs.sdcore_datawcrcclear.write(0)
@@ -105,8 +100,6 @@ def main(wb):
     sdcard_read_multiple_block(wb, 0, blocks)
     sdcard_bist_checker_wait(wb)
 
-    print("datawcrcvalids: {:d}".format(wb.regs.sdcore_datawcrcvalids.read()))
-    print("datawcrcerrors: {:d}".format(wb.regs.sdcore_datawcrcerrors.read()))
     print("bist errors: {:d}".format(wb.regs.bist_checker_errors.read()))
 
 if __name__ == '__main__':

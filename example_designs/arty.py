@@ -116,8 +116,8 @@ class SDSoC(SoCCore):
         self.submodules.sdcore = SDCore(self.sdphy)
         self.submodules.sdtimer = Timer()
 
-        self.submodules.bist_generator = BISTBlockGenerator(random=False)
-        self.submodules.bist_checker = BISTBlockChecker(random=False)
+        self.submodules.bist_generator = BISTBlockGenerator(random=True)
+        self.submodules.bist_checker = BISTBlockChecker(random=True)
 
         self.comb += [
             self.sdcore.source.connect(self.bist_checker.sink),

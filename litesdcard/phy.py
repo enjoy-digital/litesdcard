@@ -270,15 +270,16 @@ class SDPHYDATAR(Module):
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
         fsm.act("IDLE",
+            pads.data.oe.eq(0),
+            pads.clk.eq(1),
+            datarfb_reset.eq(1),
+            self.fifo.source.ready.eq(1),
             If(sink.valid,
                 NextValue(dtimeout, 0),
                 NextValue(read, 0),
                 # Read 1 block + 8*8 == 64 bits CRC
                 NextValue(toread, cfg.blocksize + 8),
                 NextState("DATA_READSTART")
-            ).Else(
-                datarfb_reset.eq(1),
-                self.fifo.source.ready.eq(1),
             )
         )
 
@@ -310,9 +311,21 @@ class SDPHYDATAR(Module):
                         NextState("DATA_CLK40")
                     ).Else(
                         sink.ready.eq(1),
-                        NextState("IDLE")
+                        NextState("DATA_FLUSH")
                     )
                 )
+            )
+        )
+
+        fsm.act("DATA_FLUSH",
+            pads.data.oe.eq(0),
+            datarfb_reset.eq(1),
+            self.fifo.source.ready.eq(1),
+            If(cnt < 4,
+                NextValue(cnt, cnt + 1),
+            ).Else(
+                NextValue(cnt, 0),
+                NextState("IDLE")
             )
         )
 

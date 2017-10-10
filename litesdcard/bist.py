@@ -105,9 +105,9 @@ class BISTBlockGenerator(Module, AutoCSR):
         self.comb += [
             core.source.connect(source),
             core.reset.eq(self.reset.re),
-            core.count.eq(self.count.storage),
             core.start.eq(self.start.re),
-            self.done.status.eq(core.done)
+            self.done.status.eq(core.done),
+            core.count.eq(self.count.storage)
         ]
 
 
@@ -171,7 +171,7 @@ class BISTBlockChecker(Module, AutoCSR):
         self.start = CSR()
         self.done = CSRStatus()
         self.count = CSRStorage(16, reset=1)
-        self.errors = CSRStatus(10)
+        self.errors = CSRStatus(32)
 
         # # #
 
@@ -181,8 +181,8 @@ class BISTBlockChecker(Module, AutoCSR):
         self.comb += [
             sink.connect(core.sink),
             core.reset.eq(self.reset.re),
-            core.count.eq(self.count.storage),
             core.start.eq(self.start.re),
             self.done.status.eq(core.done),
+            core.count.eq(self.count.storage),
             self.errors.status.eq(core.errors)
         ]
