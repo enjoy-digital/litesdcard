@@ -81,12 +81,10 @@ def main(wb):
 
         print("bist errors: {:d}".format(wb.regs.bist_checker_errors.read()))
 
-    wb.regs.sdcore_datawcrcclear.write(1)
-    wb.regs.sdcore_datawcrcclear.write(0)
-
     #  multiple blocks test
 
-    blocks = 1024
+    length = 1024*1024
+    blocks = length//512
 
     # write
     sdcard_set_block_count(wb, blocks)
