@@ -602,12 +602,12 @@ int sdcard_test(unsigned int loops) {
 	unsigned int errors;
 	unsigned long write_speed, read_speed;
 
-	sdcore_cmdtimeout_write(1<<15);
-	sdcore_datatimeout_write(1<<15);
+	sdcore_cmdtimeout_write(1<<19);
+	sdcore_datatimeout_write(1<<19);
 
 	sdtimer_init();
 
-	length = 1024*1024;
+	length = 4*1024*1024;
 	blocks = length/512;
 
 	for(i=0; i<loops; i++) {
@@ -617,6 +617,7 @@ int sdcard_test(unsigned int loops) {
 		sdcard_bist_generator_start(blocks);
 		sdcard_write_multiple_block(i, blocks);
 		sdcard_bist_generator_wait();
+		sdcard_stop_transmission();
 		end = sdtimer_get();
 		write_speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 
