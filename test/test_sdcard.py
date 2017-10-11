@@ -60,7 +60,7 @@ def main(wb):
     sdcard_app_cmd(wb, rca)
     sdcard_app_send_scr(wb)
 
-    clkfreq = 60e6
+    clkfreq = 100e6
     sdclk_set_config(wb, clkfreq)
     settimeout(wb, clkfreq, 0.1)
 
@@ -82,8 +82,7 @@ def main(wb):
         print("bist errors: {:d}".format(wb.regs.bist_checker_errors.read()))
 
     #  multiple blocks test
-
-    length = 1024*1024
+    length = 16*1024*1024
     blocks = length//512
 
     # write
@@ -91,6 +90,7 @@ def main(wb):
     sdcard_bist_generator_start(wb, blocks)
     sdcard_write_multiple_block(wb, 0, blocks)
     sdcard_bist_generator_wait(wb)
+    sdcard_stop_transmission(wb)
 
     # read
     sdcard_set_block_count(wb, blocks)
