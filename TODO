@@ -1,1 +1,2 @@
-- global cleanup.
+- add write interface with block buffer.
+- add read interface with block buffer.
