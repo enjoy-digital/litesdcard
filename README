@@ -53,10 +53,10 @@ SD2: SanDisk Extreme 128GB
 
 W/R(MB/s) performance vs SD frequency:
 
-    | 20MHz | 40MHz | 75MHz |
-SD0 |  4/9  | 6/18  |  7/33 |
-SD1 |  6/9  | 9/18  | 12/33 |
-SD2 |  9/9  | 18/18 | 33/33 |
+    | 20MHz | 40MHz | 75MHz | 100MHz | 125MHz 
+SD0 |  4/9  | 6/18  |  7/33 |   7/44 |  7/56
+SD1 |  6/9  | 9/18  | 12/33 |  14/44 | 15/56
+SD2 |  9/9  | 18/18 | 33/33 |  43/44 | 54/55
 
 [> Possible improvements
 ------------------------
