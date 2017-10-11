@@ -46,7 +46,7 @@ class _BISTBlockGenerator(Module):
         self.source = source = stream.Endpoint([("data", 32)])
         self.start = Signal()
         self.done = Signal()
-        self.count = Signal(16)
+        self.count = Signal(32)
 
         # # #
 
@@ -54,7 +54,7 @@ class _BISTBlockGenerator(Module):
         gen = gen_cls(32)
         self.submodules += gen
 
-        blkcnt = Signal(16)
+        blkcnt = Signal(32)
         datcnt = Signal(9)
 
         fsm = FSM(reset_state="IDLE")
@@ -95,7 +95,7 @@ class BISTBlockGenerator(Module, AutoCSR):
         self.reset = CSR()
         self.start = CSR()
         self.done = CSRStatus()
-        self.count = CSRStorage(16, reset=1)
+        self.count = CSRStorage(32, reset=1)
 
         # # #
 
@@ -117,7 +117,7 @@ class _BISTBlockChecker(Module):
         self.sink = sink = stream.Endpoint([("data", 32)])
         self.start = Signal()
         self.done = Signal()
-        self.count = Signal(16)
+        self.count = Signal(32)
         self.errors = Signal(32)
 
         # # #
@@ -126,7 +126,7 @@ class _BISTBlockChecker(Module):
         gen = gen_cls(32)
         self.submodules += gen
 
-        blkcnt = Signal(16)
+        blkcnt = Signal(32)
         datcnt = Signal(9)
 
         fsm = FSM(reset_state="IDLE")
@@ -147,7 +147,9 @@ class _BISTBlockChecker(Module):
                 gen.ce.eq(1),
                 NextValue(datcnt, datcnt + 1),
                 If(sink.data != gen.o,
-                    NextValue(self.errors, self.errors + 1)
+                	If(self.errors != (2**32-1),
+                    	NextValue(self.errors, self.errors + 1)
+                    )
                 ),
                 If(sink.last | (datcnt == (512//4 - 1)),
                     If(blkcnt == (self.count - 1),
@@ -170,7 +172,7 @@ class BISTBlockChecker(Module, AutoCSR):
         self.reset = CSR()
         self.start = CSR()
         self.done = CSRStatus()
-        self.count = CSRStorage(16, reset=1)
+        self.count = CSRStorage(32, reset=1)
         self.errors = CSRStatus(32)
 
         # # #
