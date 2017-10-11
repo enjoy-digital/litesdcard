@@ -111,19 +111,22 @@ class SDCore(Module, AutoCSR):
         self.comb += [
             waitresp.eq(command[0:2]),
             dataxfer.eq(command[5:7]),
-            cmdevt.eq(Cat(cmddone,
-                          C(0, 1),
-                          cerrtimeout,
-                          cerrcrc_en & ~self.crc7checker.valid)),
-            dataevt.eq(Cat(datadone,
-                           derrwrite,
-                           derrtimeout,
-                           derrread_en & ~self.crc16checker.valid)),
+            cmdevt.eq(Cat(
+                cmddone,
+                C(0, 1),
+                cerrtimeout,
+                cerrcrc_en & ~self.crc7checker.valid)),
+            dataevt.eq(Cat(
+                datadone,
+                derrwrite,
+                derrtimeout,
+                derrread_en & ~self.crc16checker.valid)),
 
-            self.crc7inserter.val.eq(Cat(argument,
-                                 command[8:14],
-                                 1,
-                                 0)),
+            self.crc7inserter.val.eq(Cat(
+                argument,
+                command[8:14],
+                1,
+                0)),
             self.crc7inserter.clr.eq(1),
             self.crc7inserter.enable.eq(1),
 
