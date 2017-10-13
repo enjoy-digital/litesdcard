@@ -1,3 +1,5 @@
+# Copyright (c) 2017 Micah Elizabeth Scott
+
 import os
 from litex.gen import *
 
