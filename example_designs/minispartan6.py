@@ -7,7 +7,7 @@ from litex.gen import *
 from litex.gen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.generic_platform import *
-from litex.build.xilinx import FpgaProg
+from litex.build.openocd import OpenOCD
 
 from litex.soc.interconnect import stream
 from litex.soc.cores.uart import UARTWishboneBridge
@@ -186,7 +186,7 @@ def main():
         soc.do_exit(vns)
     elif load:
         print("[loading]...")
-        prog = FpgaProg()
+        prog = OpenOCD("board/minispartan6.cfg")
         prog.load_bitstream("build/gateware/top.bit")
 
 
