@@ -96,21 +96,23 @@ class SDSoC(SoCCore):
                          ident="SDCard Test SoC",
                          ident_version=True,
                          integrated_rom_size=0x8000 if with_cpu else 0,
-                         integrated_sram_size=0x1000,
                          integrated_main_ram_size=0x8000 if with_cpu else 0)
 
         self.submodules.crg = _CRG(platform)
 
+        # bridge
         if not with_cpu:
             self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
             self.add_wb_master(self.cpu_or_bridge.wishbone)
 
+        # emulator
         if with_emulator:
             sdcard_pads = _sdemulator_pads()
             self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
         else:
             sdcard_pads = platform.request('sdcard')
 
+        # sd
         self.submodules.sdclk = SDClockerS7()
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
@@ -136,16 +138,10 @@ class SDSoC(SoCCore):
             self.sdclk.cd_sd.clk,
             self.sdclk.cd_sd_fb.clk)
 
+        # led
         led_counter = Signal(32)
         self.sync.sd += led_counter.eq(led_counter + 1)
         self.comb += platform.request("user_led", 0).eq(led_counter[26])
-
-        self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
-            p_INIT=1, p_SRTYPE="SYNC",
-            i_D0=0, i_D1=1, i_S=0, i_R=0, i_CE=1,
-            i_C0=ClockSignal("sd"), i_C1=~ClockSignal("sd"),
-            o_Q=platform.request("pmoda")[0]
-        )
 
         # analyzer
         if with_analyzer:
