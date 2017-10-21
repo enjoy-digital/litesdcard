@@ -4,8 +4,7 @@ from litex.soc.interconnect.csr import *
 
 
 class SDClockerS6(Module, AutoCSR):
-    # assuming 50MHz sys_clk
-    def __init__(self, max_sd_clk=100e6):
+    def __init__(self, sys_clk_freq=50e6, max_sd_clk=100e6):
             self._cmd_data = CSRStorage(10)
             self._send_cmd_data = CSR()
             self._send_go = CSR()
@@ -24,7 +23,7 @@ class SDClockerS6(Module, AutoCSR):
 
             sd_locked = Signal()
 
-            clkfx_md_max = max(2.0/4.0, max_sd_clk/50e6)
+            clkfx_md_max = max(2.0/4.0, max_sd_clk/sys_clk_freq)
             self._clkfx_md_max_1000 = CSRConstant(clkfx_md_max*1000.0)
             self.specials += Instance("DCM_CLKGEN",
                 # parameters
@@ -37,7 +36,7 @@ class SDClockerS6(Module, AutoCSR):
 
                 # input
                 i_CLKIN=ClockSignal(),
-                p_CLKIN_PERIOD=20.0,
+                p_CLKIN_PERIOD=1e9/sys_clk_freq,
 
                 # output
                 p_CLKFXDV_DIVIDE=2,
@@ -91,8 +90,7 @@ class SDClockerS6(Module, AutoCSR):
 
 
 class SDClockerS7(Module, AutoCSR):
-    # assuming 100MHz sys_clk
-    def __init__(self):
+    def __init__(self, sys_clk_freq=100e6):
         self.clock_domains.cd_sd = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
 
@@ -117,7 +115,7 @@ class SDClockerS7(Module, AutoCSR):
                 i_RST=self._mmcm_reset.storage, o_LOCKED=mmcm_locked,
 
                 # VCO
-                p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=10.0,
+                p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=1e9/sys_clk_freq,
                 p_CLKFBOUT_MULT_F=30.0, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=2,
                 i_CLKIN1=ClockSignal(), i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
 
