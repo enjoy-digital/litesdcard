@@ -21,7 +21,7 @@ class SDCore(Module, AutoCSR):
         self.dataevt = CSRStatus(32)
 
         self.blocksize = CSRStorage(16)
-        self.blockcount = CSRStorage(16)
+        self.blockcount = CSRStorage(32)
 
         self.datatimeout = CSRStorage(32, reset=2**16)
         self.cmdtimeout = CSRStorage(32, reset=2**16)
@@ -38,7 +38,7 @@ class SDCore(Module, AutoCSR):
         cmdevt = Signal(32)
         dataevt = Signal(32)
         blocksize = Signal(16)
-        blockcount = Signal(16)
+        blockcount = Signal(32)
         datatimeout = Signal(32)
         cmdtimeout = Signal(32)
 
@@ -99,7 +99,7 @@ class SDCore(Module, AutoCSR):
         dataxfer = Signal(2)
         cmddone = Signal(reset=1)
         datadone = Signal(reset=1)
-        blkcnt = Signal(16)
+        blkcnt = Signal(32)
         pos = Signal(2)
 
         cerrtimeout = Signal()
