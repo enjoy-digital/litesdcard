@@ -501,7 +501,7 @@ class SDPHYDATAW(Module):
 
 
 class SDPHYIOS6(Module):
-    def __init__(self, sdpads, pads):
+    def __init__(self, sdpads, pads, ddr_alignment="C0"):
         # Data tristate
         self.data_t = TSTriple(4)
         self.specials += self.data_t.get_tristate(pads.data)
@@ -525,7 +525,7 @@ class SDPHYIOS6(Module):
         # Cmd input DDR
         cmd = Signal(2)
         self.specials += Instance("IDDR2",
-            p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
+            p_DDR_ALIGNMENT=ddr_alignment, p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
             i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
             i_CE=1, i_S=0, i_R=0,
             i_D=self.cmd_t.i, o_Q0=cmd[0], o_Q1=cmd[1]
@@ -539,7 +539,7 @@ class SDPHYIOS6(Module):
         for i in range(4):
             data = Signal(2)
             self.specials += Instance("IDDR2",
-                p_DDR_ALIGNMENT="C0", p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
+                p_DDR_ALIGNMENT=ddr_alignment, p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
                 i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
                 i_CE=1, i_S=0, i_R=0,
                 i_D=self.data_t.i[i], o_Q0=data[0], o_Q1=data[1]
@@ -588,7 +588,7 @@ class SDPHYIOS7(Module):
 
 
 class SDPHY(Module, AutoCSR):
-    def __init__(self, pads, device):
+    def __init__(self, pads, device, **kwargs):
         self.sink = sink = stream.Endpoint([("data", 8), ("cmd_data_n", 1), ("rd_wr_n", 1)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
         if hasattr(pads, "sel"):
@@ -626,7 +626,7 @@ class SDPHY(Module, AutoCSR):
         else:
             # real phy
             if device[:3] == "xc6":
-                self.submodules.io = io = SDPHYIOS6(sdpads, pads)
+                self.submodules.io = io = SDPHYIOS6(sdpads, pads, **kwargs)
                 self.comb += [
                     io.cmd_t.oe.eq(sdpads.cmd.oe),
                     io.cmd_t.o.eq(sdpads.cmd.o),
@@ -635,7 +635,7 @@ class SDPHY(Module, AutoCSR):
                     io.data_t.o.eq(sdpads.data.o)
                 ]
             elif device[:3] == "xc7":
-                self.submodules.io = io = SDPHYIOS7(sdpads, pads)
+                self.submodules.io = io = SDPHYIOS7(sdpads, pads, **kwargs)
                 self.sync.sd += [
                     io.cmd_t.oe.eq(sdpads.cmd.oe),
                     io.cmd_t.o.eq(sdpads.cmd.o),
