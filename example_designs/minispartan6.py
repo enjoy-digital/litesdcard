@@ -100,7 +100,7 @@ class SDSoC(SoCCore):
         platform = minispartan6.Platform(device="xc6slx25")
         platform.add_extension(_sd_io)
         clk_freq = int(50e6)
-        sd_freq = int(100e6)
+        sd_freq = int(140e6)
         SoCCore.__init__(self, platform,
                          clk_freq=clk_freq,
                          cpu_type="lm32" if with_cpu else None,

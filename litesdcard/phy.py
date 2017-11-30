@@ -515,9 +515,11 @@ class SDPHYIOS6(Module):
             self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_fb"))
 
         # Clk output
+        sdpads_clk = Signal()
+        self.sync.sd += sdpads_clk.eq(sdpads.clk)
         self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
             p_INIT=1, p_SRTYPE="SYNC",
-            i_D0=0, i_D1=sdpads.clk, i_S=0, i_R=0, i_CE=1,
+            i_D0=0, i_D1=sdpads_clk, i_S=0, i_R=0, i_CE=1,
             i_C0=ClockSignal("sd"), i_C1=~ClockSignal("sd"),
             o_Q=pads.clk
         )
@@ -627,24 +629,17 @@ class SDPHY(Module, AutoCSR):
             # real phy
             if device[:3] == "xc6":
                 self.submodules.io = io = SDPHYIOS6(sdpads, pads, **kwargs)
-                self.comb += [
-                    io.cmd_t.oe.eq(sdpads.cmd.oe),
-                    io.cmd_t.o.eq(sdpads.cmd.o),
-
-                    io.data_t.oe.eq(sdpads.data.oe),
-                    io.data_t.o.eq(sdpads.data.o)
-                ]
             elif device[:3] == "xc7":
                 self.submodules.io = io = SDPHYIOS7(sdpads, pads, **kwargs)
-                self.sync.sd += [
-                    io.cmd_t.oe.eq(sdpads.cmd.oe),
-                    io.cmd_t.o.eq(sdpads.cmd.o),
-
-                    io.data_t.oe.eq(sdpads.data.oe),
-                    io.data_t.o.eq(sdpads.data.o)
-                ]
             else:
                 raise NotImplementedError
+            self.sync.sd += [
+                io.cmd_t.oe.eq(sdpads.cmd.oe),
+                io.cmd_t.o.eq(sdpads.cmd.o),
+
+                io.data_t.oe.eq(sdpads.data.oe),
+                io.data_t.o.eq(sdpads.data.o)
+            ]
 
         # PHY submodules
         self.submodules.cfg = cfg = SDPHYCFG()
