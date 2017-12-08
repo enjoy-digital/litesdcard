@@ -250,10 +250,11 @@ class SDPHYDATAR(Module):
         datarfb_reset = Signal()
 
         self.submodules.datarfb = SDPHYRFB(pads.data.i, True)
-        self.submodules.fifo = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
+        self.submodules.cdc = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
             stream.AsyncFIFO(self.datarfb.source.description, 4)
         )
-        self.comb += self.datarfb.source.connect(self.fifo.sink)
+        self.submodules.buffer = ClockDomainsRenamer("sd")(stream.Buffer(self.datarfb.source.description))
+        self.comb += self.datarfb.source.connect(self.buffer.sink)
 
         dtimeout = Signal(32)
 
@@ -267,7 +268,7 @@ class SDPHYDATAR(Module):
             pads.data.oe.eq(0),
             pads.clk.eq(1),
             datarfb_reset.eq(1),
-            self.fifo.source.ready.eq(1),
+            self.buffer.source.ready.eq(1),
             If(sink.valid,
                 NextValue(dtimeout, 0),
                 NextValue(read, 0),
@@ -283,7 +284,7 @@ class SDPHYDATAR(Module):
             pads.data.oe.eq(0),
             pads.clk.eq(1),
             NextValue(dtimeout, dtimeout + 1),
-            If(self.fifo.source.valid,
+            If(self.buffer.source.valid,
                 NextState("DATA_READ")
             ).Elif(dtimeout > cfg.datatimeout,
                 NextState("TIMEOUT")
@@ -293,11 +294,11 @@ class SDPHYDATAR(Module):
         fsm.act("DATA_READ",
             pads.data.oe.eq(0),
             pads.clk.eq(1),
-            source.valid.eq(self.fifo.source.valid),
-            source.data.eq(self.fifo.source.data),
+            source.valid.eq(self.buffer.source.valid),
+            source.data.eq(self.buffer.source.data),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
             source.last.eq(read == (toread - 1)),
-            self.fifo.source.ready.eq(source.ready),
+            self.buffer.source.ready.eq(source.ready),
             If(source.valid & source.ready,
                 NextValue(read, read + 1),
                 If(read == (toread - 1),
@@ -314,8 +315,8 @@ class SDPHYDATAR(Module):
         fsm.act("DATA_FLUSH",
             pads.data.oe.eq(0),
             datarfb_reset.eq(1),
-            self.fifo.source.ready.eq(1),
-            If(cnt < 4,
+            self.buffer.source.ready.eq(1),
+            If(cnt < 5,
                 NextValue(cnt, cnt + 1),
             ).Else(
                 NextValue(cnt, 0),
@@ -540,6 +541,7 @@ class SDPHYIOS6(Module):
         # Data input DDR
         for i in range(4):
             data = Signal(2)
+            data_r = Signal(2)
             self.specials += Instance("IDDR2",
                 p_DDR_ALIGNMENT=ddr_alignment, p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
                 i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
