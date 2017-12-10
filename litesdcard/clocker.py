@@ -4,12 +4,12 @@ from litex.soc.interconnect.csr import *
 
 
 class SDClockerS6(Module, AutoCSR):
-    def __init__(self, sys_clk_freq=50e6, max_sd_clk=100e6):
+    def __init__(self, sys_clk_freq=50e6, max_sd_clk_freq=100e6):
             self._cmd_data = CSRStorage(10)
             self._send_cmd_data = CSR()
             self._send_go = CSR()
             self._status = CSRStatus(4)
-            self._max_sd_clk = CSRConstant(max_sd_clk)
+            self._max_sd_clk_freq = CSRConstant(max_sd_clk_freq)
 
             self.clock_domains.cd_sd = ClockDomain()
             self.clock_domains.cd_sd_fb = ClockDomain()
@@ -23,7 +23,7 @@ class SDClockerS6(Module, AutoCSR):
 
             sd_locked = Signal()
 
-            clkfx_md_max = max(2.0/4.0, max_sd_clk/sys_clk_freq)
+            clkfx_md_max = max(2.0/4.0, max_sd_clk_freq/sys_clk_freq)
             self._clkfx_md_max_1000 = CSRConstant(clkfx_md_max*1000.0)
             self.specials += Instance("DCM_CLKGEN",
                 # parameters
