@@ -391,12 +391,12 @@ class SDPHYCRCRFB(Module):
             )
         )
         fsm.act("CHECK",
-            If(data == 0b010,
-                valid.eq(1),
-                error.eq(0),
-            ).Else(
+            If(data == 0b101,
                 valid.eq(0),
-                error.eq(1)
+                error.eq(1),
+            ).Else(
+                valid.eq(1),
+                error.eq(0)
             ),
             NextState("IDLE")
         )
