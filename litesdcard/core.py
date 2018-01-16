@@ -1,5 +1,5 @@
 from litex.gen import *
-from litex.gen.genlib.cdc import MultiReg, PulseSynchronizer
+from litex.gen.genlib.cdc import MultiReg, BusSynchronizer, PulseSynchronizer
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
@@ -42,17 +42,28 @@ class SDCore(Module, AutoCSR):
         datatimeout = Signal(32)
         cmdtimeout = Signal(32)
 
-
+        # sys to sd cdc
         self.specials += [
             MultiReg(self.argument.storage, argument, "sd"),
             MultiReg(self.command.storage, command, "sd"),
-            MultiReg(response, self.response.status, "sys"),
-            MultiReg(cmdevt, self.cmdevt.status, "sys"),
-            MultiReg(dataevt, self.dataevt.status, "sys"),
             MultiReg(self.blocksize.storage, blocksize, "sd"),
             MultiReg(self.blockcount.storage, blockcount, "sd"),
             MultiReg(self.datatimeout.storage, datatimeout, "sd"),
             MultiReg(self.cmdtimeout.storage, cmdtimeout, "sd")
+        ]
+
+        # sd to sys cdc
+        response_cdc = BusSynchronizer(120, "sd", "sys")
+        cmdevt_cdc = BusSynchronizer(32, "sd", "sys")
+        dataevt_cdc = BusSynchronizer(32, "sd", "sys")
+        self.submodules += response_cdc, cmdevt_cdc, dataevt_cdc
+        self.comb += [
+            response_cdc.i.eq(response),
+            self.response.status.eq(response_cdc.o),
+            cmdevt_cdc.i.eq(cmdevt),
+            self.cmdevt.status.eq(cmdevt_cdc.o),
+            dataevt_cdc.i.eq(dataevt),
+            self.dataevt.status.eq(dataevt_cdc.o)
         ]
 
         self.submodules.new_command = PulseSynchronizer("sys", "sd")
