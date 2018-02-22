@@ -3,11 +3,11 @@
        / /__/ / __/ -_)\ \/ // / /__/ _ `/ __/ _  /
       /____/_/\__/\__/___/____/\___/\_,_/_/  \_,_/
 
-          Copyright 2017 / LambdaConcept
-          Copyright 2017 / EnjoyDigital
+          Copyright 2017-2018 / LambdaConcept
+          Copyright 2017-2018 / EnjoyDigital
 
        A small footprint and configurable SDCard core
-                   powered by LiteX
+                powered by LiteX & Migen
 
 [> Intro
 --------
@@ -16,9 +16,6 @@ LiteSDCard is a small footprint and configurable SDCard core.
 LiteSDCard is part of LiteX libraries whose aims are to lower entry level of
 complex FPGA cores by providing simple, elegant and efficient implementations
 of components used in today's SoC such as Ethernet, SATA, PCIe, SDRAM Controller...
-
-The core uses simple and specific streaming buses and will provides in the future
-adapters to use standardized AXI or Avalon-ST streaming buses.
 
 Since Python is used to describe the HDL, the core is highly and easily
 configurable.
@@ -76,7 +73,7 @@ If you want to support these features, please contact us.
 2. Obtain LiteX and install it:
   git clone https://github.com/enjoy-digital/litex --recursive
   cd litex
-  python3 setup.py install
+  python3 setup.py develop
   cd ..
 
 3. Build and load Arty test design:
@@ -112,7 +109,7 @@ do them if possible:
 -------------------------
 We love open-source hardware and like sharing our designs with others.
 
-LiteSDCard is developed and maintained by EnjoyDigital.
+LiteSDCard is developed and maintained by LambdaConcept & EnjoyDigital.
 
 If you would like to know more about LiteSDCard or if you are already a happy user
 and would like to extend it for your needs, EnjoyDigital can provide standard
