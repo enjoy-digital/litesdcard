@@ -1,6 +1,7 @@
 # Copyright (c) 2017 Micah Elizabeth Scott
 
-from litex.gen import *
+from migen import *
+
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
 from litex.soc.interconnect import wishbone

@@ -1,5 +1,6 @@
-from litex.gen import *
-from litex.gen.genlib.cdc import MultiReg, BusSynchronizer, PulseSynchronizer
+from migen import *
+from migen.genlib.cdc import MultiReg, BusSynchronizer, PulseSynchronizer
+
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 

@@ -1,5 +1,6 @@
-from litex.gen import *
-from litex.gen.genlib.resetsync import AsyncResetSynchronizer
+from migen import *
+from migen.genlib.resetsync import AsyncResetSynchronizer
+
 from litex.soc.interconnect.csr import *
 
 

@@ -2,8 +2,8 @@
 
 import sys
 
-from litex.gen import *
-from litex.gen.genlib.resetsync import AsyncResetSynchronizer
+from migen import *
+from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.build.generic_platform import *
 from litex.build.xilinx import VivadoProgrammer

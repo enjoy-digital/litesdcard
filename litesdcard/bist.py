@@ -3,7 +3,7 @@
 from functools import reduce
 from operator import xor
 
-from litex.gen import *
+from migen import *
 
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *

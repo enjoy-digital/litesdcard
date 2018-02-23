@@ -1,5 +1,6 @@
-from litex.gen import *
-from litex.gen.fhdl import verilog
+from migen import *
+from migen.fhdl import verilog
+
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
@@ -70,8 +71,8 @@ class CRCDownstreamChecker(Module):
 
         fifo = [Signal(16) for i in range(4)]
         self.comb += If((fifo[0] == crctmp[0]) &
-                        (fifo[1] == crctmp[1]) & 
-                        (fifo[2] == crctmp[2]) & 
+                        (fifo[1] == crctmp[1]) &
+                        (fifo[2] == crctmp[2]) &
                         (fifo[3] == crctmp[3]),
             self.valid.eq(1)
         )

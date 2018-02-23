@@ -5,7 +5,7 @@ import os
 from litex.build.generic_platform import *
 from litex.build.xilinx import XilinxPlatform
 
-from litex.gen import *
+from migen import *
 
 from litex.build.generic_platform import *
 
