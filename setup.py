@@ -11,7 +11,7 @@ if sys.version_info[:3] < (3, 3):
 
 setup(
     name="litesdcard",
-	version="0.1",
+	version="0.2.dev",
 	description="small footprint and configurable SD Card core",
 	long_description=open("README").read(),
 	author="Pierre-Olivier Vauboin",
