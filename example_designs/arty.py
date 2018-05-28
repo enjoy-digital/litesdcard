@@ -154,7 +154,7 @@ class SDSoC(SoCCore):
                 self.sdphy.datar.sink,
                 self.sdphy.datar.source
             ]
-            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 2048, cd="sd", cd_ratio=4)
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 2048, cd="sd")
 
     def do_exit(self, vns):
         if hasattr(self, "analyzer"):
