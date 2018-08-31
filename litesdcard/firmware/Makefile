@@ -1,4 +1,4 @@
-BUILD_DIR=../../example_designs/build/
+BUILD_DIR=../../examples/build/
 
 include $(BUILD_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
