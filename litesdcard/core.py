@@ -10,13 +10,15 @@ from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
 
 
 class SDCore(Module, AutoCSR):
-    def __init__(self, phy):
+    def __init__(self, phy, csr_data_width=32):
         self.sink = stream.Endpoint([("data", 32)])
         self.source = stream.Endpoint([("data", 32)])
 
         self.argument = CSRStorage(32)
         self.command = CSRStorage(32)
-        self.issue_cmd = CSRStorage(1)
+        if csr_data_width == 8:
+            self.issue_cmd = CSRStorage(1)
+
         self.response = CSRStatus(120)
 
         self.cmdevt = CSRStatus(32)
@@ -69,8 +71,10 @@ class SDCore(Module, AutoCSR):
         ]
 
         self.submodules.new_command = PulseSynchronizer("sys", "sd")
-#        self.comb += self.new_command.i.eq(self.command.re)
-        self.comb += self.new_command.i.eq(self.issue_cmd.re)
+        if csr_data_width == 8:
+            self.comb += self.new_command.i.eq(self.issue_cmd.re)
+        else:
+            self.comb += self.new_command.i.eq(self.command.re)
 
         self.comb += [
             phy.cfg.blocksize.eq(blocksize),
@@ -109,12 +113,12 @@ class SDCore(Module, AutoCSR):
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
 
         csel = Signal(max=6)
-        waitresp = Signal(2)
-        dataxfer = Signal(2)
-        cmddone = Signal(reset=1)
-        datadone = Signal(reset=1)
+        self.waitresp = waitresp = Signal(2)
+        self.dataxfer = dataxfer = Signal(2)
+        self.cmddone = cmddone = Signal(reset=1)
+        self.datadone = datadone = Signal(reset=1)
         blkcnt = Signal(32)
-        pos = Signal(2)
+        self.pos = pos = Signal(2)
 
         cerrtimeout = Signal()
         cerrcrc_en = Signal()
