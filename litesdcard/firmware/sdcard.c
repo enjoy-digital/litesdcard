@@ -584,6 +584,12 @@ void sdcard_bist_checker_wait(void) {
 /* user */
 
 int sdcard_init(void) {
+        /* initialize SD driver parameters */ 
+	sdcore_cmdtimeout_write(1<<19);
+	sdcore_datatimeout_write(1<<19);
+
+	sdtimer_init();
+
 	/* reset card */
 	sdcard_go_idle();
 	busy_wait(1);
@@ -700,5 +706,5 @@ int sdcard_test(unsigned int loops) {
 		);
 	}
 
-	return 0;
+	return errors;
 }
