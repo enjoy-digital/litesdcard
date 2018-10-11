@@ -201,6 +201,33 @@ int sdcard_wait_data_done(void) {
 int sdcard_wait_response(void) {
 	int i;
 	int status;
+
+#if CSR_DATA_WIDTH == 8
+	unsigned int r;
+
+	status = sdcard_wait_cmd_done();
+
+	// LSB is located at RESPONSE_ADDR + (RESPONSE_SIZE - 1) * 4
+	int offset;
+	for(i=0; i<4; i++) {
+	  r = 0;
+	  for( j = 0; j < 4; j++ ) {
+	    offset = ((CSR_SDCORE_RESPONSE_SIZE - 1) * 4) - j * 4 - i * 16;
+	    if( offset >= 0 ) {
+	      r |= ((csr_readl(CSR_SDCORE_RESPONSE_ADDR + offset) & 0xFF) << (j * 8));
+	    }
+	  }
+#ifdef SDCARD_DEBUG
+	  printf("%08x ", r);
+#endif
+	  sdcard_response[3 - i] = r;  // NOTE: this is "backwards" but sticking with this because it's compatible with CSR32
+	}
+#ifdef SDCARD_DEBUG
+	printf( "\n" );
+#endif
+
+	
+#else
 	volatile unsigned int *buffer = (unsigned int *)CSR_SDCORE_RESPONSE_ADDR;
 
 	status = sdcard_wait_cmd_done();
@@ -211,11 +238,17 @@ int sdcard_wait_response(void) {
 #endif
 		sdcard_response[i] = buffer[i];
 	}
+#endif
 
 	return status;
 }
 
 /* commands */
+#if CSR_DATA_WIDTH == 8
+#define  CSR8_CMD_FIX  	sdcore_issue_cmd_write(1)
+#else
+#define  CSR8_CMD_FIX
+#endif
 
 void sdcard_go_idle(void) {
 #ifdef SDCARD_DEBUG
@@ -223,6 +256,7 @@ void sdcard_go_idle(void) {
 #endif
 	sdcore_argument_write(0x00000000);
 	sdcore_command_write((0 << 8) | SDCARD_CTRL_RESPONSE_NONE);
+	CSR8_CMD_FIX;
 }
 
 int sdcard_send_ext_csd(void) {
@@ -231,6 +265,7 @@ int sdcard_send_ext_csd(void) {
 #endif
 	sdcore_argument_write(0x000001aa);
 	sdcore_command_write((8 << 8) | SDCARD_CTRL_RESPONSE_NONE);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -241,6 +276,7 @@ int sdcard_app_cmd(int rca) {
 #endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((55 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -257,6 +293,7 @@ int sdcard_app_send_op_cond(int hcs, int s18r) {
 		arg |= 0x01000000;
 	sdcore_argument_write(arg);
 	sdcore_command_write((41 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -267,6 +304,7 @@ int sdcard_all_send_cid(void) {
 #endif
 	sdcore_argument_write(0x00000000);
 	sdcore_command_write((2 << 8) | SDCARD_CTRL_RESPONSE_LONG);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -277,6 +315,7 @@ int sdcard_set_relative_address(void) {
 #endif
 	sdcore_argument_write(0x00000000);
 	sdcore_command_write((3 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -287,6 +326,7 @@ int sdcard_send_cid(unsigned int rca) {
 #endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((10 << 8) | SDCARD_CTRL_RESPONSE_LONG);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -297,6 +337,7 @@ int sdcard_send_csd(unsigned int rca) {
 #endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((9 << 8) | SDCARD_CTRL_RESPONSE_LONG);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -307,6 +348,7 @@ int sdcard_select_card(unsigned int rca) {
 #endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((7 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -317,6 +359,7 @@ int sdcard_app_set_bus_width(void) {
 #endif
 	sdcore_argument_write(0x00000002);
 	sdcore_command_write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -336,6 +379,7 @@ int sdcard_switch(unsigned int mode, unsigned int group, unsigned int value, uns
 	sdcore_blockcount_write(1);
 	sdcore_command_write((6 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	sdcard_wait_response();
 	busy_wait(1);
@@ -351,6 +395,7 @@ int sdcard_app_send_scr(void) {
 	sdcore_blockcount_write(1);
 	sdcore_command_write((51 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 						 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	sdcard_wait_response();
 	busy_wait(1);
@@ -364,6 +409,7 @@ int sdcard_app_set_blocklen(unsigned int blocklen) {
 #endif
 	sdcore_argument_write(blocklen);
 	sdcore_command_write((16 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -379,6 +425,7 @@ int sdcard_write_single_block(unsigned int blockaddr) {
 		sdcore_blockcount_write(1);
 		sdcore_command_write((24 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 							 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
+		CSR8_CMD_FIX;
 		cmd_response = sdcard_wait_response();
 	}
 	return cmd_response;
@@ -395,6 +442,7 @@ int sdcard_write_multiple_block(unsigned int blockaddr, unsigned int blockcnt) {
 		sdcore_blockcount_write(blockcnt);
 		sdcore_command_write((25 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 							 (SDCARD_CTRL_DATA_TRANSFER_WRITE << 5));
+		CSR8_CMD_FIX;
 		cmd_response = sdcard_wait_response();
 	}
 	return cmd_response;
@@ -411,6 +459,7 @@ int cmd_response = -1;
 		sdcore_blockcount_write(1);
 		sdcore_command_write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 							 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+		CSR8_CMD_FIX;
 		cmd_response = sdcard_wait_response();
 	}
 	return sdcard_wait_data_done();
@@ -427,6 +476,7 @@ int cmd_response = -1;
 		sdcore_blockcount_write(blockcnt);
 		sdcore_command_write((18 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
 							 (SDCARD_CTRL_DATA_TRANSFER_READ << 5));
+		CSR8_CMD_FIX;
 		cmd_response = sdcard_wait_response();
 	}
 	return cmd_response;
@@ -438,6 +488,7 @@ int sdcard_stop_transmission(void) {
 #endif
 	sdcore_argument_write(0x0000000);
 	sdcore_command_write((12 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -448,6 +499,7 @@ int sdcard_send_status(unsigned int rca) {
 #endif
 	sdcore_argument_write(rca << 16);
 	sdcore_command_write((13 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
@@ -458,6 +510,7 @@ int sdcard_set_block_count(unsigned int blockcnt) {
 #endif
 	sdcore_argument_write(blockcnt);
 	sdcore_command_write((23 << 8) | SDCARD_CTRL_RESPONSE_SHORT);
+	CSR8_CMD_FIX;
 	busy_wait(1);
 	return sdcard_wait_response();
 }
