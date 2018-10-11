@@ -16,6 +16,7 @@ class SDCore(Module, AutoCSR):
 
         self.argument = CSRStorage(32)
         self.command = CSRStorage(32)
+        self.issue_cmd = CSRStorage(1)
         self.response = CSRStatus(120)
 
         self.cmdevt = CSRStatus(32)
@@ -68,7 +69,8 @@ class SDCore(Module, AutoCSR):
         ]
 
         self.submodules.new_command = PulseSynchronizer("sys", "sd")
-        self.comb += self.new_command.i.eq(self.command.re)
+#        self.comb += self.new_command.i.eq(self.command.re)
+        self.comb += self.new_command.i.eq(self.issue_cmd.re)
 
         self.comb += [
             phy.cfg.blocksize.eq(blocksize),
