@@ -30,18 +30,18 @@ def sdclks7_set_config(wb, freq):
     clock_m, clock_d = sdclks7_get_config(freq//1000)
     # clkfbout_mult = clock_m
     if(clock_m%2):
-        sdclk_mmcm_write(wb, 0x14, 0x1000 | ((clock_m//2)<<6) | (clock_m//2 + 1))
+        sdclks7_mmcm_write(wb, 0x14, 0x1000 | ((clock_m//2)<<6) | (clock_m//2 + 1))
     else:
-        sdclk_mmcm_write(wb, 0x14, 0x1000 | ((clock_m//2)<<6) | clock_m//2)
+        sdclks7_mmcm_write(wb, 0x14, 0x1000 | ((clock_m//2)<<6) | clock_m//2)
     # divclk_divide = clock_d
     if (clock_d == 1):
-        sdclk_mmcm_write(wb, 0x16, 0x1000)
+        sdclks7_mmcm_write(wb, 0x16, 0x1000)
     elif(clock_d%2):
-        sdclk_mmcm_write(wb, 0x16, ((clock_d//2)<<6) | (clock_d//2 + 1))
+        sdclks7_mmcm_write(wb, 0x16, ((clock_d//2)<<6) | (clock_d//2 + 1))
     else:
-        sdclk_mmcm_write(wb, 0x16, ((clock_d//2)<<6) | clock_d//2)
+        sdclks7_mmcm_write(wb, 0x16, ((clock_d//2)<<6) | clock_d//2)
     # clkout0_divide = 10
-    sdclk_mmcm_write(wb, 0x8, 0x1000 | (5<<6) | 5)
+    sdclks7_mmcm_write(wb, 0x8, 0x1000 | (5<<6) | 5)
 
 
 CLKGEN_STATUS_BUSY = 0x1
