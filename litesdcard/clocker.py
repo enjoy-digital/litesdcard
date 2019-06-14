@@ -117,11 +117,11 @@ class SDClockerS7(Module, AutoCSR):
 
                 # VCO
                 p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=1e9/sys_clk_freq,
-                p_CLKFBOUT_MULT_F=30.0, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=2,
+                p_CLKFBOUT_MULT_F=32, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=5,
                 i_CLKIN1=ClockSignal(), i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
 
                 # CLK0
-                p_CLKOUT0_DIVIDE_F=10.0, p_CLKOUT0_PHASE=0.000, o_CLKOUT0=mmcm_clk0,
+                p_CLKOUT0_DIVIDE_F=128, p_CLKOUT0_PHASE=0.000, o_CLKOUT0=mmcm_clk0,
 
                 # DRP
                 i_DCLK=ClockSignal(),
