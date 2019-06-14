@@ -3,7 +3,7 @@
 import sys
 import time
 
-from litex.soc.tools.remote import RemoteClient
+from litex import RemoteClient
 
 from libbase.sdcard import *
 
