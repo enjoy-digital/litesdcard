@@ -113,12 +113,12 @@ class SDCore(Module, AutoCSR):
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
 
         csel = Signal(max=6)
-        self.waitresp = waitresp = Signal(2)
-        self.dataxfer = dataxfer = Signal(2)
-        self.cmddone = cmddone = Signal(reset=1)
-        self.datadone = datadone = Signal(reset=1)
+        waitresp = Signal(2)
+        dataxfer = Signal(2)
+        cmddone = Signal(reset=1)
+        datadone = Signal(reset=1)
         blkcnt = Signal(32)
-        self.pos = pos = Signal(2)
+        pos = Signal(2)
 
         cerrtimeout = Signal()
         cerrcrc_en = Signal()
