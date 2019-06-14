@@ -27,7 +27,7 @@ def sdclks7_get_config(freq):
     return best_m, best_d
 
 def sdclks7_set_config(wb, freq):
-    clock_m, clock_d = sdclk_get_config(freq//1000)
+    clock_m, clock_d = sdclks7_get_config(freq//1000)
     # clkfbout_mult = clock_m
     if(clock_m%2):
         sdclk_mmcm_write(wb, 0x14, 0x1000 | ((clock_m//2)<<6) | (clock_m//2 + 1))
