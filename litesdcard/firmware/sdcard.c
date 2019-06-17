@@ -658,7 +658,7 @@ int sdcard_test(unsigned int loops) {
 	unsigned int blocks;
 	unsigned int start;
 	unsigned int end;
-	unsigned int errors;
+	unsigned int errors = 0;
 	unsigned long write_speed, read_speed;
 
 	sdcore_cmdtimeout_write(1<<19);
