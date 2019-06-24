@@ -1,3 +1,8 @@
+# This file is Copyright (c) 2017 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2019 Kees Jongenburger <kees.jongenburger@gmail.com>
+# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
+# License: BSD
+
 from litesdcard.common import *
 
 # clocking
@@ -227,7 +232,7 @@ def sdcard_read_single_block(wb, blkaddr):
         wb.regs.sdcore_argument.write(blkaddr)
         wb.regs.sdcore_blocksize.write(512)
         wb.regs.sdcore_blockcount.write(1)
-        wb.regs.sdcore_command.write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT | 
+        wb.regs.sdcore_command.write((17 << 8) | SDCARD_CTRL_RESPONSE_SHORT |
                                      (SDCARD_CTRL_DATA_TRANSFER_READ << 5))
         cmd_response = sdcard_wait_cmd_done(wb)
     return cmd_response

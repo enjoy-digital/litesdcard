@@ -1,3 +1,8 @@
+# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
+# This file is Copyright (c) 2017 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2019 Kees Jongenburger <kees.jongenburger@gmail.com>
+# License: BSD
+
 #!/usr/bin/env python3
 
 import sys

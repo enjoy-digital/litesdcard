@@ -1,3 +1,6 @@
+# This file is Copyright (c) 2017 Florent Kermarrec <florent@enjoy-digital.fr>
+# License: BSD
+
 SD_OK         = 0
 SD_CRCERROR   = 1
 SD_TIMEOUT    = 2

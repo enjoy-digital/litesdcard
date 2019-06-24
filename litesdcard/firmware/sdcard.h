@@ -1,3 +1,6 @@
+// This file is Copyright (c) 2017 Florent Kermarrec <florent@enjoy-digital.fr>
+// License: BSD
+
 #ifndef __SDCARD_H
 #define __SDCARD_H
 

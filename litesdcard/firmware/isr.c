@@ -1,3 +1,6 @@
+// This file is Copyright (c) 2017 Florent Kermarrec <florent@enjoy-digital.fr>
+// License: BSD
+
 #include <generated/csr.h>
 #include <irq.h>
 #include <uart.h>

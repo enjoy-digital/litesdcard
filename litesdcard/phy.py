@@ -1,3 +1,7 @@
+# This file is Copyright (c) 2017-2018 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
+# License: BSD
+
 from migen import *
 from migen.genlib.cdc import MultiReg, PulseSynchronizer
 

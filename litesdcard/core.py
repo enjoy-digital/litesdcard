@@ -1,3 +1,9 @@
+# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
+# This file is Copyright (c) 2017-2019 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2018 bunnie <bunnie@kosagi.com>
+# License: BSD
+
+
 from migen import *
 from migen.genlib.cdc import MultiReg, BusSynchronizer, PulseSynchronizer
 

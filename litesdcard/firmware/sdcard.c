@@ -1,3 +1,8 @@
+// This file is Copyright (c) 2017 Florent Kermarrec <florent@enjoy-digital.fr>
+// This file is Copyright (c) 2019 Kees Jongenburger <kees.jongenburger@gmail.com>
+// This file is Copyright (c) 2018 bunnie <bunnie@kosagi.com>
+// License: BSD
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -226,7 +231,7 @@ int sdcard_wait_response(void) {
 	printf( "\n" );
 #endif
 
-	
+
 #else
 	volatile unsigned int *buffer = (unsigned int *)CSR_SDCORE_RESPONSE_ADDR;
 
@@ -584,7 +589,7 @@ void sdcard_bist_checker_wait(void) {
 /* user */
 
 int sdcard_init(void) {
-        /* initialize SD driver parameters */ 
+        /* initialize SD driver parameters */
 	sdcore_cmdtimeout_write(1<<19);
 	sdcore_datatimeout_write(1<<19);
 
@@ -691,7 +696,7 @@ int sdcard_test(unsigned int loops) {
 		sdcard_bist_checker_wait();
 		end = sdtimer_get();
 		read_speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
-		
+
 		/* errors */
 		errors = bist_checker_errors_read();
 

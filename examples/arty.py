@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# This file is Copyright (c) 2017-2018 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2019 Kees Jongenburger <kees.jongenburger@gmail.com>
+# This file is Copyright (c) 2018 Rohit Kumar Singh <rohit91.2008@gmail.com>
+# License: BSD
+
 import sys
 
 from migen import *
