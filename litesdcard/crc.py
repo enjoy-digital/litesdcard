@@ -13,7 +13,7 @@ class CRC(Module):
     def __init__(self, poly, size, dw, init=0):
         crcreg = [Signal(size, reset=init) for i in range(dw+1)]
         self.val = val = Signal(dw)
-        self.crc = crcreg[dw]
+        self.crc = Signal(size)
         self.clr = Signal()
         self.enable = Signal()
 
@@ -34,6 +34,11 @@ class CRC(Module):
             If(self.enable,
                crcreg[0].eq(crcreg[dw])
             )
+        )
+        self.comb += If(self.enable,
+            self.crc.eq(crcreg[dw])
+        ).Else(
+            self.crc.eq(crcreg[0])
         )
 
 
