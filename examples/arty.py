@@ -107,8 +107,8 @@ class SDSoC(SoCCore):
 
         # bridge
         if not with_cpu:
-            self.add_cpu(UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200))
-            self.add_wb_master(self.cpu.wishbone)
+            self.submodules.bridge = UARTWishboneBridge(platform.request("serial"), clk_freq, baudrate=115200)
+            self.add_wb_master(self.bridge.wishbone)
 
         # emulator
         if with_emulator:
