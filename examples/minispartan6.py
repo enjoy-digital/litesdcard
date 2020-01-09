@@ -33,16 +33,6 @@ from litex.boards.platforms import minispartan6
 from litescope import LiteScopeAnalyzer
 
 
-_sd_io = [
-    ("sdcard", 0,
-        Subsignal("data", Pins("M10 L10 J11 K12"), Misc("PULLUP")),
-        Subsignal("cmd", Pins("K11"), Misc("PULLUP")),
-        Subsignal("clk", Pins("L12")),
-        IOStandard("LVCMOS33"), Misc("SLEW=FAST")
-    )
-]
-
-
 class _CRG(Module):
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
@@ -101,7 +91,6 @@ class SDSoC(SoCCore):
 
     def __init__(self, with_cpu, with_emulator, with_analyzer):
         platform = minispartan6.Platform(device="xc6slx25")
-        platform.add_extension(_sd_io)
         clk_freq = int(50e6)
         sd_freq = int(140e6)
         SoCCore.__init__(self, platform,
