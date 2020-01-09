@@ -71,9 +71,9 @@ If you want to support these features, please contact us.
   python3 setup.py develop
   cd ..
 
-3. Build and load Arty test design:
+3. Build and load Nexys4DDR test design:
   go to examples
-  run ./arty.py cpu
+  run ./nexys4ddr.py cpu
 
 4. Build firmware:
   go to litesdcard/firmware

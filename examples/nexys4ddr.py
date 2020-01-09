@@ -29,19 +29,9 @@ from litesdcard.bist import BISTBlockGenerator, BISTBlockChecker
 
 from litesdcard.emulator import SDEmulator, _sdemulator_pads
 
-from litex.boards.platforms import arty
+from litex.boards.platforms import nexys4ddr
 
 from litescope import LiteScopeAnalyzer
-
-
-_sd_io = [
-    ("sdcard", 0,
-        Subsignal("data", Pins("V11 T13 U13 U12"), Misc("PULLUP True")),
-        Subsignal("cmd", Pins("V10"), Misc("PULLUP True")),
-        Subsignal("clk", Pins("V12")),
-        IOStandard("LVCMOS33"), Misc("SLEW=FAST")
-    )
-]
 
 
 class _CRG(Module):
@@ -88,8 +78,7 @@ class SDSoC(SoCCore):
     csr_map.update(SoCCore.csr_map)
 
     def __init__(self, with_cpu, with_emulator, with_analyzer):
-        platform = arty.Platform()
-        platform.add_extension(_sd_io)
+        platform = nexys4ddr.Platform()
         clk_freq = int(100e6)
         sd_freq = int(100e6)
         SoCCore.__init__(self, platform,
@@ -118,6 +107,7 @@ class SDSoC(SoCCore):
             sdcard_pads = platform.request('sdcard')
 
         # sd
+        self.comb += sdcard_pads.rst.eq(0)
         self.submodules.sdclk = SDClockerS7()
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
