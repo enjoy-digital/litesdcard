@@ -146,12 +146,8 @@ class SDSoC(SoCCore):
                 self.sdphy.datar.sink,
                 self.sdphy.datar.source
             ]
-            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 2048, cd="sd")
-
-    def do_exit(self, vns):
-        if hasattr(self, "analyzer"):
-            self.analyzer.export_csv(vns, "../test/analyzer.csv")
-
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 2048, cd="sd",
+                csr_csv="../test/analyzer.csv")
 
 def main():
     args = sys.argv[1:]
@@ -167,7 +163,6 @@ def main():
         soc = SDSoC(with_cpu, with_emulator, with_analyzer)
         builder = Builder(soc, output_dir="build", csr_csv="../test/csr.csv")
         vns = builder.build()
-        soc.do_exit(vns)
     elif load:
         print("[loading]...")
         prog = VivadoProgrammer()
