@@ -83,7 +83,7 @@ static void help(void)
 
 static void reboot(void)
 {
-	asm("call r0");
+	ctrl_reset_write(1);
 }
 
 static void console_service(void)

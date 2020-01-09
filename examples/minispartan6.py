@@ -52,7 +52,7 @@ class SDSoC(SoCCore):
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform,
             clk_freq                 = sys_clk_freq,
-            cpu_type                 = "lm32" if with_cpu else None,
+            cpu_type                 = "vexriscv" if with_cpu else None,
             csr_data_width           = 32,
             with_uart                = with_cpu,
             with_timer               = with_cpu,
@@ -60,7 +60,7 @@ class SDSoC(SoCCore):
             ident_version            = True,
             integrated_rom_size      = 0x8000 if with_cpu else 0,
             integrated_main_ram_size = 0x8000 if with_cpu else 0
-        )
+        )s
 
         # CRG --------------------------------------------------------------------------------------
         self.submodules.crg = _CRG(platform, sys_clk_freq)

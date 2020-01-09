@@ -55,7 +55,7 @@ class SDCardSoC(SoCCore):
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform,
             clk_freq                 = sys_clk_freq,
-            cpu_type                 = "lm32" if with_cpu else None,
+            cpu_type                 = "vexriscv" if with_cpu else None,
             csr_data_width           = 32,
             with_uart                = with_cpu,
             with_timer               = with_cpu,
@@ -94,7 +94,7 @@ class SDCardSoC(SoCCore):
         self.add_csr("sdtimer")
 
         self.submodules.bist_generator = BISTBlockGenerator(random=True)
-        self.submodules.bist_checker = BISTBlockChecker(random=True)
+        self.submodules.bist_checker   = BISTBlockChecker(random=True)
         self.add_csr("bist_generator")
         self.add_csr("bist_checker")
         self.comb += [
