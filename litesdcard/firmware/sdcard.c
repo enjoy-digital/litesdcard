@@ -139,7 +139,7 @@ static void busy_wait(unsigned int ms)
 {
 	timer0_en_write(0);
 	timer0_reload_write(0);
-	timer0_load_write(SYSTEM_CLOCK_FREQUENCY/1000*ms);
+	timer0_load_write(CONFIG_CLOCK_FREQUENCY/1000*ms);
 	timer0_en_write(1);
 	timer0_update_value_write(1);
 	while(timer0_value_read()) timer0_update_value_write(1);
@@ -683,7 +683,7 @@ int sdcard_test(unsigned int loops) {
 		sdcard_bist_generator_wait();
 		sdcard_stop_transmission();
 		end = sdtimer_get();
-		write_speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
+		write_speed = length*(CONFIG_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 
 		/* delay FIXME */
 		busy_wait(200);
@@ -695,7 +695,7 @@ int sdcard_test(unsigned int loops) {
 		sdcard_read_multiple_block(i, blocks);
 		sdcard_bist_checker_wait();
 		end = sdtimer_get();
-		read_speed = length*(SYSTEM_CLOCK_FREQUENCY/100000)/((start - end)/100000);
+		read_speed = length*(CONFIG_CLOCK_FREQUENCY/100000)/((start - end)/100000);
 
 		/* errors */
 		errors = bist_checker_errors_read();
