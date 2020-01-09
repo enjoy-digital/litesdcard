@@ -13,6 +13,7 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.build.generic_platform import *
 from litex.build.xilinx import VivadoProgrammer
 
+from litex.soc.cores.clock import *
 from litex.soc.interconnect import stream
 from litex.soc.cores.uart import UARTWishboneBridge
 from litex.soc.cores.timer import Timer
@@ -35,33 +36,15 @@ from litescope import LiteScopeAnalyzer
 
 
 class _CRG(Module):
-    def __init__(self, platform):
+    def __init__(self, platform, sys_clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
 
         # # #
 
-        clk100 = platform.request("clk100")
-        rst = ~platform.request("cpu_reset")
-
-        pll_locked = Signal()
-        pll_fb = Signal()
-        pll_sys = Signal()
-        self.specials += [
-            Instance("PLLE2_BASE",
-                     p_STARTUP_WAIT="FALSE", o_LOCKED=pll_locked,
-
-                     # VCO @ 1600 MHz
-                     p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=10.0,
-                     p_CLKFBOUT_MULT=16, p_DIVCLK_DIVIDE=1,
-                     i_CLKIN1=clk100, i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb,
-
-                     # 100 MHz
-                     p_CLKOUT0_DIVIDE=16, p_CLKOUT0_PHASE=0.0,
-                     o_CLKOUT0=pll_sys
-            ),
-            Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
-            AsyncResetSynchronizer(self.cd_sys, ~pll_locked | rst),
-        ]
+        self.submodules.pll = pll = S7PLL(speedgrade=-1)
+        self.comb += pll.reset.eq(~platform.request("cpu_reset"))
+        pll.register_clkin(platform.request("clk100"), 100e6)
+        pll.create_clkout(self.cd_sys,       sys_clk_freq)
 
 
 class SDSoC(SoCCore):
@@ -80,7 +63,7 @@ class SDSoC(SoCCore):
                          integrated_rom_size=0x8000 if with_cpu else 0,
                          integrated_main_ram_size=0x8000 if with_cpu else 0)
 
-        self.submodules.crg = _CRG(platform)
+        self.submodules.crg = _CRG(platform, clk_freq)
 
         # bridge
         if not with_cpu:
