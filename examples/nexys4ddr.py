@@ -65,18 +65,6 @@ class _CRG(Module):
 
 
 class SDSoC(SoCCore):
-    csr_map = {
-        "sdclk":          20,
-        "sdphy":          21,
-        "sdcore":         22,
-        "sdtimer":        23,
-        "sdemulator":     24,
-        "bist_generator": 25,
-        "bist_checker":   26,
-        "analyzer":       30
-    }
-    csr_map.update(SoCCore.csr_map)
-
     def __init__(self, with_cpu, with_emulator, with_analyzer):
         platform = nexys4ddr.Platform()
         clk_freq = int(100e6)
@@ -103,6 +91,7 @@ class SDSoC(SoCCore):
         if with_emulator:
             sdcard_pads = _sdemulator_pads()
             self.submodules.sdemulator = SDEmulator(platform, sdcard_pads)
+            self.add_csr("sdemulator")
         else:
             sdcard_pads = platform.request('sdcard')
 
@@ -112,9 +101,15 @@ class SDSoC(SoCCore):
         self.submodules.sdphy = SDPHY(sdcard_pads, platform.device)
         self.submodules.sdcore = SDCore(self.sdphy)
         self.submodules.sdtimer = Timer()
+        self.add_csr("sdclk")
+        self.add_csr("sdphy")
+        self.add_csr("sdcore")
+        self.add_csr("sdtimer")
 
         self.submodules.bist_generator = BISTBlockGenerator(random=True)
         self.submodules.bist_checker = BISTBlockChecker(random=True)
+        self.add_csr("bist_generator")
+        self.add_csr("bist_checker")
 
         self.comb += [
             self.sdcore.source.connect(self.bist_checker.sink),
@@ -148,6 +143,7 @@ class SDSoC(SoCCore):
             ]
             self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 2048, cd="sd",
                 csr_csv="../test/analyzer.csv")
+            self.add_csr("analyzer")
 
 def main():
     args = sys.argv[1:]
