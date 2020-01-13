@@ -204,45 +204,13 @@ int sdcard_wait_data_done(void) {
 }
 
 int sdcard_wait_response(void) {
-	int i;
-	int status;
+	int status = sdcard_wait_cmd_done();
 
-#if CSR_DATA_WIDTH == 8
-	unsigned int r;
-
-	status = sdcard_wait_cmd_done();
-
-	// LSB is located at RESPONSE_ADDR + (RESPONSE_SIZE - 1) * 4
-	int offset;
-	for(i=0; i<4; i++) {
-	  r = 0;
-	  for( j = 0; j < 4; j++ ) {
-	    offset = ((CSR_SDCORE_RESPONSE_SIZE - 1) * 4) - j * 4 - i * 16;
-	    if( offset >= 0 ) {
-	      r |= ((csr_readl(CSR_SDCORE_RESPONSE_ADDR + offset) & 0xFF) << (j * 8));
-	    }
-	  }
+	csr_rd_buf_uint32(CSR_SDCORE_RESPONSE_ADDR, sdcard_response, 4);
 #ifdef SDCARD_DEBUG
-	  printf("%08x ", r);
-#endif
-	  sdcard_response[3 - i] = r;  // NOTE: this is "backwards" but sticking with this because it's compatible with CSR32
-	}
-#ifdef SDCARD_DEBUG
-	printf( "\n" );
-#endif
-
-
-#else
-	volatile unsigned int *buffer = (unsigned int *)CSR_SDCORE_RESPONSE_ADDR;
-
-	status = sdcard_wait_cmd_done();
-
-	for(i=0; i<4; i++) {
-#ifdef SDCARD_DEBUG
-		printf("%08x\n", buffer[i]);
-#endif
-		sdcard_response[i] = buffer[i];
-	}
+	printf("sdcard_response = [%08x, %08x, %08x, %08x];\n",
+		sdcard_response[0], sdcard_response[1],
+		sdcard_response[2], sdcard_response[3]);
 #endif
 
 	return status;
