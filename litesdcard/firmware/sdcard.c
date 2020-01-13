@@ -557,6 +557,8 @@ void sdcard_bist_checker_wait(void) {
 /* user */
 
 int sdcard_init(void) {
+	unsigned short rca;
+
         /* initialize SD driver parameters */
 	sdcore_cmdtimeout_write(1<<19);
 	sdcore_datatimeout_write(1<<19);
