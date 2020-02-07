@@ -44,8 +44,6 @@
 #define SDCARD_CTRL_RESPONSE_SHORT 1
 #define SDCARD_CTRL_RESPONSE_LONG  2
 
-unsigned short rca;
-
 /* clocking */
 
 void sdclk_set_clk(unsigned int freq);
