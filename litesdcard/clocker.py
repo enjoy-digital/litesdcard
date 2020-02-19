@@ -94,7 +94,8 @@ class SDClockerS6(Module, AutoCSR):
 
 
 class SDClockerS7(Module, AutoCSR):
-    def __init__(self, sys_clk_freq=100e6):
+    def __init__(self, clkin=ClockSignal(), clkin_freq=100e6):
+        assert clkin_freq == 100e6
         self.clock_domains.cd_sd    = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
 
@@ -119,9 +120,9 @@ class SDClockerS7(Module, AutoCSR):
                 i_RST=self._mmcm_reset.storage, o_LOCKED=mmcm_locked,
 
                 # VCO
-                p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=1e9/sys_clk_freq,
+                p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=1e9/clkin_freq,
                 p_CLKFBOUT_MULT_F=32, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=5,
-                i_CLKIN1=ClockSignal(), i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
+                i_CLKIN1=clkin, i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
 
                 # CLK0
                 p_CLKOUT0_DIVIDE_F=128, p_CLKOUT0_PHASE=0.000, o_CLKOUT0=mmcm_clk0,
