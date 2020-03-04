@@ -3,8 +3,8 @@
        / /__/ / __/ -_)\ \/ // / /__/ _ `/ __/ _  /
       /____/_/\__/\__/___/____/\___/\_,_/_/  \_,_/
 
+          Copyright 2017-2020 / EnjoyDigital
           Copyright 2017-2018 / LambdaConcept
-          Copyright 2017-2018 / EnjoyDigital
 
        A small footprint and configurable SDCard core
                 powered by LiteX & Migen
@@ -104,7 +104,7 @@ do them if possible:
 -------------------------
 We love open-source hardware and like sharing our designs with others.
 
-LiteSDCard is developed and maintained by LambdaConcept & EnjoyDigital.
+LiteSDCard is developed and maintained by EnjoyDigital & LambdaConcept.
 
 If you would like to know more about LiteSDCard or if you are already a happy user
 and would like to extend it for your needs, EnjoyDigital can provide standard
@@ -116,6 +116,6 @@ the list of the possible improvements :)
 [> Contact
 ----------
 E-mail:
+florent [AT] enjoy-digital.fr
 po [AT] lambdaconcept.com
 ramtin [AT] lambdaconcept.com
-florent [AT] enjoy-digital.fr
