@@ -7,6 +7,8 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.soc.interconnect.csr import *
 
+from litex.soc.cores.clock import S7MMCM
+
 
 class SDClockerS6(Module, AutoCSR):
     def __init__(self, sys_clk_freq=50e6, max_sd_clk_freq=100e6):
@@ -94,55 +96,11 @@ class SDClockerS6(Module, AutoCSR):
 
 
 class SDClockerS7(Module, AutoCSR):
-    def __init__(self, clkin=ClockSignal(), clkin_freq=100e6):
-        assert clkin_freq == 100e6
-        self.clock_domains.cd_sd    = ClockDomain()
+    def __init__(self, sys_clk_freq=100e6, sd_clk_freq=10e6):
+        self.clock_domains.cd_sd = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
 
-        self._mmcm_reset = CSRStorage()
-        self._mmcm_read  = CSR()
-        self._mmcm_write = CSR()
-        self._mmcm_drdy  = CSRStatus()
-        self._mmcm_adr   = CSRStorage(7)
-        self._mmcm_dat_w = CSRStorage(16)
-        self._mmcm_dat_r = CSRStatus(16)
-
-        # # #
-
-        mmcm_locked = Signal()
-        mmcm_fb     = Signal()
-        mmcm_clk0   = Signal()
-        mmcm_drdy   = Signal()
-
-        self.specials += [
-            Instance("MMCME2_ADV",
-                p_BANDWIDTH="OPTIMIZED",
-                i_RST=self._mmcm_reset.storage, o_LOCKED=mmcm_locked,
-
-                # VCO
-                p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=1e9/clkin_freq,
-                p_CLKFBOUT_MULT_F=32, p_CLKFBOUT_PHASE=0.000, p_DIVCLK_DIVIDE=5,
-                i_CLKIN1=clkin, i_CLKFBIN=mmcm_fb, o_CLKFBOUT=mmcm_fb,
-
-                # CLK0
-                p_CLKOUT0_DIVIDE_F=128, p_CLKOUT0_PHASE=0.000, o_CLKOUT0=mmcm_clk0,
-
-                # DRP
-                i_DCLK  = ClockSignal(),
-                i_DWE   = self._mmcm_write.re,
-                i_DEN   = self._mmcm_read.re | self._mmcm_write.re,
-                o_DRDY  = mmcm_drdy,
-                i_DADDR = self._mmcm_adr.storage,
-                i_DI    = self._mmcm_dat_w.storage,
-                o_DO    = self._mmcm_dat_r.status
-            ),
-            Instance("BUFG", i_I=mmcm_clk0, o_O=self.cd_sd.clk),
-        ]
-        self.sync += [
-            If(self._mmcm_read.re | self._mmcm_write.re,
-                self._mmcm_drdy.status.eq(0)
-            ).Elif(mmcm_drdy,
-                self._mmcm_drdy.status.eq(1)
-            )
-        ]
-        self.comb += self.cd_sd.rst.eq(~mmcm_locked)
+        self.submodules.mmcm = mmcm = S7MMCM(speedgrade=-1)
+        mmcm.register_clkin(ClockSignal(), sys_clk_freq)
+        mmcm.create_clkout(self.cd_sd, sd_clk_freq)
+        mmcm.expose_drp()
