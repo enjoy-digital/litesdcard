@@ -74,15 +74,12 @@ If you want to support these features, please contact us.
 3. Build and load Nexys4DDR test design:
   go to examples
   run ./nexys4ddr.py cpu
+  run ./nexys4ddr.py load
 
-4. Build firmware:
-  go to litesdcard/firmware
-  make all
+4. Connect to the board:
+  litex_term <your_serial_port>
 
-5. Load firmware:
-  litex_term --kernel firmware.bin <your_serial_port>
-
-6. Test firmware:
+5. Test:
   sdclk 10
   sdinit
   sdtest 8
