@@ -1,5 +1,5 @@
 # This file is Copyright (c) 2017-2018 Florent Kermarrec <florent@enjoy-digital.fr>
-# This file is Copyright (c) 2020 Mariusz Glebocki Antmicro <www.antmicro.com>
+# This file is Copyright (c) 2020 Antmicro
 # License: BSD
 # Based on litesdcard/bist.py
 
