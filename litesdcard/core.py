@@ -139,7 +139,9 @@ class SDCore(Module, AutoCSR):
                 cmddone,
                 C(0, 1),
                 cerrtimeout,
-                cerrcrc_en & ~self.crc7checker.valid)),
+                0)),
+                #cerrcrc_en & ~self.crc7checker.valid)),
+                #FIXME: Disable CRC check as they do not work for CMD41 (and maybe others)
             dataevt.eq(Cat(
                 datadone,
                 derrwrite,
