@@ -1,13 +1,18 @@
-         __   _ __      _______  _____            __
-        / /  (_) /____ / __/ _ \/ ___/__ ________/ /
-       / /__/ / __/ -_)\ \/ // / /__/ _ `/ __/ _  /
-      /____/_/\__/\__/___/____/\___/\_,_/_/  \_,_/
+```
+                              __   _ __      _______  _____            __
+                             / /  (_) /____ / __/ _ \/ ___/__ ________/ /
+                            / /__/ / __/ -_)\ \/ // / /__/ _ `/ __/ _  /
+                           /____/_/\__/\__/___/____/\___/\_,_/_/  \_,_/
 
-          Copyright 2017-2020 / EnjoyDigital
-          Copyright 2017-2018 / LambdaConcept
+                               Copyright 2017-2020 / EnjoyDigital
+                               Copyright 2017-2018 / LambdaConcept
 
-       A small footprint and configurable SDCard core
-                powered by LiteX & Migen
+                            A small footprint and configurable SDCard core
+                                     powered by LiteX & Migen
+```
+
+[![](https://travis-ci.com/enjoy-digital/litesdcard.svg?branch=master)](https://travis-ci.com/enjoy-digital/litesdcard) ![License](https://img.shields.io/badge/License-BSD%202--Clause-orange.svg)
+
 
 [> Intro
 --------
@@ -27,11 +32,13 @@ design flow by generating the verilog rtl that you will use as a standard core.
 PHY:
   - Xilinx Spartan 6 and 7-Series FPGA
   - optional clock feedback (UHS-I)
+
 Core:
   - Command & Data CRC inserters/checkers
   - Single and multiple blocks write/read
   - Errors detection and reporting
   - Dynamically configurable clock speed
+
 Frontend:
   - Synthetizable BIST
   - 32 <--> 8 bits stream converters
@@ -44,10 +51,11 @@ SD2: SanDisk Extreme 128GB
 
 W/R(MB/s) performance vs SD frequency:
 
-    | 20MHz | 40MHz | 75MHz | 100MHz | 125MHz
-SD0 |  4/9  | 6/18  |  7/33 |   7/44 |  7/56
-SD1 |  6/9  | 9/18  | 12/33 |  14/44 | 15/56
-SD2 |  9/9  | 18/18 | 33/33 |  43/44 | 54/55
+| SDCard | 20MHz | 40MHz | 75MHz | 100MHz | 125MHz |
+|--------|-------|-------|-------|--------|--------|
+|   SD0  |  4/9  | 6/18  |  7/33 |   7/44 |  7/56  |
+|   SD1  |  6/9  | 9/18  | 12/33 |  14/44 | 15/56  |
+|   SD2  |  9/9  | 18/18 | 33/33 |  43/44 | 54/55  |
 
 [> Possible improvements
 ------------------------
@@ -62,27 +70,36 @@ If you want to support these features, please contact us.
 
 [> Getting started
 ------------------
-1. Install Python 3.5, Migen and FPGA vendor's development tools.
-   Get Migen from: https://github.com/m-labs/migen
+1. Install Python 3.6+ and FPGA vendor's development tools.
+2. Install Migen/LiteX and the LiteX's cores:
 
-2. Obtain LiteX and install it:
-  git clone https://github.com/enjoy-digital/litex --recursive
-  cd litex
-  python3 setup.py develop
-  cd ..
+```sh
+$ wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
+$ chmod +x litex_setup.py
+$ ./litex_setup.py init install --user (--user to install to user directory)
+```
+  Later, if you need to update all repositories:
+```sh
+$ ./litex_setup.py update
+```
 
 3. Build and load Nexys4DDR test design:
   go to examples
-  run ./nexys4ddr.py cpu
-  run ./nexys4ddr.py load
-
+```sh
+$ ./nexys4ddr.py cpu
+$ ./nexys4ddr.py cpu
+```
 4. Connect to the board:
-  litex_term <your_serial_port>
+```sh
+$ litex_term <your_serial_port>
+```
 
 5. Test:
-  sdclk 10
-  sdinit
-  sdtest 8
+```sh
+$  sdclk 10
+$  sdinit
+$  sdtest 8
+```
 
 [> License
 ----------
