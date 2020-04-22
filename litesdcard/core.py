@@ -25,7 +25,7 @@ class SDCore(Module, AutoCSR):
         if csr_data_width == 8:
             self.issue_cmd = CSRStorage(1)
 
-        self.response = CSRStatus(120)
+        self.response = CSRStatus(136)
 
         self.cmdevt = CSRStatus(32)
         self.dataevt = CSRStatus(32)
@@ -44,7 +44,7 @@ class SDCore(Module, AutoCSR):
 
         argument = Signal(32)
         command = Signal(32)
-        response = Signal(120)
+        response = Signal(136)
         cmdevt = Signal(32)
         dataevt = Signal(32)
         blocksize = Signal(16)
@@ -63,7 +63,7 @@ class SDCore(Module, AutoCSR):
         ]
 
         # sd to sys cdc
-        response_cdc = BusSynchronizer(120, "sd", "sys")
+        response_cdc = BusSynchronizer(136, "sd", "sys")
         cmdevt_cdc = BusSynchronizer(32, "sd", "sys")
         dataevt_cdc = BusSynchronizer(32, "sd", "sys")
         self.submodules += response_cdc, cmdevt_cdc, dataevt_cdc
@@ -92,7 +92,7 @@ class SDCore(Module, AutoCSR):
         ]
 
         self.submodules.crc7inserter = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
-        self.submodules.crc7checker = ClockDomainsRenamer("sd")(CRCChecker(9, 7, 120))
+        self.submodules.crc7checker = ClockDomainsRenamer("sd")(CRCChecker(9, 7, 136))
         self.submodules.crc16inserter = ClockDomainsRenamer("sd")(CRCUpstreamInserter())
         self.submodules.crc16checker = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
 
@@ -139,7 +139,9 @@ class SDCore(Module, AutoCSR):
                 cmddone,
                 C(0, 1),
                 cerrtimeout,
-                cerrcrc_en & ~self.crc7checker.valid)),
+                0)),
+                #cerrcrc_en & ~self.crc7checker.valid)),
+                #FIXME: Disable CRC check as they do not work for CMD41 (and maybe others)
             dataevt.eq(Cat(
                 datadone,
                 derrwrite,
@@ -210,7 +212,10 @@ class SDCore(Module, AutoCSR):
             If(waitresp == SDCARD_CTRL_RESPONSE_SHORT,
                 phy.sink.data.eq(5) # (5+1)*8 == 48bits
             ).Elif(waitresp == SDCARD_CTRL_RESPONSE_LONG,
-                phy.sink.data.eq(16) # (16+1)*8 == 136bits
+                phy.sink.data.eq(17) # (17+1)*8 == 144bits
+                #FIXME: Setting sink data width to 16 here, results in missing 2 last bytes in LONG response
+                #Before this, example response is: 0x        000e00325b590000734f7f800a40001b
+                #After this, example response is : 0x0000003f400e00325b590000734f7f800a40001b
             ),
 
             If(phy.source.valid, # Wait for resp or timeout coming from phy
@@ -234,8 +239,7 @@ class SDCore(Module, AutoCSR):
                         NextState("IDLE")
                     ),
                 ).Else(
-                    NextValue(response,
-                        Cat(phy.source.data, response[0:112]))
+                    NextValue(response, Cat(phy.source.data, response[:-len(phy.source.data)]))
                 )
             )
         )
