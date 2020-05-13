@@ -40,14 +40,7 @@ class SDCore(Module, AutoCSR):
         self.datawcrcvalids = CSRStatus(32)
         self.datawcrcerrors = CSRStatus(32)
 
-        self.cardcd = CSRStatus()
         # # #
-
-        if carddetect_pin is not None:
-            self.comb += self.cardcd.status.eq(carddetect_pin)
-        else:
-            # If we do not have pin to detect card presence, we are assuming, that card is always present
-            self.cardcd = CSRConstant(0)
 
         argument = Signal(32)
         command = Signal(32)
