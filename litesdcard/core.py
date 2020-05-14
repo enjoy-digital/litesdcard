@@ -16,7 +16,7 @@ from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
 
 
 class SDCore(Module, AutoCSR):
-    def __init__(self, phy, carddetect_pin=None, csr_data_width=32):
+    def __init__(self, phy, csr_data_width=32):
         self.sink = stream.Endpoint([("data", 32)])
         self.source = stream.Endpoint([("data", 32)])
 
