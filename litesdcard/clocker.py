@@ -9,6 +9,7 @@ from litex.soc.interconnect.csr import *
 
 from litex.soc.cores.clock import S7MMCM
 
+# SDClockerS6 --------------------------------------------------------------------------------------
 
 class SDClockerS6(Module, AutoCSR):
     def __init__(self, sys_clk_freq=50e6, max_sd_clk_freq=100e6):
@@ -95,9 +96,11 @@ class SDClockerS6(Module, AutoCSR):
             ]
 
 
+# SDClockerS7 --------------------------------------------------------------------------------------
+
 class SDClockerS7(Module, AutoCSR):
     def __init__(self, sys_clk_freq=100e6, sd_clk_freq=10e6):
-        self.clock_domains.cd_sd = ClockDomain()
+        self.clock_domains.cd_sd    = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
 
         self.submodules.mmcm = mmcm = S7MMCM(speedgrade=-1)

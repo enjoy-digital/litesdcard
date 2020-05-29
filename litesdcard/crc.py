@@ -1,5 +1,5 @@
 # This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
-# This file is Copyright (c) 2017-2018 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # License: BSD
 
 from migen import *
@@ -8,13 +8,14 @@ from migen.fhdl import verilog
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
+# CRC ----------------------------------------------------------------------------------------------
 
 class CRC(Module):
     def __init__(self, poly, size, dw, init=0):
         crcreg = [Signal(size, reset=init) for i in range(dw+1)]
-        self.val = val = Signal(dw)
-        self.crc = Signal(size)
-        self.clr = Signal()
+        self.val    = val = Signal(dw)
+        self.crc    = Signal(size)
+        self.clr    = Signal()
         self.enable = Signal()
 
         for i in range(dw):
@@ -41,11 +42,12 @@ class CRC(Module):
             self.crc.eq(crcreg[0])
         )
 
+# CRCChecker ---------------------------------------------------------------------------------------
 
 class CRCChecker(Module):
     def __init__(self, poly, size, dw, init=0):
         self.submodules.subcrc = CRC(poly, size, dw, init=init)
-        self.val = self.subcrc.val
+        self.val   = self.subcrc.val
         self.check = Signal(size)
         self.valid = Signal()
 
@@ -55,18 +57,19 @@ class CRCChecker(Module):
             self.valid.eq(self.subcrc.crc == self.check),
         ]
 
+# CRCDownstreamChecker -----------------------------------------------------------------------------
 
 class CRCDownstreamChecker(Module):
     def __init__(self):
-        self.sink = sink = stream.Endpoint([("data", 8)])
+        self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8)])
 
         # # #
 
-        val = Signal(8)
-        cnt = Signal(4)
+        val    = Signal(8)
+        cnt    = Signal(4)
         tmpcnt = Signal(10)
-        crcs = [CRC(poly=0x1021, size=16, dw=2, init=0) for i in range(4)]
+        crcs   = [CRC(poly=0x1021, size=16, dw=2, init=0) for i in range(4)]
         crctmp = [Signal(16) for i in range(4)]
         self.valid = Signal()
 
@@ -127,14 +130,15 @@ class CRCDownstreamChecker(Module):
             source.last.eq(sink.last)
         ]
 
+# CRCUpstreamChecker -------------------------------------------------------------------------------
 
 class CRCUpstreamInserter(Module):
     def __init__(self):
-        self.sink = sink = stream.Endpoint([("data", 8)])
+        self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8)])
 
-        crc = Signal(8)
-        cnt = Signal(3)
+        crc  = Signal(8)
+        cnt  = Signal(3)
         crcs = [CRC(poly=0x1021, size=16, dw=2, init=0) for i in range(4)]
 
         crctmp = [Signal(16) for i in range(4)]
@@ -155,8 +159,7 @@ class CRCUpstreamInserter(Module):
 
             cases[i] = source.data.eq(Cat(*crclist))
 
-        fsm = FSM()
-        self.submodules.fsm = fsm
+        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         crctmpsync = [NextValue(crctmp[i], crcs[i].crc) for i in range(4)]
 
         fsm.act("IDLE",

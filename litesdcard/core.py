@@ -1,5 +1,5 @@
 # This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
-# This file is Copyright (c) 2017-2019 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # This file is Copyright (c) 2018 bunnie <bunnie@kosagi.com>
 # License: BSD
 
@@ -14,58 +14,59 @@ from litesdcard.common import *
 from litesdcard.crc import CRC, CRCChecker
 from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
 
+# SDCore -------------------------------------------------------------------------------------------
 
 class SDCore(Module, AutoCSR):
     def __init__(self, phy, csr_data_width=32):
-        self.sink = stream.Endpoint([("data", 32)])
+        self.sink   = stream.Endpoint([("data", 32)])
         self.source = stream.Endpoint([("data", 32)])
 
-        self.argument = CSRStorage(32)
-        self.command = CSRStorage(32)
+        self.argument       = CSRStorage(32)
+        self.command        = CSRStorage(32)
         if csr_data_width == 8:
-            self.issue_cmd = CSRStorage(1)
+            self.issue_cmd  = CSRStorage(1)
 
-        self.response = CSRStatus(136)
+        self.response       = CSRStatus(136)
 
-        self.cmdevt = CSRStatus(32)
-        self.dataevt = CSRStatus(32)
+        self.cmdevt         = CSRStatus(32)
+        self.dataevt        = CSRStatus(32)
 
-        self.blocksize = CSRStorage(16)
-        self.blockcount = CSRStorage(32)
+        self.blocksize      = CSRStorage(16)
+        self.blockcount     = CSRStorage(32)
 
-        self.datatimeout = CSRStorage(32, reset=2**16)
-        self.cmdtimeout = CSRStorage(32, reset=2**16)
+        self.datatimeout    = CSRStorage(32, reset=2**16)
+        self.cmdtimeout     = CSRStorage(32, reset=2**16)
 
-        self.datawcrcclear = CSRStorage()
+        self.datawcrcclear  = CSRStorage()
         self.datawcrcvalids = CSRStatus(32)
         self.datawcrcerrors = CSRStatus(32)
 
         # # #
 
-        argument = Signal(32)
-        command = Signal(32)
-        response = Signal(136)
-        cmdevt = Signal(32)
-        dataevt = Signal(32)
-        blocksize = Signal(16)
-        blockcount = Signal(32)
+        argument    = Signal(32)
+        command     = Signal(32)
+        response    = Signal(136)
+        cmdevt      = Signal(32)
+        dataevt     = Signal(32)
+        blocksize   = Signal(16)
+        blockcount  = Signal(32)
         datatimeout = Signal(32)
-        cmdtimeout = Signal(32)
+        cmdtimeout  = Signal(32)
 
         # sys to sd cdc
         self.specials += [
-            MultiReg(self.argument.storage, argument, "sd"),
-            MultiReg(self.command.storage, command, "sd"),
-            MultiReg(self.blocksize.storage, blocksize, "sd"),
-            MultiReg(self.blockcount.storage, blockcount, "sd"),
+            MultiReg(self.argument.storage,    argument,    "sd"),
+            MultiReg(self.command.storage,     command,     "sd"),
+            MultiReg(self.blocksize.storage,   blocksize,   "sd"),
+            MultiReg(self.blockcount.storage,  blockcount,  "sd"),
             MultiReg(self.datatimeout.storage, datatimeout, "sd"),
-            MultiReg(self.cmdtimeout.storage, cmdtimeout, "sd")
+            MultiReg(self.cmdtimeout.storage,  cmdtimeout,  "sd"),
         ]
 
         # sd to sys cdc
         response_cdc = BusSynchronizer(136, "sd", "sys")
-        cmdevt_cdc = BusSynchronizer(32, "sd", "sys")
-        dataevt_cdc = BusSynchronizer(32, "sd", "sys")
+        cmdevt_cdc   = BusSynchronizer(32, "sd", "sys")
+        dataevt_cdc  = BusSynchronizer(32, "sd", "sys")
         self.submodules += response_cdc, cmdevt_cdc, dataevt_cdc
         self.comb += [
             response_cdc.i.eq(response),
@@ -91,10 +92,10 @@ class SDCore(Module, AutoCSR):
             self.datawcrcerrors.status.eq(phy.dataw.crc_errors)
         ]
 
-        self.submodules.crc7inserter = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
-        self.submodules.crc7checker = ClockDomainsRenamer("sd")(CRCChecker(9, 7, 136))
+        self.submodules.crc7inserter  = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
+        self.submodules.crc7checker   = ClockDomainsRenamer("sd")(CRCChecker(9, 7, 136))
         self.submodules.crc16inserter = ClockDomainsRenamer("sd")(CRCUpstreamInserter())
-        self.submodules.crc16checker = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
+        self.submodules.crc16checker  = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
 
         self.submodules.upstream_cdc = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
             stream.AsyncFIFO(self.sink.description, 4))
@@ -118,18 +119,18 @@ class SDCore(Module, AutoCSR):
 
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
 
-        csel = Signal(max=6)
+        csel     = Signal(max=6)
         waitresp = Signal(2)
         dataxfer = Signal(2)
-        cmddone = Signal(reset=1)
+        cmddone  = Signal(reset=1)
         datadone = Signal(reset=1)
-        blkcnt = Signal(32)
-        pos = Signal(2)
+        blkcnt   = Signal(32)
+        pos      = Signal(2)
 
         cerrtimeout = Signal()
-        cerrcrc_en = Signal()
+        cerrcrc_en  = Signal()
         derrtimeout = Signal()
-        derrwrite = Signal()
+        derrwrite   = Signal()
         derrread_en = Signal()
 
         self.comb += [
@@ -286,7 +287,6 @@ class SDCore(Module, AutoCSR):
             phy.sink.last.eq(self.crc16inserter.source.last),
             phy.sink.data.eq(self.crc16inserter.source.data),
             self.crc16inserter.source.ready.eq(phy.sink.ready),
-
             If(self.crc16inserter.source.valid &
                self.crc16inserter.source.last &
                self.crc16inserter.source.ready,

@@ -1,4 +1,4 @@
-# This file is Copyright (c) 2017-2018 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # License: BSD
 
 """Built In Self Test (BIST) modules for testing liteSDCard functionality."""
@@ -11,6 +11,7 @@ from migen import *
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
+# LFSR/Counter -------------------------------------------------------------------------------------
 
 @CEInserter()
 class LFSR(Module):
@@ -19,7 +20,7 @@ class LFSR(Module):
 
         # # #
 
-        state = Signal(n_state)
+        state  = Signal(n_state)
         curval = [state[i] for i in range(n_state)]
         curval += [0]*(n_out - n_state)
         for i in range(n_out):
@@ -42,26 +43,26 @@ class Counter(Module):
 
         self.sync += self.o.eq(self.o + 1)
 
+# BISTBlockGenerator -------------------------------------------------------------------------------
 
 @ResetInserter()
 class _BISTBlockGenerator(Module):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
-        self.start = Signal()
-        self.done = Signal()
-        self.count = Signal(32)
+        self.start  = Signal()
+        self.done   = Signal()
+        self.count  = Signal(32)
 
         # # #
 
         gen_cls = LFSR if random else Counter
-        gen = gen_cls(32)
+        gen     = gen_cls(32)
         self.submodules += gen
 
         blkcnt = Signal(32)
         datcnt = Signal(9)
 
-        fsm = FSM(reset_state="IDLE")
-        self.submodules += fsm
+        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             If(self.start,
                 NextValue(blkcnt, 0),
@@ -95,16 +96,14 @@ class _BISTBlockGenerator(Module):
 class BISTBlockGenerator(Module, AutoCSR):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
-        self.reset = CSR()
-        self.start = CSR()
-        self.done = CSRStatus()
-        self.count = CSRStorage(32, reset=1)
+        self.reset  = CSR()
+        self.start  = CSR()
+        self.done   = CSRStatus()
+        self.count  = CSRStorage(32, reset=1)
 
         # # #
 
-        core = _BISTBlockGenerator(random)
-        self.submodules += core
-
+        self.submodules.core = core = _BISTBlockGenerator(random)
         self.comb += [
             core.source.connect(source),
             core.reset.eq(self.reset.re),
@@ -113,27 +112,27 @@ class BISTBlockGenerator(Module, AutoCSR):
             core.count.eq(self.count.storage)
         ]
 
+# BISTBlockChecker ---------------------------------------------------------------------------------
 
 @ResetInserter()
 class _BISTBlockChecker(Module):
     def __init__(self, random):
-        self.sink = sink = stream.Endpoint([("data", 32)])
-        self.start = Signal()
-        self.done = Signal()
-        self.count = Signal(32)
+        self.sink   = sink = stream.Endpoint([("data", 32)])
+        self.start  = Signal()
+        self.done   = Signal()
+        self.count  = Signal(32)
         self.errors = Signal(32)
 
         # # #
 
         gen_cls = LFSR if random else Counter
-        gen = gen_cls(32)
+        gen     = gen_cls(32)
         self.submodules += gen
 
         blkcnt = Signal(32)
         datcnt = Signal(9)
 
-        fsm = FSM(reset_state="IDLE")
-        self.submodules += fsm
+        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             sink.ready.eq(1),
             self.done.eq(1),
@@ -171,18 +170,16 @@ class _BISTBlockChecker(Module):
 
 class BISTBlockChecker(Module, AutoCSR):
     def __init__(self, random):
-        self.sink = sink = stream.Endpoint([("data", 32)])
-        self.reset = CSR()
-        self.start = CSR()
-        self.done = CSRStatus()
-        self.count = CSRStorage(32, reset=1)
+        self.sink   = sink = stream.Endpoint([("data", 32)])
+        self.reset  = CSR()
+        self.start  = CSR()
+        self.done   = CSRStatus()
+        self.count  = CSRStorage(32, reset=1)
         self.errors = CSRStatus(32)
 
         # # #
 
-        core = _BISTBlockChecker(random)
-        self.submodules += core
-
+        self.submodules.core = core = _BISTBlockChecker(random)
         self.comb += [
             sink.connect(core.sink),
             core.reset.eq(self.reset.re),
