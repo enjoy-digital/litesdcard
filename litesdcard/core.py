@@ -17,14 +17,13 @@ from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
 # SDCore -------------------------------------------------------------------------------------------
 
 class SDCore(Module, AutoCSR):
-    def __init__(self, phy, csr_data_width=32):
+    def __init__(self, phy):
         self.sink   = stream.Endpoint([("data", 32)])
         self.source = stream.Endpoint([("data", 32)])
 
         self.argument       = CSRStorage(32)
         self.command        = CSRStorage(32)
-        if csr_data_width == 8:
-            self.issue_cmd  = CSRStorage(1)
+        self.send           = CSR()
 
         self.response       = CSRStatus(136)
 
@@ -78,10 +77,7 @@ class SDCore(Module, AutoCSR):
         ]
 
         self.submodules.new_command = PulseSynchronizer("sys", "sd")
-        if csr_data_width == 8:
-            self.comb += self.new_command.i.eq(self.issue_cmd.re)
-        else:
-            self.comb += self.new_command.i.eq(self.command.re)
+        self.comb += self.new_command.i.eq(self.send.re)
 
         self.comb += [
             phy.cfg.blocksize.eq(blocksize),
