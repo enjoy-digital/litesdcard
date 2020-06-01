@@ -25,7 +25,7 @@ class SDCore(Module, AutoCSR):
         self.command        = CSRStorage(32)
         self.send           = CSR()
 
-        self.response       = CSRStatus(136)
+        self.response       = CSRStatus(128)
 
         self.cmdevt         = CSRStatus(32)
         self.dataevt        = CSRStatus(32)
@@ -69,7 +69,7 @@ class SDCore(Module, AutoCSR):
         self.submodules += response_cdc, cmdevt_cdc, dataevt_cdc
         self.comb += [
             response_cdc.i.eq(response),
-            self.response.status.eq(response_cdc.o),
+            self.response.status.eq(response_cdc.o[:128]),
             cmdevt_cdc.i.eq(cmdevt),
             self.cmdevt.status.eq(cmdevt_cdc.o),
             dataevt_cdc.i.eq(dataevt),
