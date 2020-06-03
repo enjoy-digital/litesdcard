@@ -109,9 +109,9 @@ class SDClockerS7(Module, AutoCSR):
         mmcm.expose_drp()
 
 
-# SDClockerECP5 ------------------------------------------------------------------------------------
+# SDClockerGen ------------------------------------------------------------------------------------
 
-class SDClockerECP5(Module):
+class SDClockerGen(Module):
     def __init__(self):
         self.clock_domains.cd_sd    = ClockDomain()
         self.clock_domains.cd_sd_fb = ClockDomain()
