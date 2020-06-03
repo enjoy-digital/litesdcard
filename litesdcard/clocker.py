@@ -107,3 +107,14 @@ class SDClockerS7(Module, AutoCSR):
         mmcm.register_clkin(ClockSignal(), sys_clk_freq)
         mmcm.create_clkout(self.cd_sd, sd_clk_freq)
         mmcm.expose_drp()
+
+
+# SDClockerECP5 ------------------------------------------------------------------------------------
+
+class SDClockerECP5(Module):
+    def __init__(self):
+        self.clock_domains.cd_sd    = ClockDomain()
+        self.clock_domains.cd_sd_fb = ClockDomain()
+
+        self.comb += self.cd_sd.clk.eq(ClockSignal("clk10"))
+        self.comb += self.cd_sd.rst.eq(ResetSignal("clk10"))
