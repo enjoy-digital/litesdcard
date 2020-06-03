@@ -5,6 +5,8 @@
 from migen import *
 from migen.genlib.cdc import MultiReg, PulseSynchronizer
 
+from litex.build.io import SDRInput, SDROutput
+
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
@@ -596,7 +598,7 @@ class SDPHYIOS7(Module):
             )
 
 
-class SDPHYIOECP5(Module):
+class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
         # Data tristate
         self.data_t = TSTriple(4)
@@ -611,23 +613,17 @@ class SDPHYIOECP5(Module):
             raise NotImplementedError
 
         # Clk output
-        self.specials += Instance("ODDRX1F",
-            i_SCLK=ClockSignal("sd"), i_RST=0,
-            i_D0=0, i_D1=sdpads.clk, o_Q=pads.clk,
-        )
+        # FIXME: use DDR output for high clk freq but requires low latency or modification to the core.
+        sdpads_clk = Signal()
+        self.sync.sd += sdpads_clk.eq(sdpads.clk)
+        self.comb += If(sdpads_clk, pads.clk.eq(~ClockSignal("sd")))
 
-        # Cmd input DDR
-        self.specials += Instance("IDDRX1F",
-            i_SCLK=ClockSignal("sd_fb"), i_RST=0,
-            i_D=self.cmd_t.i, o_Q0=Signal(), o_Q1=sdpads.cmd.i,
-        )
+        # Cmd input
+        self.specials += SDRInput(self.cmd_t.i, sdpads.cmd.i, ClockSignal("sd"))
 
-        # Data input DDR
+        # Data input
         for i in range(4):
-            self.specials += Instance("IDDRX1F",
-                i_SCLK=ClockSignal("sd_fb"), i_RST=0,
-                i_D=self.data_t.i[i], o_Q0=Signal(), o_Q1=sdpads.data.i[i],
-            )
+            self.specials += SDRInput(self.data_t.i[i], sdpads.data.i[i], ClockSignal("sd"))
 
 
 class SDPHY(Module, AutoCSR):
@@ -674,10 +670,8 @@ class SDPHY(Module, AutoCSR):
                 self.submodules.io = io = SDPHYIOS6(sdpads, pads, **kwargs)
             elif device[:3] == "xc7":
                 self.submodules.io = io = SDPHYIOS7(sdpads, pads, **kwargs)
-            elif device[:5] == "LFE5U":
-                self.submodules.io = io = SDPHYIOECP5(sdpads, pads, **kwargs)
             else:
-                raise NotImplementedError
+                self.submodules.io = io = SDPHYIOGen(sdpads, pads, **kwargs)
             self.sync.sd += [
                 io.cmd_t.oe.eq(sdpads.cmd.oe),
                 io.cmd_t.o.eq(sdpads.cmd.o),
