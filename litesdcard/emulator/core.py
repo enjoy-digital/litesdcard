@@ -27,6 +27,12 @@ class SDEmulator(Module, AutoCSR):
     def __init__(self, platform, pads):
         self.submodules.ll = ClockDomainsRenamer("local")(SDLinkLayer(platform, pads))
 
+        # Clocking
+        self.clock_domains.cd_sd    = ClockDomain("sd")
+        self.clock_domains.cd_sd_fb = ClockDomain("sd_fb")
+        self.comb += self.cd_sd.clk.eq(ClockSignal())
+        self.comb += self.cd_sd_fb.clk.eq(ClockSignal())
+
         # Event interrupts and acknowledgment
         self.submodules.ev = EventManager()
         self.ev.read = EventSourcePulse()
