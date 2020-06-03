@@ -596,6 +596,40 @@ class SDPHYIOS7(Module):
             )
 
 
+class SDPHYIOECP5(Module):
+    def __init__(self, sdpads, pads):
+        # Data tristate
+        self.data_t = TSTriple(4)
+        self.specials += self.data_t.get_tristate(pads.data)
+
+        # Cmd tristate
+        self.cmd_t = TSTriple()
+        self.specials += self.cmd_t.get_tristate(pads.cmd)
+
+        # Clk domain feedback
+        if hasattr(pads, "clkfb"):
+            raise NotImplementedError
+
+        # Clk output
+        self.specials += Instance("ODDRX1F",
+            i_SCLK=ClockSignal("sd"), i_RST=0,
+            i_D0=0, i_D1=sdpads.clk, o_Q=pads.clk,
+        )
+
+        # Cmd input DDR
+        self.specials += Instance("IDDRX1F",
+            i_SCLK=ClockSignal("sd_fb"), i_RST=0,
+            i_D=self.cmd_t.i, o_Q0=Signal(), o_Q1=sdpads.cmd.i,
+        )
+
+        # Data input DDR
+        for i in range(4):
+            self.specials += Instance("IDDRX1F",
+                i_SCLK=ClockSignal("sd_fb"), i_RST=0,
+                i_D=self.data_t.i[i], o_Q0=Signal(), o_Q1=sdpads.data.i[i],
+            )
+
+
 class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device, **kwargs):
         self.sink = sink = stream.Endpoint([("data", 8), ("cmd_data_n", 1), ("rd_wr_n", 1)])
@@ -640,6 +674,8 @@ class SDPHY(Module, AutoCSR):
                 self.submodules.io = io = SDPHYIOS6(sdpads, pads, **kwargs)
             elif device[:3] == "xc7":
                 self.submodules.io = io = SDPHYIOS7(sdpads, pads, **kwargs)
+            elif device[:5] == "LFE5U":
+                self.submodules.io = io = SDPHYIOECP5(sdpads, pads, **kwargs)
             else:
                 raise NotImplementedError
             self.sync.sd += [
