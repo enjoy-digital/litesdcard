@@ -83,23 +83,7 @@ $ ./litex_setup.py init install --user (--user to install to user directory)
 $ ./litex_setup.py update
 ```
 
-3. Build and load Nexys4DDR test design:
-  go to examples
-```sh
-$ ./nexys4ddr.py cpu
-$ ./nexys4ddr.py cpu
-```
-4. Connect to the board:
-```sh
-$ litex_term <your_serial_port>
-```
-
-5. Test:
-```sh
-$  sdclk 10
-$  sdinit
-$  sdtest 8
-```
+3. Examples of integration can be found in LiteX's targets.
 
 [> License
 ----------
