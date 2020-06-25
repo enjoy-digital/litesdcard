@@ -46,36 +46,31 @@ class SDPHYCFG(Module, AutoCSR):
 
 @ResetInserter()
 class SDPHYR(Module):
-    def __init__(self, idata, skip_start_bit=False):
+    def __init__(self, pads_width, skip_start_bit=False):
+        self.sink   = sink   = stream.Endpoint([("data", pads_width)])
         self.source = source = stream.Endpoint([("data", 8)])
 
         # # #
 
-        n = 8//len(idata)
-        sel = Signal(max=n)
+        n    = 8//pads_width
+        sel  = Signal(max=n)
         data = Signal(8)
 
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd_fb")(FSM(reset_state="IDLE"))
-
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
         fsm.act("IDLE",
-            If(idata == 0,
+            If(sink.data == 0,
                 NextValue(data, 0),
-                If(skip_start_bit,
-                    NextValue(sel, 0)
-                ).Else(
-                    NextValue(sel, 1)
-                ),
+                NextValue(sel,  0 if skip_start_bit else 1),
                 NextState("READ")
             )
         )
-
         fsm.act("READ",
             If(sel == (n-1),
                 source.valid.eq(1),
-                source.data.eq(Cat(idata, data)),
+                source.data.eq(Cat(sink.data, data)),
                 NextValue(sel, 0)
             ).Else(
-                NextValue(data, Cat(idata, data)),
+                NextValue(data, Cat(sink.data, data)),
                 NextValue(sel, sel + 1)
             )
         )
@@ -90,13 +85,12 @@ class SDPHYCMDR(Module):
 
         # # #
 
-        cmdrfb_reset = Signal()
+        cmdr_reset = Signal()
 
-        self.submodules.cmdrfb = SDPHYR(pads.cmd.i, False)
-        self.submodules.fifo = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
-            stream.AsyncFIFO(self.cmdrfb.source.description, 4)
-        )
-        self.comb += self.cmdrfb.source.connect(self.fifo.sink)
+        self.submodules.cmdr = SDPHYR(1, skip_start_bit=False)
+        self.submodules.fifo   = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(stream.AsyncFIFO(self.cmdr.source.description, 4))
+        self.comb += self.cmdr.sink.data.eq(pads.cmd.i)
+        self.comb += self.cmdr.source.connect(self.fifo.sink)
 
         ctimeout = Signal(32)
         cread    = Signal(10)
@@ -112,11 +106,11 @@ class SDPHYCMDR(Module):
                 NextValue(ctoread, sink.data),
                 NextState("CMD_READSTART")
             ).Else(
-                cmdrfb_reset.eq(1),
+                cmdr_reset.eq(1),
                 self.fifo.source.ready.eq(1),
             )
         )
-        self.specials += MultiReg(cmdrfb_reset, self.cmdrfb.reset, "sd_fb")
+        self.specials += MultiReg(cmdr_reset, self.cmdr.reset, "sd_fb")
 
         fsm.act("CMD_READSTART",
             pads.cmd.oe.eq(0),
@@ -259,11 +253,12 @@ class SDPHYDATAR(Module):
 
         # # #
 
-        datarfb_reset = Signal()
+        datar_reset = Signal()
 
-        self.submodules.datarfb = SDPHYR(pads.data.i, True)
-        self.submodules.buffer  = ClockDomainsRenamer("sd")(stream.Buffer(self.datarfb.source.description))
-        self.comb += self.datarfb.source.connect(self.buffer.sink)
+        self.submodules.datar = SDPHYR(4, True)
+        self.submodules.buffer  = ClockDomainsRenamer("sd")(stream.Buffer(self.datar.source.description))
+        self.comb += self.datar.sink.data.eq(pads.data.i)
+        self.comb += self.datar.source.connect(self.buffer.sink)
 
         dtimeout = Signal(32)
         read     = Signal(10)
@@ -275,7 +270,7 @@ class SDPHYDATAR(Module):
         fsm.act("IDLE",
             pads.data.oe.eq(0),
             pads.clk.eq(1),
-            datarfb_reset.eq(1),
+            datar_reset.eq(1),
             self.buffer.source.ready.eq(1),
             If(sink.valid,
                 NextValue(dtimeout, 0),
@@ -286,7 +281,7 @@ class SDPHYDATAR(Module):
             )
         )
 
-        self.specials += MultiReg(datarfb_reset, self.datarfb.reset, "sd_fb")
+        self.specials += MultiReg(datar_reset, self.datar.reset, "sd_fb")
 
         fsm.act("DATA_READSTART",
             pads.data.oe.eq(0),
@@ -322,7 +317,7 @@ class SDPHYDATAR(Module):
 
         fsm.act("DATA_FLUSH",
             pads.data.oe.eq(0),
-            datarfb_reset.eq(1),
+            datar_reset.eq(1),
             self.buffer.source.ready.eq(1),
             If(cnt < 5,
                 NextValue(cnt, cnt + 1),
