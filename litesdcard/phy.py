@@ -507,97 +507,6 @@ class SDPHYDATAW(Module):
             )
         )
 
-
-class SDPHYIOS6(Module):
-    def __init__(self, sdpads, pads, ddr_alignment="C0"):
-        # Data tristate
-        self.data_t = TSTriple(4)
-        self.specials += self.data_t.get_tristate(pads.data)
-
-        # Cmd tristate
-        self.cmd_t = TSTriple()
-        self.specials += self.cmd_t.get_tristate(pads.cmd)
-
-        # Clk domain feedback
-        if hasattr(pads, "clkfb"):
-            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_fb"))
-
-        # Clk output
-        sdpads_clk = Signal()
-        self.sync.sd += sdpads_clk.eq(sdpads.clk)
-        self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
-            p_INIT=1, p_SRTYPE="SYNC",
-            i_D0=0, i_D1=sdpads_clk, i_S=0, i_R=0, i_CE=1,
-            i_C0=ClockSignal("sd"), i_C1=~ClockSignal("sd"),
-            o_Q=pads.clk
-        )
-
-        # Cmd input DDR
-        cmd = Signal(2)
-        self.specials += Instance("IDDR2",
-            p_DDR_ALIGNMENT=ddr_alignment, p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-            i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
-            i_CE=1, i_S=0, i_R=0,
-            i_D=self.cmd_t.i, o_Q0=cmd[0], o_Q1=cmd[1]
-        )
-        if hasattr(pads, "clkfb"):
-            self.comb += sdpads.cmd.i.eq(cmd[0])
-        else:
-            self.comb += sdpads.cmd.i.eq(cmd[1])
-
-        # Data input DDR
-        for i in range(4):
-            data = Signal(2)
-            data_r = Signal(2)
-            self.specials += Instance("IDDR2",
-                p_DDR_ALIGNMENT=ddr_alignment, p_INIT_Q0=0, p_INIT_Q1=0, p_SRTYPE="ASYNC",
-                i_C0=ClockSignal("sd_fb"), i_C1=~ClockSignal("sd_fb"),
-                i_CE=1, i_S=0, i_R=0,
-                i_D=self.data_t.i[i], o_Q0=data[0], o_Q1=data[1]
-            )
-            if hasattr(pads, "clkfb"):
-                self.comb += sdpads.data.i[i].eq(data[0])
-            else:
-                self.comb += sdpads.data.i[i].eq(data[1])
-
-
-class SDPHYIOS7(Module):
-    def __init__(self, sdpads, pads):
-        # Data tristate
-        self.data_t = TSTriple(4)
-        self.specials += self.data_t.get_tristate(pads.data)
-
-        # Cmd tristate
-        self.cmd_t = TSTriple()
-        self.specials += self.cmd_t.get_tristate(pads.cmd)
-
-        # Clk domain feedback
-        if hasattr(pads, "clkfb"):
-            self.specials += Instance("IBUFG", i_I=pads.clkfb, o_O=ClockSignal("sd_fb"))
-
-        # Clk output
-        self.specials += Instance("ODDR",
-            p_DDR_CLK_EDGE="SAME_EDGE",
-            i_C=ClockSignal("sd"), i_CE=1, i_S=0, i_R=0,
-            i_D1=0, i_D2=sdpads.clk, o_Q=pads.clk
-        )
-
-        # Cmd input DDR
-        self.specials += Instance("IDDR",
-            p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-            i_C=ClockSignal("sd_fb"), i_CE=1, i_S=0, i_R=0,
-            i_D=self.cmd_t.i, o_Q1=Signal(), o_Q2=sdpads.cmd.i
-        )
-
-        # Data input DDR
-        for i in range(4):
-            self.specials += Instance("IDDR",
-                p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-                i_C=ClockSignal("sd_fb"), i_CE=1, i_S=0, i_R=0,
-                i_D=self.data_t.i[i], o_Q1=Signal(), o_Q2=sdpads.data.i[i],
-            )
-
-
 class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
         # Data tristate
@@ -669,13 +578,7 @@ class SDPHY(Module, AutoCSR):
                 If(~pads.dat_t[3], sdpads.data.i[3].eq(pads.dat_o[3]))
             ]
         else:
-            # real phy
-            if device[:3] == "xc6":
-                self.submodules.io = io = SDPHYIOS6(sdpads, pads, **kwargs)
-            elif device[:3] == "xc7":
-                self.submodules.io = io = SDPHYIOS7(sdpads, pads, **kwargs)
-            else:
-                self.submodules.io = io = SDPHYIOGen(sdpads, pads, **kwargs)
+            self.submodules.io = io = SDPHYIOGen(sdpads, pads, **kwargs)
             self.sync.sd += [
                 io.cmd_t.oe.eq(sdpads.cmd.oe),
                 io.cmd_t.o.eq(sdpads.cmd.o),
