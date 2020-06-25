@@ -28,8 +28,8 @@ def _sdpads():
         ]),
         ("clk", 1, DIR_M_TO_S)
     ])
-    sdpads.cmd.o.reset   = 1
-    sdpads.cmd.oe.reset  = 1
+    sdpads.cmd.o.reset   = 0b1
+    sdpads.cmd.oe.reset  = 0b1
     sdpads.data.o.reset  = 0b1111
     sdpads.data.oe.reset = 0b1111
     return sdpads
@@ -38,9 +38,8 @@ def _sdpads():
 
 class SDPHYCFG(Module, AutoCSR):
     def __init__(self):
-        self.datatimeout = Signal(32)
-        self.cmdtimeout  = Signal(32)
-        self.blocksize   = Signal(16)
+        self.timeout   = Signal(32)
+        self.blocksize = Signal(16)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -88,7 +87,7 @@ class SDPHYCMDR(Module):
         cmdr_reset = Signal()
 
         self.submodules.cmdr = SDPHYR(1, skip_start_bit=False)
-        self.submodules.fifo   = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(stream.AsyncFIFO(self.cmdr.source.description, 4))
+        self.submodules.fifo = ClockDomainsRenamer("sd")(stream.SyncFIFO(self.cmdr.source.description, 4))
         self.comb += self.cmdr.sink.data.eq(pads.cmd.i)
         self.comb += self.cmdr.source.connect(self.fifo.sink)
 
@@ -118,7 +117,7 @@ class SDPHYCMDR(Module):
             NextValue(ctimeout, ctimeout + 1),
             If(self.fifo.source.valid,
                 NextState("CMD_READ")
-            ).Elif(ctimeout > cfg.cmdtimeout,
+            ).Elif(ctimeout > cfg.timeout,
                 NextState("TIMEOUT")
             )
         )
@@ -256,9 +255,9 @@ class SDPHYDATAR(Module):
         datar_reset = Signal()
 
         self.submodules.datar = SDPHYR(4, True)
-        self.submodules.buffer  = ClockDomainsRenamer("sd")(stream.Buffer(self.datar.source.description))
+        self.submodules.fifo  = ClockDomainsRenamer("sd")(stream.SyncFIFO(self.datar.source.description, 4))
         self.comb += self.datar.sink.data.eq(pads.data.i)
-        self.comb += self.datar.source.connect(self.buffer.sink)
+        self.comb += self.datar.source.connect(self.fifo.sink)
 
         dtimeout = Signal(32)
         read     = Signal(10)
@@ -271,7 +270,7 @@ class SDPHYDATAR(Module):
             pads.data.oe.eq(0),
             pads.clk.eq(1),
             datar_reset.eq(1),
-            self.buffer.source.ready.eq(1),
+            self.fifo.source.ready.eq(1),
             If(sink.valid,
                 NextValue(dtimeout, 0),
                 NextValue(read, 0),
@@ -287,9 +286,9 @@ class SDPHYDATAR(Module):
             pads.data.oe.eq(0),
             pads.clk.eq(1),
             NextValue(dtimeout, dtimeout + 1),
-            If(self.buffer.source.valid,
+            If(self.fifo.source.valid,
                 NextState("DATA_READ")
-            ).Elif(dtimeout > cfg.datatimeout,
+            ).Elif(dtimeout > cfg.timeout,
                 NextState("TIMEOUT")
             )
         )
@@ -297,11 +296,11 @@ class SDPHYDATAR(Module):
         fsm.act("DATA_READ",
             pads.data.oe.eq(0),
             pads.clk.eq(1),
-            source.valid.eq(self.buffer.source.valid),
-            source.data.eq(self.buffer.source.data),
+            source.valid.eq(self.fifo.source.valid),
+            source.data.eq(self.fifo.source.data),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
             source.last.eq(read == (toread - 1)),
-            self.buffer.source.ready.eq(source.ready),
+            self.fifo.source.ready.eq(source.ready),
             If(source.valid & source.ready,
                 NextValue(read, read + 1),
                 If(read == (toread - 1),
@@ -318,7 +317,7 @@ class SDPHYDATAR(Module):
         fsm.act("DATA_FLUSH",
             pads.data.oe.eq(0),
             datar_reset.eq(1),
-            self.buffer.source.ready.eq(1),
+            self.fifo.source.ready.eq(1),
             If(cnt < 5,
                 NextValue(cnt, cnt + 1),
             ).Else(

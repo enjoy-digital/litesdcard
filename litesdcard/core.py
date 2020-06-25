@@ -33,8 +33,7 @@ class SDCore(Module, AutoCSR):
         self.blocksize      = CSRStorage(16)
         self.blockcount     = CSRStorage(32)
 
-        self.datatimeout    = CSRStorage(32, reset=2**16)
-        self.cmdtimeout     = CSRStorage(32, reset=2**16)
+        self.timeout        = CSRStorage(32, reset=2**16)
 
         self.datawcrcclear  = CSRStorage()
         self.datawcrcvalids = CSRStatus(32)
@@ -49,8 +48,7 @@ class SDCore(Module, AutoCSR):
         dataevt     = Signal(32)
         blocksize   = Signal(16)
         blockcount  = Signal(32)
-        datatimeout = Signal(32)
-        cmdtimeout  = Signal(32)
+        timeout     = Signal(32)
 
         # sys to sd cdc
         self.specials += [
@@ -58,8 +56,7 @@ class SDCore(Module, AutoCSR):
             MultiReg(self.command.storage,     command,     "sd"),
             MultiReg(self.blocksize.storage,   blocksize,   "sd"),
             MultiReg(self.blockcount.storage,  blockcount,  "sd"),
-            MultiReg(self.datatimeout.storage, datatimeout, "sd"),
-            MultiReg(self.cmdtimeout.storage,  cmdtimeout,  "sd"),
+            MultiReg(self.timeout.storage,     timeout,     "sd"),
         ]
 
         # sd to sys cdc
@@ -80,9 +77,8 @@ class SDCore(Module, AutoCSR):
         self.comb += self.new_command.i.eq(self.send.re)
 
         self.comb += [
+            phy.cfg.timeout.eq(timeout),
             phy.cfg.blocksize.eq(blocksize),
-            phy.cfg.datatimeout.eq(datatimeout),
-            phy.cfg.cmdtimeout.eq(cmdtimeout),
             phy.dataw.crc_clear.eq(self.datawcrcclear.storage),
             self.datawcrcvalids.status.eq(phy.dataw.crc_valids),
             self.datawcrcerrors.status.eq(phy.dataw.crc_errors)
