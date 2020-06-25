@@ -640,12 +640,16 @@ class SDPHY(Module, AutoCSR):
 
         self.sdpads = sdpads = _sdpads()
 
+        self.clock_domains.cd_sd    = ClockDomain()
+        self.clock_domains.cd_sd_fb = ClockDomain()
+
         # IOs (device specific)
-        if not hasattr(pads, "clkfb"):
-            self.comb += [
-                ClockSignal("sd_fb").eq(ClockSignal("sd")),
-                ResetSignal("sd_fb").eq(ResetSignal("sd"))
-            ]
+        self.comb += [
+            ClockSignal("sd").eq(ClockSignal("sdcard")),
+            ResetSignal("sd").eq(ResetSignal("sdcard")),
+            ClockSignal("sd_fb").eq(ClockSignal("sdcard")),
+            ResetSignal("sd_fb").eq(ResetSignal("sdcard")),
+        ]
         if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
             # emulator phy
             self.comb += [
