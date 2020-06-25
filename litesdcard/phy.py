@@ -553,14 +553,14 @@ class SDPHY(Module, AutoCSR):
         self.clock_domains.cd_sd_fb = ClockDomain()
 
         # IOs (device specific)
-        self.comb += [
-            ClockSignal("sd").eq(ClockSignal("sdcard")),
-            ResetSignal("sd").eq(ResetSignal("sdcard")),
-            ClockSignal("sd_fb").eq(ClockSignal("sdcard")),
-            ResetSignal("sd_fb").eq(ResetSignal("sdcard")),
-        ]
         if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
             # emulator phy
+            self.comb += [
+                ClockSignal("sd").eq(ClockSignal()),
+                ResetSignal("sd").eq(ResetSignal()),
+                ClockSignal("sd_fb").eq(ClockSignal()),
+                ResetSignal("sd_fb").eq(ResetSignal()),
+            ]
             self.comb += [
                 If(sdpads.clk, pads.clk.eq(~ClockSignal("sd"))),
 
@@ -578,6 +578,12 @@ class SDPHY(Module, AutoCSR):
                 If(~pads.dat_t[3], sdpads.data.i[3].eq(pads.dat_o[3]))
             ]
         else:
+            self.comb += [
+                ClockSignal("sd").eq(ClockSignal("sdcard")),
+                ResetSignal("sd").eq(ResetSignal("sdcard")),
+                ClockSignal("sd_fb").eq(ClockSignal("sdcard")),
+                ResetSignal("sd_fb").eq(ResetSignal("sdcard")),
+            ]
             self.submodules.io = io = SDPHYIOGen(sdpads, pads, **kwargs)
             self.sync.sd += [
                 io.cmd_t.oe.eq(sdpads.cmd.oe),
