@@ -1,4 +1,4 @@
-# This file is Copyright (c) 2017-2018 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # License: BSD
 
@@ -12,6 +12,7 @@ from litex.soc.interconnect.csr import *
 
 from litesdcard.common import *
 
+# Pads ---------------------------------------------------------------------------------------------
 
 def _sdpads():
     sdpads = Record([
@@ -27,22 +28,24 @@ def _sdpads():
         ]),
         ("clk", 1, DIR_M_TO_S)
     ])
-    sdpads.cmd.o.reset = 1
-    sdpads.cmd.oe.reset = 1
-    sdpads.data.o.reset = 0b1111
+    sdpads.cmd.o.reset   = 1
+    sdpads.cmd.oe.reset  = 1
+    sdpads.data.o.reset  = 0b1111
     sdpads.data.oe.reset = 0b1111
     return sdpads
 
+# Configuration ------------------------------------------------------------------------------------
 
 class SDPHYCFG(Module, AutoCSR):
     def __init__(self):
         self.datatimeout = Signal(32)
-        self.cmdtimeout = Signal(32)
-        self.blocksize = Signal(16)
+        self.cmdtimeout  = Signal(32)
+        self.blocksize   = Signal(16)
 
+# SDCard PHY Read ----------------------------------------------------------------------------------
 
 @ResetInserter()
-class SDPHYRFB(Module):
+class SDPHYR(Module):
     def __init__(self, idata, skip_start_bit=False):
         self.source = source = stream.Endpoint([("data", 8)])
 
@@ -77,28 +80,28 @@ class SDPHYRFB(Module):
             )
         )
 
+# SDCard PHY Command Read --------------------------------------------------------------------------
 
 class SDPHYCMDR(Module):
     def __init__(self, cfg):
-        self.pads = pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8)])
+        self.pads   = pads   = _sdpads()
+        self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
         cmdrfb_reset = Signal()
 
-        self.submodules.cmdrfb = SDPHYRFB(pads.cmd.i, False)
+        self.submodules.cmdrfb = SDPHYR(pads.cmd.i, False)
         self.submodules.fifo = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
             stream.AsyncFIFO(self.cmdrfb.source.description, 4)
         )
         self.comb += self.cmdrfb.source.connect(self.fifo.sink)
 
         ctimeout = Signal(32)
-
-        cread = Signal(10)
-        ctoread = Signal(10)
-        cnt = Signal(8)
+        cread    = Signal(10)
+        ctoread  = Signal(10)
+        cnt      = Signal(8)
 
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
@@ -169,6 +172,7 @@ class SDPHYCMDR(Module):
             )
         )
 
+# SDCard PHY Command Write -------------------------------------------------------------------------
 
 class SDPHYCMDW(Module):
     def __init__(self):
@@ -177,10 +181,10 @@ class SDPHYCMDW(Module):
 
         # # #
 
-        isinit = Signal()
-        cntinit = Signal(8)
-        cnt = Signal(8)
-        wrsel = Signal(3)
+        isinit    = Signal()
+        cntinit   = Signal(8)
+        cnt       = Signal(8)
+        wrsel     = Signal(3)
         wrtmpdata = Signal(8)
 
         wrcases = {} # For command write
@@ -245,29 +249,26 @@ class SDPHYCMDW(Module):
             )
         )
 
+# SDCard PHY Data Read -----------------------------------------------------------------------------
 
 class SDPHYDATAR(Module):
     def __init__(self, cfg):
-        self.pads = pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8)])
+        self.pads   = pads   = _sdpads()
+        self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
         datarfb_reset = Signal()
 
-        self.submodules.datarfb = SDPHYRFB(pads.data.i, True)
-        self.submodules.cdc = ClockDomainsRenamer({"write": "sd_fb", "read": "sd"})(
-            stream.AsyncFIFO(self.datarfb.source.description, 4)
-        )
-        self.submodules.buffer = ClockDomainsRenamer("sd")(stream.Buffer(self.datarfb.source.description))
+        self.submodules.datarfb = SDPHYR(pads.data.i, True)
+        self.submodules.buffer  = ClockDomainsRenamer("sd")(stream.Buffer(self.datarfb.source.description))
         self.comb += self.datarfb.source.connect(self.buffer.sink)
 
         dtimeout = Signal(32)
-
-        read = Signal(10)
-        toread = Signal(10)
-        cnt = Signal(8)
+        read     = Signal(10)
+        toread   = Signal(10)
+        cnt      = Signal(8)
 
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
 
@@ -355,6 +356,7 @@ class SDPHYDATAR(Module):
             )
         )
 
+# SDCard PHY CRC Read ------------------------------------------------------------------------------
 
 class SDPHYCRCRFB(Module):
     def __init__(self, idata):
@@ -365,11 +367,10 @@ class SDPHYCRCRFB(Module):
         # # #
 
         counter = Signal(2)
-        shift = Signal()
-        data = Signal(3)
-
-        valid = Signal()
-        error = Signal()
+        shift   = Signal()
+        data    = Signal(3)
+        valid   = Signal()
+        error   = Signal()
 
         self.submodules.fsm = fsm = ClockDomainsRenamer("sd_fb")(FSM(reset_state="IDLE"))
 
@@ -418,12 +419,14 @@ class SDPHYCRCRFB(Module):
         ]
 
 
+# SDCard PHY Data Write ----------------------------------------------------------------------------
+
 class SDPHYDATAW(Module):
     def __init__(self):
         self.pads = pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8)])
 
-        self.crc_clear = Signal()
+        self.crc_clear  = Signal()
         self.crc_valids = Signal(32)
         self.crc_errors = Signal(32)
 
@@ -431,7 +434,7 @@ class SDPHYDATAW(Module):
 
 
         wrstarted = Signal()
-        cnt = Signal(8)
+        cnt       = Signal(8)
 
         self.submodules.crcfb = SDPHYCRCRFB(pads.data.i[0])
         self.sync.sd += [
@@ -507,6 +510,9 @@ class SDPHYDATAW(Module):
             )
         )
 
+
+# SDCard PHY IO ------------------------------------------------------------------------------------
+
 class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
         # Data tristate
@@ -534,10 +540,11 @@ class SDPHYIOGen(Module):
         for i in range(4):
             self.specials += SDRInput(self.data_t.i[i], sdpads.data.i[i], ClockSignal("sd"))
 
+# SDCard PHY ---------------------------------------------------------------------------------------
 
 class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device, **kwargs):
-        self.sink = sink = stream.Endpoint([("data", 8), ("cmd_data_n", 1), ("rd_wr_n", 1)])
+        self.sink   = sink   = stream.Endpoint([("data", 8), ("cmd_data_n", 1), ("rd_wr_n", 1)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
         if hasattr(pads, "sel"):
             self.voltage_sel = CSRStorage()
@@ -594,9 +601,9 @@ class SDPHY(Module, AutoCSR):
             ]
 
         # PHY submodules
-        self.submodules.cfg = cfg = SDPHYCFG()
-        self.submodules.cmdw = cmdw = SDPHYCMDW()
-        self.submodules.cmdr = cmdr = SDPHYCMDR(cfg)
+        self.submodules.cfg   = cfg   = SDPHYCFG()
+        self.submodules.cmdw  = cmdw  = SDPHYCMDW()
+        self.submodules.cmdr  = cmdr  = SDPHYCMDR(cfg)
         self.submodules.dataw = dataw = SDPHYDATAW()
         self.submodules.datar = datar = SDPHYDATAR(cfg)
 
