@@ -35,10 +35,6 @@ class SDCore(Module, AutoCSR):
 
         self.timeout        = CSRStorage(32, reset=2**16)
 
-        self.datawcrcclear  = CSRStorage()
-        self.datawcrcvalids = CSRStatus(32)
-        self.datawcrcerrors = CSRStatus(32)
-
         # # #
 
         argument    = Signal(32)
@@ -76,13 +72,8 @@ class SDCore(Module, AutoCSR):
         self.submodules.new_command = PulseSynchronizer("sys", "sd")
         self.comb += self.new_command.i.eq(self.send.re)
 
-        self.comb += [
-            phy.cfg.timeout.eq(timeout),
-            phy.cfg.blocksize.eq(blocksize),
-            phy.dataw.crc_clear.eq(self.datawcrcclear.storage),
-            self.datawcrcvalids.status.eq(phy.dataw.crc_valids),
-            self.datawcrcerrors.status.eq(phy.dataw.crc_errors)
-        ]
+        self.comb += phy.cfg.timeout.eq(timeout)
+        self.comb += phy.cfg.blocksize.eq(blocksize)
 
         self.submodules.crc7inserter  = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
         self.submodules.crc7checker   = ClockDomainsRenamer("sd")(CRCChecker(9, 7, 136))

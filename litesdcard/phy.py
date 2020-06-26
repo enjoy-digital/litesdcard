@@ -3,7 +3,7 @@
 # License: BSD
 
 from migen import *
-from migen.genlib.cdc import MultiReg, PulseSynchronizer
+from migen.genlib.cdc import MultiReg
 
 from litex.build.io import SDRInput, SDROutput
 
@@ -16,17 +16,17 @@ from litesdcard.common import *
 
 def _sdpads():
     sdpads = Record([
-        ("data", [
-            ("i",  4, DIR_S_TO_M),
-            ("o",  4, DIR_M_TO_S),
-            ("oe", 1, DIR_M_TO_S)
-        ]),
+        ("clk", 1, DIR_M_TO_S),
         ("cmd", [
             ("i",  1, DIR_S_TO_M),
             ("o",  1, DIR_M_TO_S),
             ("oe", 1, DIR_M_TO_S)
         ]),
-        ("clk", 1, DIR_M_TO_S)
+        ("data", [
+            ("i",  4, DIR_S_TO_M),
+            ("o",  4, DIR_M_TO_S),
+            ("oe", 1, DIR_M_TO_S)
+        ]),
     ])
     sdpads.cmd.o.reset   = 0b1
     sdpads.cmd.oe.reset  = 0b1
@@ -45,36 +45,27 @@ class SDPHYCFG(Module, AutoCSR):
 
 @ResetInserter()
 class SDPHYR(Module):
-    def __init__(self, pads_width, skip_start_bit=False):
-        self.sink   = sink   = stream.Endpoint([("data", pads_width)])
-        self.source = source = stream.Endpoint([("data", 8)])
+    def __init__(self, idata, skip_start_bit=False):
+        self.source = stream.Endpoint([("data", 8)])
 
         # # #
 
-        n    = 8//pads_width
-        sel  = Signal(max=n)
-        data = Signal(8)
+        # Xfer starts when data == 0
+        start = Signal()
+        run   = Signal()
+        self.comb += start.eq(idata == 0)
+        self.sync += run.eq(start | run)
 
-        self.submodules.buffer = ClockDomainsRenamer("sd")(stream.Buffer([("data", 8)]))
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
-        fsm.act("IDLE",
-            If(sink.data == 0,
-                NextValue(data, 0),
-                NextValue(sel,  0 if skip_start_bit else 1),
-                NextState("READ")
-            )
-        )
-        fsm.act("READ",
-            If(sel == (n-1),
-                self.buffer.sink.valid.eq(1),
-                self.buffer.sink.data.eq(Cat(sink.data, data)),
-                NextValue(sel, 0)
-            ).Else(
-                NextValue(data, Cat(sink.data, data)),
-                NextValue(sel, sel + 1)
-            )
-        )
-        self.comb += self.buffer.source.connect(self.source)
+        # Convert data to 8-bit stream
+        converter = stream.Converter(len(idata), 8, reverse=True)
+        buf       = stream.Buffer([("data", 8)])
+        self.submodules += converter, buf
+        self.comb += [
+            converter.sink.valid.eq(run if skip_start_bit else (start | run)),
+            converter.sink.data.eq(idata),
+            converter.source.connect(buf.sink),
+            buf.source.connect(self.source)
+        ]
 
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
@@ -86,56 +77,45 @@ class SDPHYCMDR(Module):
 
         # # #
 
-        cmdr_reset = Signal()
+        timeout = Signal(32)
+        count   = Signal(8)
 
-        self.submodules.cmdr = SDPHYR(1, skip_start_bit=False)
-
-        self.comb += self.cmdr.sink.data.eq(pads.cmd.i)
-
-        ctimeout = Signal(32)
-        cread    = Signal(10)
-        ctoread  = Signal(10)
-        cnt      = Signal(8)
-
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
-
+        cmdr = SDPHYR(pads.cmd.i, skip_start_bit=False)
+        fsm  = FSM(reset_state="IDLE")
+        self.submodules += cmdr, fsm
         fsm.act("IDLE",
+            NextValue(count,   0),
+            NextValue(timeout, 0),
             If(sink.valid,
-                NextValue(ctimeout, 0),
-                NextValue(cread, 0),
-                NextValue(ctoread, sink.data),
-                NextState("CMD_READSTART")
-            ).Else(
-                cmdr_reset.eq(1),
-                self.cmdr.source.ready.eq(1),
+                NextValue(cmdr.reset, 1),
+                NextState("WAIT"),
             )
         )
-        self.specials += MultiReg(cmdr_reset, self.cmdr.reset, "sd_fb")
-
-        fsm.act("CMD_READSTART",
+        fsm.act("WAIT",
             pads.cmd.oe.eq(0),
             pads.clk.eq(1),
-            NextValue(ctimeout, ctimeout + 1),
-            If(self.cmdr.source.valid,
-                NextState("CMD_READ")
-            ).Elif(ctimeout > cfg.timeout,
+            NextValue(cmdr.reset, 0),
+            NextValue(timeout, timeout + 1),
+            If(cmdr.source.valid,
+                NextState("CMD")
+            ).Elif(timeout > cfg.timeout,
                 NextState("TIMEOUT")
             )
         )
-
-        fsm.act("CMD_READ",
+        fsm.act("CMD",
             pads.cmd.oe.eq(0),
             pads.clk.eq(1),
-            source.valid.eq(self.cmdr.source.valid),
-            source.data.eq(self.cmdr.source.data),
+            source.valid.eq(cmdr.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
-            source.last.eq(cread == ctoread),
-            self.cmdr.source.ready.eq(source.ready),
+            source.last.eq(count == sink.data),
+            source.data.eq(cmdr.source.data),
             If(source.valid & source.ready,
-                NextValue(cread, cread + 1),
-                If(cread == ctoread,
+                cmdr.source.ready.eq(1),
+                NextValue(count, count + 1),
+                If(source.last,
                     If(sink.last,
-                        NextState("CMD_CLK8")
+                        NextValue(count, 0),
+                        NextState("CLK8")
                     ).Else(
                         sink.ready.eq(1),
                         NextState("IDLE")
@@ -143,21 +123,16 @@ class SDPHYCMDR(Module):
                 )
             )
         )
-
-        fsm.act("CMD_CLK8",
-            If(cnt < 7,
-                NextValue(cnt, cnt + 1),
-                pads.clk.eq(1)
-            ).Else(
-                NextValue(cnt, 0),
+        fsm.act("CLK8",
+            pads.clk.eq(1),
+            NextValue(count, count + 1),
+            If(count == 7,
                 sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
-
         fsm.act("TIMEOUT",
             source.valid.eq(1),
-            source.data.eq(0),
             source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             source.last.eq(1),
             If(source.valid & source.ready,
@@ -175,69 +150,47 @@ class SDPHYCMDW(Module):
 
         # # #
 
-        isinit    = Signal()
-        cntinit   = Signal(8)
-        cnt       = Signal(8)
-        wrsel     = Signal(3)
-        wrtmpdata = Signal(8)
-
-        wrcases = {} # For command write
-        for i in range(8):
-            wrcases[i] =  pads.cmd.o.eq(wrtmpdata[7-i])
-
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
-
+        initialized = Signal() # FIXME: should be controlled by software.
+        count       = Signal(8)
+        fsm = FSM(reset_state="IDLE")
+        self.submodules += fsm
         fsm.act("IDLE",
+            NextValue(count, 0),
             If(sink.valid,
-                If(~isinit,
+                If(~initialized,
                     NextState("INIT")
                 ).Else(
-                    pads.clk.eq(1),
-                    pads.cmd.o.eq(sink.data[7]),
-                    NextValue(wrtmpdata, sink.data),
-                    NextValue(wrsel, 1),
-                    NextState("CMD_WRITE")
+                    NextState("WRITE")
                 )
             )
         )
-
         fsm.act("INIT",
-            # Initialize sdcard with 80 clock cycles
             pads.clk.eq(1),
-            If(cntinit < 80,
-                NextValue(cntinit, cntinit + 1),
-                NextValue(pads.data.oe, 1),
-                NextValue(pads.data.o, 0xf)
-            ).Else(
-                NextValue(cntinit, 0),
-                NextValue(isinit, 1),
-                NextValue(pads.data.oe, 0),
+            pads.data.oe.eq(1),
+            pads.data.o.eq(0xf),
+            NextValue(count, count + 1),
+            If(count == (80-1),
+                NextValue(initialized, 1),
                 NextState("IDLE")
             )
         )
-
-        fsm.act("CMD_WRITE",
-            Case(wrsel, wrcases),
-            NextValue(wrsel, wrsel + 1),
-            If(wrsel == 0,
+        fsm.act("WRITE",
+            pads.clk.eq(1),
+            Case(count, {i: pads.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
+            NextValue(count, count + 1),
+            If(count == (8-1),
                 If(sink.last,
-                    pads.clk.eq(1),
-                    NextState("CMD_CLK8")
+                    NextState("CLK8")
                 ).Else(
                     sink.ready.eq(1),
                     NextState("IDLE")
                 )
-            ).Else(
-                pads.clk.eq(1)
             )
         )
-
-        fsm.act("CMD_CLK8",
-            If(cnt < 7,
-                NextValue(cnt, cnt + 1),
-                pads.clk.eq(1)
-            ).Else(
-                NextValue(cnt, 0),
+        fsm.act("CLK8",
+            pads.clk.eq(1),
+            NextValue(count, count + 1),
+            If(count == (8-1),
                 sink.ready.eq(1),
                 NextState("IDLE")
             )
@@ -253,94 +206,65 @@ class SDPHYDATAR(Module):
 
         # # #
 
-        datar_reset = Signal()
+        timeout = Signal(32)
+        count   = Signal(10)
 
-        self.submodules.datar = SDPHYR(4, True)
-        self.comb += self.datar.sink.data.eq(pads.data.i)
-
-        dtimeout = Signal(32)
-        read     = Signal(10)
-        toread   = Signal(10)
-        cnt      = Signal(8)
-
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
-
+        datar = SDPHYR(pads.data.i, skip_start_bit=True)
+        fsm   = FSM(reset_state="IDLE")
+        self.submodules += datar, fsm
         fsm.act("IDLE",
+            NextValue(count, 0),
             pads.data.oe.eq(0),
             pads.clk.eq(1),
-            datar_reset.eq(1),
-            self.datar.source.ready.eq(1),
             If(sink.valid,
-                NextValue(dtimeout, 0),
-                NextValue(read, 0),
-                # Read 1 block + 8*8 == 64 bits CRC
-                NextValue(toread, cfg.blocksize + 8),
-                NextState("DATA_READSTART")
+                NextValue(timeout, 0),
+                NextValue(count, 0),
+                NextValue(datar.reset, 1),
+                NextState("WAIT")
             )
         )
-
-        self.specials += MultiReg(datar_reset, self.datar.reset, "sd_fb")
-
-        fsm.act("DATA_READSTART",
+        fsm.act("WAIT",
             pads.data.oe.eq(0),
             pads.clk.eq(1),
-            NextValue(dtimeout, dtimeout + 1),
-            If(self.datar.source.valid,
-                NextState("DATA_READ")
-            ).Elif(dtimeout > cfg.timeout,
+            NextValue(datar.reset, 0),
+            NextValue(timeout, timeout + 1),
+            If(datar.source.valid,
+                NextState("DATA")
+            ).Elif(timeout > cfg.timeout,
                 NextState("TIMEOUT")
             )
         )
-
-        fsm.act("DATA_READ",
+        fsm.act("DATA",
             pads.data.oe.eq(0),
             pads.clk.eq(1),
-            source.valid.eq(self.datar.source.valid),
-            source.data.eq(self.datar.source.data),
+            source.valid.eq(datar.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
-            source.last.eq(read == (toread - 1)),
-            self.datar.source.ready.eq(source.ready),
+            source.last.eq(count == (cfg.blocksize + 8 - 1)), # 1 block + 64-bit CRC
+            source.data.eq(datar.source.data),
             If(source.valid & source.ready,
-                NextValue(read, read + 1),
-                If(read == (toread - 1),
+                datar.source.ready.eq(1),
+                NextValue(count, count + 1),
+                If(source.last,
                     If(sink.last,
-                        NextState("DATA_CLK40")
+                        NextValue(count, 0),
+                        NextState("CLK40")
                     ).Else(
                         sink.ready.eq(1),
-                        NextState("DATA_FLUSH")
+                        NextState("IDLE")
                     )
                 )
             )
         )
-
-        fsm.act("DATA_FLUSH",
-            pads.data.oe.eq(0),
-            datar_reset.eq(1),
-            self.datar.source.ready.eq(1),
-            If(cnt < 5,
-                NextValue(cnt, cnt + 1),
-            ).Else(
-                NextValue(cnt, 0),
-                NextState("IDLE")
-            )
-        )
-
-        fsm.act("DATA_CLK40",
-            pads.data.oe.eq(1),
-            pads.data.o.eq(0xf),
-            If(cnt < 40,
-                NextValue(cnt, cnt + 1),
-                pads.clk.eq(1)
-            ).Else(
-                NextValue(cnt, 0),
+        fsm.act("CLK40",
+            pads.clk.eq(1),
+            NextValue(count, count + 1),
+            If(count == (40-1),
                 sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
-
         fsm.act("TIMEOUT",
             source.valid.eq(1),
-            source.data.eq(0),
             source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             source.last.eq(1),
             If(source.valid & source.ready,
@@ -351,7 +275,7 @@ class SDPHYDATAR(Module):
 
 # SDCard PHY CRC Read ------------------------------------------------------------------------------
 
-class SDPHYCRCRFB(Module):
+class SDPHYCRCR(Module):
     def __init__(self, idata):
         self.start = Signal()
         self.valid = Signal()
@@ -359,58 +283,24 @@ class SDPHYCRCRFB(Module):
 
         # # #
 
-        counter = Signal(2)
-        shift   = Signal()
-        data    = Signal(3)
-        valid   = Signal()
-        error   = Signal()
-
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd_fb")(FSM(reset_state="IDLE"))
-
-        self.sync.sd_fb += If(shift, data.eq(Cat(idata, data)))
-
-        self.submodules.pulse_start = PulseSynchronizer("sd", "sd_fb")
-        self.comb += self.pulse_start.i.eq(self.start)
-
+        crcr = SDPHYR(idata, skip_start_bit=True)
+        fsm  = FSM(reset_state="IDLE")
+        self.submodules += crcr, fsm
         fsm.act("IDLE",
-            If(self.pulse_start.o,
-                NextState("START")
+            If(self.start,
+                NextValue(crcr.reset, 1),
+                NextState("WAIT-CHECK")
             )
         )
-        fsm.act("START",
-            If(idata == 0,
-                NextValue(counter, 0),
-                NextState("RECEIVE")
+        fsm.act("WAIT-CHECK",
+            NextValue(crcr.reset, 0),
+            crcr.source.ready.eq(1),
+            If(crcr.source.valid,
+                self.valid.eq(crcr.source.data != 0b101),
+                self.error.eq(crcr.source.data == 0b101),
+                NextState("IDLE")
             )
         )
-        fsm.act("RECEIVE",
-            shift.eq(1),
-            If(counter == 2,
-                NextState("CHECK")
-            ).Else(
-                NextValue(counter, counter + 1)
-            )
-        )
-        fsm.act("CHECK",
-            If(data == 0b101,
-                valid.eq(0),
-                error.eq(1),
-            ).Else(
-                valid.eq(1),
-                error.eq(0)
-            ),
-            NextState("IDLE")
-        )
-
-        self.submodules.pulse_valid = PulseSynchronizer("sd_fb", "sd")
-        self.submodules.pulse_error = PulseSynchronizer("sd_fb", "sd")
-        self.comb += [
-            self.pulse_valid.i.eq(valid),
-            self.valid.eq(self.pulse_valid.o),
-            self.pulse_error.i.eq(error),
-            self.error.eq(self.pulse_error.o)
-        ]
-
 
 # SDCard PHY Data Write ----------------------------------------------------------------------------
 
@@ -419,90 +309,67 @@ class SDPHYDATAW(Module):
         self.pads = pads = _sdpads()
         self.sink = sink = stream.Endpoint([("data", 8)])
 
-        self.crc_clear  = Signal()
-        self.crc_valids = Signal(32)
-        self.crc_errors = Signal(32)
-
         # # #
 
-
         wrstarted = Signal()
-        cnt       = Signal(8)
+        count     = Signal(8)
 
-        self.submodules.crcfb = SDPHYCRCRFB(pads.data.i[0])
-        self.sync.sd += [
-            If(self.crc_clear,
-                self.crc_valids.eq(0),
-                self.crc_errors.eq(0)
-            ),
-            If(self.crcfb.valid,
-                self.crc_valids.eq(self.crc_valids + 1)
-            ),
-            If(self.crcfb.error,
-                self.crc_errors.eq(self.crc_errors + 1)
-            )
-        ]
-
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM(reset_state="IDLE"))
-
+        crc = SDPHYCRCR(pads.data.i[0]) # FIXME: Report valid/errors to software.
+        fsm = fsm = FSM(reset_state="IDLE")
+        self.submodules += crc, fsm
         fsm.act("IDLE",
             If(sink.valid,
                 pads.clk.eq(1),
                 pads.data.oe.eq(1),
                 If(wrstarted,
                     pads.data.o.eq(sink.data[4:8]),
-                    NextState("DATA_WRITE")
+                    NextState("DATA")
                 ).Else(
                     pads.data.o.eq(0),
-                    NextState("DATA_WRITESTART")
+                    NextState("START")
                 )
             )
         )
-
-        fsm.act("DATA_WRITESTART",
+        fsm.act("START",
             pads.clk.eq(1),
             pads.data.oe.eq(1),
             pads.data.o.eq(sink.data[4:8]),
             NextValue(wrstarted, 1),
-            NextState("DATA_WRITE")
+            NextState("DATA")
         )
-
-        fsm.act("DATA_WRITE",
+        fsm.act("DATA",
             pads.clk.eq(1),
             pads.data.oe.eq(1),
             pads.data.o.eq(sink.data[0:4]),
             If(sink.last,
-                NextState("DATA_WRITESTOP")
+                NextState("STOP")
             ).Else(
                 sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
-
-        fsm.act("DATA_WRITESTOP",
+        fsm.act("STOP",
             pads.clk.eq(1),
             pads.data.oe.eq(1),
             pads.data.o.eq(0xf),
             NextValue(wrstarted, 0),
-            self.crcfb.start.eq(1),
-            NextState("DATA_RESPONSE")
+            crc.start.eq(1),
+            NextState("RESPONSE")
         )
-
-        fsm.act("DATA_RESPONSE",
+        fsm.act("RESPONSE",
             pads.clk.eq(1),
             pads.data.oe.eq(0),
-            If(cnt < 16,
-                NextValue(cnt, cnt + 1),
+            If(count < 16,
+                NextValue(count, count + 1),
             ).Else(
                 # wait while busy
                 If(pads.data.i[0],
-                    NextValue(cnt, 0),
+                    NextValue(count, 0),
                     sink.ready.eq(1),
                     NextState("IDLE")
                 )
             )
         )
-
 
 # SDCard PHY IO ------------------------------------------------------------------------------------
 
@@ -549,18 +416,13 @@ class SDPHY(Module, AutoCSR):
 
         self.sdpads = sdpads = _sdpads()
 
-        self.clock_domains.cd_sd    = ClockDomain()
-        self.clock_domains.cd_sd_fb = ClockDomain()
+        self.clock_domains.cd_sd = ClockDomain()
 
         # IOs (device specific)
         if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
             # emulator phy
-            self.comb += [
-                ClockSignal("sd").eq(ClockSignal()),
-                ResetSignal("sd").eq(ResetSignal()),
-                ClockSignal("sd_fb").eq(ClockSignal()),
-                ResetSignal("sd_fb").eq(ResetSignal()),
-            ]
+            self.comb += ClockSignal("sd").eq(ClockSignal())
+            self.comb += ResetSignal("sd").eq(ResetSignal())
             self.comb += [
                 If(sdpads.clk, pads.clk.eq(~ClockSignal("sd"))),
 
@@ -578,12 +440,8 @@ class SDPHY(Module, AutoCSR):
                 If(~pads.dat_t[3], sdpads.data.i[3].eq(pads.dat_o[3]))
             ]
         else:
-            self.comb += [
-                ClockSignal("sd").eq(ClockSignal("sdcard")),
-                ResetSignal("sd").eq(ResetSignal("sdcard")),
-                ClockSignal("sd_fb").eq(ClockSignal("sdcard")),
-                ResetSignal("sd_fb").eq(ResetSignal("sdcard")),
-            ]
+            self.comb += ClockSignal("sd").eq(ClockSignal("sdcard"))
+            self.comb += ResetSignal("sd").eq(ResetSignal("sdcard"))
             self.submodules.io = io = SDPHYIOGen(sdpads, pads, **kwargs)
             self.sync.sd += [
                 io.cmd_t.oe.eq(sdpads.cmd.oe),
@@ -594,11 +452,11 @@ class SDPHY(Module, AutoCSR):
             ]
 
         # PHY submodules
-        self.submodules.cfg   = cfg   = SDPHYCFG()
-        self.submodules.cmdw  = cmdw  = SDPHYCMDW()
-        self.submodules.cmdr  = cmdr  = SDPHYCMDR(cfg)
-        self.submodules.dataw = dataw = SDPHYDATAW()
-        self.submodules.datar = datar = SDPHYDATAR(cfg)
+        self.submodules.cfg   = cfg   = ClockDomainsRenamer("sd")(SDPHYCFG())
+        self.submodules.cmdw  = cmdw  = ClockDomainsRenamer("sd")(SDPHYCMDW())
+        self.submodules.cmdr  = cmdr  = ClockDomainsRenamer("sd")(SDPHYCMDR(cfg))
+        self.submodules.dataw = dataw = ClockDomainsRenamer("sd")(SDPHYDATAW())
+        self.submodules.datar = datar = ClockDomainsRenamer("sd")(SDPHYDATAR(cfg))
 
         self.comb += \
             If(sink.valid,
