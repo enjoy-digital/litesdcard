@@ -2,6 +2,9 @@
 # This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # License: BSD
 
+from functools import reduce
+from operator import or_
+
 from migen import *
 from migen.genlib.cdc import MultiReg
 
@@ -28,10 +31,6 @@ def _sdpads():
             ("oe", 1, DIR_M_TO_S)
         ]),
     ])
-    sdpads.cmd.o.reset   = 0b1
-    sdpads.cmd.oe.reset  = 0b1
-    sdpads.data.o.reset  = 0b1111
-    sdpads.data.oe.reset = 0b1111
     return sdpads
 
 # Configuration ------------------------------------------------------------------------------------
@@ -66,8 +65,10 @@ class SDPHYCMDW(Module):
         )
         fsm.act("INIT",
             pads.clk.eq(1),
+            pads.cmd.oe.eq(1),
+            pads.cmd.o.eq(1),
             pads.data.oe.eq(1),
-            pads.data.o.eq(0xf),
+            pads.data.o.eq(0b1111),
             NextValue(count, count + 1),
             If(count == (80-1),
                 NextValue(initialized, 1),
@@ -76,6 +77,7 @@ class SDPHYCMDW(Module):
         )
         fsm.act("WRITE",
             pads.clk.eq(1),
+            pads.cmd.oe.eq(1),
             Case(count, {i: pads.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
             NextValue(count, count + 1),
             If(count == (8-1),
@@ -89,6 +91,8 @@ class SDPHYCMDW(Module):
         )
         fsm.act("CLK8",
             pads.clk.eq(1),
+            pads.cmd.oe.eq(1),
+            pads.cmd.o.eq(1),
             NextValue(count, count + 1),
             If(count == (8-1),
                 sink.ready.eq(1),
@@ -147,7 +151,6 @@ class SDPHYCMDR(Module):
             )
         )
         fsm.act("WAIT",
-            pads.cmd.oe.eq(0),
             pads.clk.eq(1),
             NextValue(cmdr.reset, 0),
             NextValue(timeout, timeout + 1),
@@ -158,7 +161,6 @@ class SDPHYCMDR(Module):
             )
         )
         fsm.act("CMD",
-            pads.cmd.oe.eq(0),
             pads.clk.eq(1),
             source.valid.eq(cmdr.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
@@ -180,6 +182,8 @@ class SDPHYCMDR(Module):
         )
         fsm.act("CLK8",
             pads.clk.eq(1),
+            pads.cmd.oe.eq(1),
+            pads.cmd.o.eq(1),
             NextValue(count, count + 1),
             If(count == 7,
                 sink.ready.eq(1),
@@ -274,14 +278,13 @@ class SDPHYDATAW(Module):
         fsm.act("STOP",
             pads.clk.eq(1),
             pads.data.oe.eq(1),
-            pads.data.o.eq(0xf),
+            pads.data.o.eq(0b1111),
             NextValue(wrstarted, 0),
             crc.start.eq(1),
             NextState("RESPONSE")
         )
         fsm.act("RESPONSE",
             pads.clk.eq(1),
-            pads.data.oe.eq(0),
             If(count < 16,
                 NextValue(count, count + 1),
             ).Else(
@@ -312,9 +315,8 @@ class SDPHYDATAR(Module):
         self.submodules += datar, fsm
         fsm.act("IDLE",
             NextValue(count, 0),
-            pads.data.oe.eq(0),
-            pads.clk.eq(1),
             If(sink.valid,
+                pads.clk.eq(1),
                 NextValue(timeout, 0),
                 NextValue(count, 0),
                 NextValue(datar.reset, 1),
@@ -322,7 +324,6 @@ class SDPHYDATAR(Module):
             )
         )
         fsm.act("WAIT",
-            pads.data.oe.eq(0),
             pads.clk.eq(1),
             NextValue(datar.reset, 0),
             NextValue(timeout, timeout + 1),
@@ -333,7 +334,6 @@ class SDPHYDATAR(Module):
             )
         )
         fsm.act("DATA",
-            pads.data.oe.eq(0),
             pads.clk.eq(1),
             source.valid.eq(datar.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
@@ -462,18 +462,17 @@ class SDPHY(Module, AutoCSR):
         self.submodules.dataw = dataw = ClockDomainsRenamer("sd")(SDPHYDATAW())
         self.submodules.datar = datar = ClockDomainsRenamer("sd")(SDPHYDATAR(cfg))
 
-        self.comb += \
+        # Mux sink/source to/from submodules.
+        self.comb += [
             If(sink.valid,
                 # Command mode
                 If(sink.cmd_data_n,
                     # Write command
                     If(~sink.rd_wr_n,
                         sink.connect(cmdw.sink, omit=set(["cmd_data_n", "rd_wr_n"])),
-                        cmdw.pads.connect(sdpads)
                     # Read command
                     ).Else(
                         sink.connect(cmdr.sink, omit=set(["cmd_data_n", "rd_wr_n"])),
-                        cmdr.pads.connect(sdpads),
                         cmdr.source.connect(source)
                     )
                 # Data mode
@@ -481,12 +480,23 @@ class SDPHY(Module, AutoCSR):
                     # Write data
                     If(~sink.rd_wr_n,
                         sink.connect(dataw.sink, omit=set(["cmd_data_n", "rd_wr_n"])),
-                        dataw.pads.connect(sdpads)
                     # Read data
                     ).Else(
                         sink.connect(datar.sink, omit=set(["cmd_data_n", "rd_wr_n"])),
-                        datar.pads.connect(sdpads),
                         datar.source.connect(source)
                     )
                 )
             )
+        ]
+
+        # Connect pads to/from submodules.
+        self.comb += [
+            sdpads.clk.eq(    reduce(or_, [m.pads.clk     for m in [cmdw, cmdr, dataw, datar]])),
+            sdpads.cmd.oe.eq( reduce(or_, [m.pads.cmd.oe  for m in [cmdw, cmdr, dataw, datar]])),
+            sdpads.cmd.o.eq(  reduce(or_, [m.pads.cmd.o   for m in [cmdw, cmdr, dataw, datar]])),
+            sdpads.data.oe.eq(reduce(or_, [m.pads.data.oe for m in [cmdw, cmdr, dataw, datar]])),
+            sdpads.data.o.eq( reduce(or_, [m.pads.data.o  for m in [cmdw, cmdr, dataw, datar]])),
+        ]
+        for m in [cmdw, cmdr, dataw, datar]:
+            self.comb += m.pads.cmd.i.eq(sdpads.cmd.i)
+            self.comb += m.pads.data.i.eq(sdpads.data.i)
