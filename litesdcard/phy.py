@@ -442,9 +442,6 @@ class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device):
         self.sink   = sink   = stream.Endpoint([("data", 8), ("cmd_data_n", 1), ("rd_wr_n", 1)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
-        if hasattr(pads, "sel"):
-            self.voltage_sel = CSRStorage()
-            self.comb += pads.sel.eq(self.voltage_sel.storage)
         self.card_detect = CSRStatus()
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0)) # Assume SDCard is present if no cd pin.
 
