@@ -8,40 +8,32 @@ from migen import *
 
 def _sdemulator_pads():
     pads = Record([
+        ("clk",   1),
         ("cmd_i", 1),
         ("cmd_o", 1),
         ("cmd_t", 1),
         ("dat_i", 4),
         ("dat_o", 4),
         ("dat_t", 4),
-        ("clk", 1)
     ])
     return pads
 
 
-class SDLinkLayer(Module):
+class SDEmulator(Module):
     """This is a Migen wrapper around the lower-level parts of the SD card emulator
        from Google Project Vault's Open Reference Platform. This core still does all
-       SD card command processing in hardware, presenting a RAM buffered interface
-       for single 512 byte blocks.
+       SD card command processing in hardware, integrating a 512-bytes block buffer.
        """
-    block_size = 512
     def  __init__(self, platform, pads):
         self.pads = pads
-
-        # Verilog sources from ProjectVault ORP
-        vdir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "verilog")
-        platform.add_verilog_include_path(vdir)
-        platform.add_sources(vdir, "sd_common.v", "sd_link.v", "sd_phy.v")
 
         # The external SD clock drives a separate clock domain
         self.clock_domains.cd_sd_ll = ClockDomain(reset_less=True)
         self.comb += self.cd_sd_ll.clk.eq(pads.clk)
 
-        self.specials.rd_buffer = Memory(32, self.block_size//4, init=[i for i in range(self.block_size//4)])
-        self.specials.wr_buffer = Memory(32, self.block_size//4, init=[i for i in range(self.block_size//4)])
-        self.specials.internal_rd_port = self.rd_buffer.get_port(clock_domain="sd_ll")
-        self.specials.internal_wr_port = self.wr_buffer.get_port(write_capable=True, clock_domain="sd_ll")
+        self.specials.buffer = Memory(32, 512//4, init=[i for i in range(512//4)])
+        self.specials.internal_rd_port = self.buffer.get_port(clock_domain="sd_ll")
+        self.specials.internal_wr_port = self.buffer.get_port(write_capable=True, clock_domain="sd_ll")
 
         # Communication between PHY and Link layers
         self.card_state       = Signal(4)
@@ -213,3 +205,14 @@ class SDLinkLayer(Module):
             o_dc                   = self.link_dc,
             o_ddc                  = self.link_ddc
         )
+
+        # Send block data when read receiving read_act.
+        self.comb += self.block_read_go.eq(self.block_read_act)
+
+        # Ack block write when receiving write_act.
+        self.comb += self.block_write_done.eq(self.block_write_act)
+
+        # Verilog sources from ProjectVault ORP
+        vdir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "verilog")
+        platform.add_verilog_include_path(vdir)
+        platform.add_sources(vdir, "sd_common.v", "sd_link.v", "sd_phy.v")
