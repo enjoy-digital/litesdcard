@@ -144,12 +144,12 @@ class SDCore(Module, AutoCSR):
         ]
 
         ccases = {} # To send command and CRC
-        ccases[0] = phy.cmd_sink.data.eq(Cat(command[8:14], 1, 0))
+        ccases[0] = phy.cmdw.sink.data.eq(Cat(command[8:14], 1, 0))
         for i in range(4):
-            ccases[i+1] = phy.cmd_sink.data.eq(argument[24-8*i:32-8*i])
+            ccases[i+1] = phy.cmdw.sink.data.eq(argument[24-8*i:32-8*i])
         ccases[5] = [
-            phy.cmd_sink.data.eq(Cat(1, self.crc7inserter.crc)),
-            phy.cmd_sink.last.eq(waitresp == SDCARD_CTRL_RESPONSE_NONE)
+            phy.cmdw.sink.data.eq(Cat(1, self.crc7inserter.crc)),
+            phy.cmdw.sink.last.eq(waitresp == SDCARD_CTRL_RESPONSE_NONE)
         ]
 
         fsm.act("IDLE",
@@ -167,10 +167,9 @@ class SDCore(Module, AutoCSR):
             )
         )
         fsm.act("SEND_CMD",
-            phy.cmd_sink.valid.eq(1),
-            phy.cmd_sink.rd_wr_n.eq(0),
+            phy.cmdw.sink.valid.eq(1),
             Case(csel, ccases),
-            If(phy.cmd_sink.valid & phy.cmd_sink.ready,
+            If(phy.cmdw.sink.valid & phy.cmdw.sink.ready,
                 If(csel < 5,
                     NextValue(csel, csel + 1)
                 ).Else(
@@ -186,27 +185,26 @@ class SDCore(Module, AutoCSR):
             )
         )
         fsm.act("RECV_RESP",
-            phy.cmd_sink.valid.eq(1),
-            phy.cmd_sink.rd_wr_n.eq(1),
-            phy.cmd_sink.last.eq(dataxfer == SDCARD_CTRL_DATA_TRANSFER_NONE),
+            phy.cmdr.sink.valid.eq(1),
+            phy.cmdr.sink.last.eq(dataxfer == SDCARD_CTRL_DATA_TRANSFER_NONE),
             If(waitresp == SDCARD_CTRL_RESPONSE_SHORT,
-                phy.cmd_sink.data.eq(5) # (5+1)*8 == 48bits
+                phy.cmdr.sink.data.eq(5) # (5+1)*8 == 48bits
             ).Elif(waitresp == SDCARD_CTRL_RESPONSE_LONG,
-                phy.cmd_sink.data.eq(17) # (17+1)*8 == 144bits
+                phy.cmdr.sink.data.eq(17) # (17+1)*8 == 144bits
                 #FIXME: Setting sink data width to 16 here, results in missing 2 last bytes in LONG response
                 #Before this, example response is: 0x        000e00325b590000734f7f800a40001b
                 #After this, example response is : 0x0000003f400e00325b590000734f7f800a40001b
             ),
-            If(phy.cmd_source.valid, # Wait for resp or timeout coming from phy
-                phy.cmd_source.ready.eq(1),
-                If(phy.cmd_source.status == SDCARD_STREAM_STATUS_TIMEOUT,
+            If(phy.cmdr.source.valid, # Wait for resp or timeout coming from phy
+                phy.cmdr.source.ready.eq(1),
+                If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
                     NextValue(cerrtimeout, 1),
                     NextValue(cmddone, 1),
                     NextValue(datadone, 1),
                     NextState("IDLE")
-                ).Elif(phy.cmd_source.last,
+                ).Elif(phy.cmdr.source.last,
                     # Check response CRC
-                    NextValue(self.crc7checker.check, phy.cmd_source.data[1:8]),
+                    NextValue(self.crc7checker.check, phy.cmdr.source.data[1:8]),
                     NextValue(cmddone, 1),
                     If(dataxfer == SDCARD_CTRL_DATA_TRANSFER_READ,
                         NextValue(derrread_en, 1),
@@ -218,23 +216,22 @@ class SDCore(Module, AutoCSR):
                         NextState("IDLE")
                     ),
                 ).Else(
-                    NextValue(response, Cat(phy.cmd_source.data, response[:-len(phy.cmd_source.data)]))
+                    NextValue(response, Cat(phy.cmdr.source.data, response[:-len(phy.cmdr.source.data)]))
                 )
             )
         )
         fsm.act("RECV_DATA",
-            phy.data_sink.valid.eq(1),
-            phy.data_sink.rd_wr_n.eq(1),
-            phy.data_sink.last.eq(blkcnt == (blockcount - 1)),
-            phy.data_sink.data.eq(0), # Read 1 block
-            If(phy.data_source.valid,
-                phy.data_source.ready.eq(1),
-                If(phy.data_source.status == SDCARD_STREAM_STATUS_OK,
-                    self.crc16checker.sink.data.eq(phy.data_source.data),
-                    self.crc16checker.sink.valid.eq(phy.data_source.valid),
-                    self.crc16checker.sink.last.eq(phy.data_source.last),
-                    phy.data_source.ready.eq(self.crc16checker.sink.ready),
-                    If(phy.data_source.last & phy.data_source.ready, # End of block
+            phy.datar.sink.valid.eq(1),
+            phy.datar.sink.last.eq(blkcnt == (blockcount - 1)),
+            phy.datar.sink.data.eq(0), # Read 1 block
+            If(phy.datar.source.valid,
+                phy.datar.source.ready.eq(1),
+                If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
+                    self.crc16checker.sink.data.eq(phy.datar.source.data),
+                    self.crc16checker.sink.valid.eq(phy.datar.source.valid),
+                    self.crc16checker.sink.last.eq(phy.datar.source.last),
+                    phy.datar.source.ready.eq(self.crc16checker.sink.ready),
+                    If(phy.datar.source.last & phy.datar.source.ready, # End of block
                         If(blkcnt < (blockcount - 1),
                             NextValue(blkcnt, blkcnt + 1),
                             NextState("RECV_DATA")
@@ -244,21 +241,20 @@ class SDCore(Module, AutoCSR):
                             NextState("IDLE")
                         )
                     )
-                ).Elif(phy.data_source.status == SDCARD_STREAM_STATUS_TIMEOUT,
+                ).Elif(phy.datar.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
                     NextValue(derrtimeout, 1),
                     NextValue(blkcnt, 0),
                     NextValue(datadone, 1),
-                    phy.data_source.ready.eq(1),
+                    phy.datar.source.ready.eq(1),
                     NextState("IDLE")
                 )
             )
         )
         fsm.act("SEND_DATA",
-            phy.data_sink.valid.eq(self.crc16inserter.source.valid),
-            phy.data_sink.rd_wr_n.eq(0),
-            phy.data_sink.last.eq(self.crc16inserter.source.last),
-            phy.data_sink.data.eq(self.crc16inserter.source.data),
-            self.crc16inserter.source.ready.eq(phy.data_sink.ready),
+            phy.dataw.sink.valid.eq(self.crc16inserter.source.valid),
+            phy.dataw.sink.last.eq(self.crc16inserter.source.last),
+            phy.dataw.sink.data.eq(self.crc16inserter.source.data),
+            self.crc16inserter.source.ready.eq(phy.dataw.sink.ready),
             If(self.crc16inserter.source.valid &
                self.crc16inserter.source.last &
                self.crc16inserter.source.ready,
@@ -271,9 +267,9 @@ class SDCore(Module, AutoCSR):
                 )
             ),
 
-            If(phy.data_source.valid,
-                phy.data_source.ready.eq(1),
-                If(phy.data_source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
+            If(phy.datar.source.valid,
+                phy.datar.source.ready.eq(1),
+                If(phy.datar.source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
                     NextValue(derrwrite, 1)
                 )
             )

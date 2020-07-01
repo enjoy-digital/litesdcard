@@ -45,7 +45,7 @@ class SDPHYCFG(Module, AutoCSR):
 class SDPHYCMDW(Module):
     def __init__(self):
         self.pads = pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8), ("rd_wr_n", 1)])
+        self.sink = sink = stream.Endpoint([("data", 8)])
 
         # # #
 
@@ -55,7 +55,7 @@ class SDPHYCMDW(Module):
         self.submodules += fsm
         fsm.act("IDLE",
             NextValue(count, 0),
-            If(sink.valid & ~sink.rd_wr_n,
+            If(sink.valid,
                 If(~initialized,
                     NextState("INIT")
                 ).Else(
@@ -131,7 +131,7 @@ class SDPHYR(Module):
 class SDPHYCMDR(Module):
     def __init__(self, cfg):
         self.pads   = pads   = _sdpads()
-        self.sink   = sink   = stream.Endpoint([("data", 8), ("rd_wr_n", 1)])
+        self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
@@ -145,7 +145,7 @@ class SDPHYCMDR(Module):
         fsm.act("IDLE",
             NextValue(count,   0),
             NextValue(timeout, 0),
-            If(sink.valid & sink.rd_wr_n,
+            If(sink.valid,
                 NextValue(cmdr.reset, 1),
                 NextState("WAIT"),
             )
@@ -234,7 +234,7 @@ class SDPHYCRCR(Module):
 class SDPHYDATAW(Module):
     def __init__(self):
         self.pads = pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8), ("rd_wr_n", 1)])
+        self.sink = sink = stream.Endpoint([("data", 8)])
 
         # # #
 
@@ -245,7 +245,7 @@ class SDPHYDATAW(Module):
         fsm = fsm = FSM(reset_state="IDLE")
         self.submodules += crc, fsm
         fsm.act("IDLE",
-            If(sink.valid & ~sink.rd_wr_n,
+            If(sink.valid,
                 pads.clk.eq(1),
                 pads.data.oe.eq(1),
                 If(wrstarted,
@@ -302,7 +302,7 @@ class SDPHYDATAW(Module):
 class SDPHYDATAR(Module):
     def __init__(self, cfg):
         self.pads   = pads   = _sdpads()
-        self.sink   = sink   = stream.Endpoint([("data", 8), ("rd_wr_n", 1)])
+        self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
@@ -315,7 +315,7 @@ class SDPHYDATAR(Module):
         self.submodules += datar, fsm
         fsm.act("IDLE",
             NextValue(count, 0),
-            If(sink.valid & sink.rd_wr_n,
+            If(sink.valid,
                 pads.clk.eq(1),
                 NextValue(timeout, 0),
                 NextValue(count, 0),
@@ -440,13 +440,14 @@ class SDPHYIOEmulator(Module):
 
 class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device):
-        self.cmd_sink    = stream.Endpoint([("data", 8), ("rd_wr_n", 1)])
-        self.cmd_source  = stream.Endpoint([("data", 8), ("status", 3)])
-        self.data_sink   = stream.Endpoint([("data", 8), ("rd_wr_n", 1)])
-        self.data_source = stream.Endpoint([("data", 8), ("status", 3)])
-
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
+
+        self.submodules.cfg   = cfg   = ClockDomainsRenamer("sd")(SDPHYCFG())
+        self.submodules.cmdw  = cmdw  = ClockDomainsRenamer("sd")(SDPHYCMDW())
+        self.submodules.cmdr  = cmdr  = ClockDomainsRenamer("sd")(SDPHYCMDR(cfg))
+        self.submodules.dataw = dataw = ClockDomainsRenamer("sd")(SDPHYDATAW())
+        self.submodules.datar = datar = ClockDomainsRenamer("sd")(SDPHYDATAR(cfg))
 
         # # #
 
@@ -457,27 +458,6 @@ class SDPHY(Module, AutoCSR):
             self.submodules.io = SDPHYIOEmulator(sdpads, pads)
         else:
             self.submodules.io = SDPHYIOGen(sdpads, pads)
-
-        # PHY submodules
-        self.submodules.cfg   = cfg   = ClockDomainsRenamer("sd")(SDPHYCFG())
-        self.submodules.cmdw  = cmdw  = ClockDomainsRenamer("sd")(SDPHYCMDW())
-        self.submodules.cmdr  = cmdr  = ClockDomainsRenamer("sd")(SDPHYCMDR(cfg))
-        self.submodules.dataw = dataw = ClockDomainsRenamer("sd")(SDPHYDATAW())
-        self.submodules.datar = datar = ClockDomainsRenamer("sd")(SDPHYDATAR(cfg))
-
-        # Mux Cmd/Data to/from submodules.
-        self.comb += [
-            self.cmd_sink.connect(cmdw.sink, omit={"ready"}),
-            self.cmd_sink.connect(cmdr.sink, omit={"ready"}),
-            self.cmd_sink.ready.eq(cmdw.sink.ready | cmdr.sink.ready),
-            cmdr.source.connect(self.cmd_source),
-        ]
-        self.comb += [
-            self.data_sink.connect(dataw.sink, omit={"ready"}),
-            self.data_sink.connect(datar.sink, omit={"ready"}),
-            self.data_sink.ready.eq(dataw.sink.ready | datar.sink.ready),
-            datar.source.connect(self.data_source),
-        ]
 
         # Connect pads to/from submodules.
         self.comb += [
