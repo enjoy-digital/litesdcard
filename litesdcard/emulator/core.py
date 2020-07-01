@@ -29,8 +29,8 @@ class SDEmulator(Module, AutoCSR):
 
         # Event interrupts and acknowledgment
         self.submodules.ev = EventManager()
-        self.ev.read = EventSourcePulse()
-        self.ev.write = EventSourcePulse()
+        self.ev.read       = EventSourcePulse()
+        self.ev.write      = EventSourcePulse()
         self.ev.finalize()
         self._connect_event(self.ev.read, self.ll.block_read_act, self.ll.block_read_go)
         self._connect_event(self.ev.write, self.ll.block_write_act, self.ll.block_write_done)
@@ -52,18 +52,18 @@ class SDEmulator(Module, AutoCSR):
         self.comb += self.cd_local.rst.eq(ResetSignal() | self._reset.storage)
 
         # Current data operation
-        self._read_act = CSRStatus()
-        self._read_addr = CSRStatus(32)
-        self._read_byteaddr = CSRStatus(32)
-        self._read_num = CSRStatus(32)
-        self._read_stop = CSRStatus()
-        self._write_act = CSRStatus()
-        self._write_addr = CSRStatus(32)
+        self._read_act       = CSRStatus()
+        self._read_addr      = CSRStatus(32)
+        self._read_byteaddr  = CSRStatus(32)
+        self._read_num       = CSRStatus(32)
+        self._read_stop      = CSRStatus()
+        self._write_act      = CSRStatus()
+        self._write_addr     = CSRStatus(32)
         self._write_byteaddr = CSRStatus(32)
-        self._write_num = CSRStatus(32)
-        self._preerase_num = CSRStatus(23)
-        self._erase_start = CSRStatus(32)
-        self._erase_end = CSRStatus(32)
+        self._write_num      = CSRStatus(32)
+        self._preerase_num   = CSRStatus(23)
+        self._erase_start    = CSRStatus(32)
+        self._erase_end      = CSRStatus(32)
         self.comb += [
             self._read_act.status.eq(self.ll.block_read_act),
             self._read_addr.status.eq(self.ll.block_read_addr),
@@ -85,11 +85,11 @@ class SDEmulator(Module, AutoCSR):
             self.ll.mode_4bit,
             self.ll.mode_spi,
             self.ll.host_hc_support,
-            Constant(False),             # Reserved bit 3
-            Constant(False),             # Reserved bit 4
-            Constant(False),             # Reserved bit 5
-            Constant(False),             # Reserved bit 6
-            Constant(False),             # Reserved bit 7
+            Constant(False), # Reserved bit 3
+            Constant(False), # Reserved bit 4
+            Constant(False), # Reserved bit 5
+            Constant(False), # Reserved bit 6
+            Constant(False), # Reserved bit 7
             self.ll.info_card_desel,
             self.ll.err_op_out_range,
             self.ll.err_unhandled_cmd,
