@@ -375,9 +375,6 @@ class SDPHYDATAW(Module):
 
 class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
-        self.comb += ClockSignal("sd").eq(ClockSignal("sdcard"))
-        self.comb += ResetSignal("sd").eq(ResetSignal("sdcard"))
-
         # Data tristate
         self.data_t = TSTriple(4)
         self.specials += self.data_t.get_tristate(pads.data)
@@ -415,6 +412,7 @@ class SDPHYIOGen(Module):
 
 class SDPHYIOEmulator(Module):
     def __init__(self, sdpads, pads):
+        self.clock_domains.cd_sd = ClockDomain()
         self.comb += ClockSignal("sd").eq(ClockSignal())
         self.comb += ResetSignal("sd").eq(ResetSignal())
 
@@ -453,8 +451,6 @@ class SDPHY(Module, AutoCSR):
         # # #
 
         self.sdpads = sdpads = _sdpads()
-
-        self.clock_domains.cd_sd = ClockDomain()
 
         # IOs
         if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
