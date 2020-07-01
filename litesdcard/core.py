@@ -188,10 +188,10 @@ class SDCore(Module, AutoCSR):
             phy.cmdr.sink.valid.eq(1),
             phy.cmdr.sink.last.eq(dataxfer == SDCARD_CTRL_DATA_TRANSFER_NONE),
             If(waitresp == SDCARD_CTRL_RESPONSE_SHORT,
-                phy.cmdr.sink.data.eq(5) # (5+1)*8 == 48bits
+                phy.cmdr.sink.length.eq(6) # 6*8 == 48bits
             ).Elif(waitresp == SDCARD_CTRL_RESPONSE_LONG,
-                phy.cmdr.sink.data.eq(17) # (17+1)*8 == 144bits
-                #FIXME: Setting sink data width to 16 here, results in missing 2 last bytes in LONG response
+                phy.cmdr.sink.length.eq(18) # 18*8 == 144bits
+                #FIXME: Setting sink data width to 17 here, results in missing 2 last bytes in LONG response
                 #Before this, example response is: 0x        000e00325b590000734f7f800a40001b
                 #After this, example response is : 0x0000003f400e00325b590000734f7f800a40001b
             ),

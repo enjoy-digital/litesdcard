@@ -131,7 +131,7 @@ class SDPHYR(Module):
 class SDPHYCMDR(Module):
     def __init__(self, cfg):
         self.pads   = pads   = _sdpads()
-        self.sink   = sink   = stream.Endpoint([("data", 8)])
+        self.sink   = sink   = stream.Endpoint([("length", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
@@ -164,7 +164,7 @@ class SDPHYCMDR(Module):
             pads.clk.eq(1),
             source.valid.eq(cmdr.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
-            source.last.eq(count == sink.data),
+            source.last.eq(count == (sink.length - 1)),
             source.data.eq(cmdr.source.data),
             If(source.valid & source.ready,
                 cmdr.source.ready.eq(1),
