@@ -302,7 +302,7 @@ class SDPHYDATAW(Module):
 class SDPHYDATAR(Module):
     def __init__(self, cfg):
         self.pads   = pads   = _sdpads()
-        self.sink   = sink   = stream.Endpoint([("data", 8)])
+        self.sink   = sink   = stream.Endpoint([("length", 8)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #

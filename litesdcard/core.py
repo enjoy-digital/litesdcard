@@ -1,5 +1,5 @@
-# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # This file is Copyright (c) 2018 bunnie <bunnie@kosagi.com>
 # License: BSD
 
@@ -21,27 +21,27 @@ class SDCore(Module, AutoCSR):
         self.sink   = stream.Endpoint([("data", 32)])
         self.source = stream.Endpoint([("data", 32)])
 
-        self.argument       = CSRStorage(32)
-        self.command        = CSRStorage(32)
-        self.send           = CSR()
+        self.argument   = CSRStorage(32)
+        self.command    = CSRStorage(32)
+        self.send       = CSR()
 
-        self.response       = CSRStatus(128)
+        self.response   = CSRStatus(128)
 
-        self.cmdevt         = CSRStatus(32)
-        self.dataevt        = CSRStatus(32)
+        self.cmdevt     = CSRStatus(4)
+        self.dataevt    = CSRStatus(4)
 
-        self.blocksize      = CSRStorage(16)
-        self.blockcount     = CSRStorage(32)
+        self.blocksize  = CSRStorage(16)
+        self.blockcount = CSRStorage(32)
 
-        self.timeout        = CSRStorage(32, reset=2**16)
+        self.timeout    = CSRStorage(32, reset=2**16)
 
         # # #
 
         argument    = Signal(32)
         command     = Signal(32)
         response    = Signal(136)
-        cmdevt      = Signal(32)
-        dataevt     = Signal(32)
+        cmdevt      = Signal(4)
+        dataevt     = Signal(4)
         blocksize   = Signal(16)
         blockcount  = Signal(32)
         timeout     = Signal(32)
@@ -57,8 +57,8 @@ class SDCore(Module, AutoCSR):
 
         # sd to sys cdc
         response_cdc = BusSynchronizer(136, "sd", "sys")
-        cmdevt_cdc   = BusSynchronizer(32, "sd", "sys")
-        dataevt_cdc  = BusSynchronizer(32, "sd", "sys")
+        cmdevt_cdc   = BusSynchronizer(4, "sd", "sys")
+        dataevt_cdc  = BusSynchronizer(4, "sd", "sys")
         self.submodules += response_cdc, cmdevt_cdc, dataevt_cdc
         self.comb += [
             response_cdc.i.eq(response),
@@ -75,10 +75,9 @@ class SDCore(Module, AutoCSR):
         self.comb += phy.cfg.timeout.eq(timeout)
         self.comb += phy.cfg.blocksize.eq(blocksize)
 
-        self.submodules.crc7inserter  = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
-        self.submodules.crc7checker   = ClockDomainsRenamer("sd")(CRCChecker(9, 7, 136))
-        self.submodules.crc16inserter = ClockDomainsRenamer("sd")(CRCUpstreamInserter())
-        self.submodules.crc16checker  = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
+        self.submodules.crc7_inserter  = crc7_inserter  = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
+        self.submodules.crc16_inserter = crc16_inserter = ClockDomainsRenamer("sd")(CRCUpstreamInserter())
+        self.submodules.crc16_checker  = crc16_checker  = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
 
         self.submodules.upstream_cdc = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
             stream.AsyncFIFO(self.sink.description, 4))
@@ -93,184 +92,150 @@ class SDCore(Module, AutoCSR):
         self.comb += [
             self.sink.connect(self.upstream_cdc.sink),
             self.upstream_cdc.source.connect(self.upstream_converter.sink),
-            self.upstream_converter.source.connect(self.crc16inserter.sink),
+            self.upstream_converter.source.connect(crc16_inserter.sink),
 
-            self.crc16checker.source.connect(self.downstream_converter.sink),
+            crc16_checker.source.connect(self.downstream_converter.sink),
             self.downstream_converter.source.connect(self.downstream_cdc.sink),
             self.downstream_cdc.source.connect(self.source)
         ]
 
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
+        cmd_type    = Signal(2)
+        cmd_count   = Signal(3)
+        cmd_done    = Signal()
+        cmd_error   = Signal()
+        cmd_timeout = Signal()
 
-        csel     = Signal(max=6)
-        waitresp = Signal(2)
-        dataxfer = Signal(2)
-        cmddone  = Signal(reset=1)
-        datadone = Signal(reset=1)
-        blkcnt   = Signal(32)
-        pos      = Signal(2)
-
-        cerrtimeout = Signal()
-        cerrcrc_en  = Signal()
-        derrtimeout = Signal()
-        derrwrite   = Signal()
-        derrread_en = Signal()
+        data_type    = Signal(2)
+        data_count   = Signal(32)
+        data_done    = Signal()
+        data_error   = Signal()
+        data_timeout = Signal()
 
         self.comb += [
-            waitresp.eq(command[0:2]),
-            dataxfer.eq(command[5:7]),
+            cmd_type.eq(command[0:2]),
+            data_type.eq(command[5:7]),
             cmdevt.eq(Cat(
-                cmddone,
-                C(0, 1),
-                cerrtimeout,
-                0)),
-                #cerrcrc_en & ~self.crc7checker.valid)),
-                #FIXME: Disable CRC check as they do not work for CMD41 (and maybe others)
+                cmd_done,
+                cmd_error,
+                cmd_timeout,
+                0)), # FIXME cmd response CRC.
             dataevt.eq(Cat(
-                datadone,
-                derrwrite,
-                derrtimeout,
-                derrread_en & ~self.crc16checker.valid)),
-
-            self.crc7inserter.val.eq(Cat(
+                data_done,
+                data_error,
+                data_timeout,
+                ~crc16_checker.valid)),
+            crc7_inserter.val.eq(Cat(
                 argument,
                 command[8:14],
                 1,
                 0)),
-            self.crc7inserter.clr.eq(1),
-            self.crc7inserter.enable.eq(1),
-
-            self.crc7checker.val.eq(response)
+            crc7_inserter.clr.eq(1),
+            crc7_inserter.enable.eq(1),
         ]
 
-        ccases = {} # To send command and CRC
-        ccases[0] = phy.cmdw.sink.data.eq(Cat(command[8:14], 1, 0))
-        for i in range(4):
-            ccases[i+1] = phy.cmdw.sink.data.eq(argument[24-8*i:32-8*i])
-        ccases[5] = [
-            phy.cmdw.sink.data.eq(Cat(1, self.crc7inserter.crc)),
-            phy.cmdw.sink.last.eq(waitresp == SDCARD_CTRL_RESPONSE_NONE)
-        ]
-
+        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
         fsm.act("IDLE",
-            NextValue(pos, 0),
+            NextValue(cmd_done,   1),
+            NextValue(data_done,  1),
+            NextValue(cmd_count,  0),
+            NextValue(data_count, 0),
             If(self.new_command.o,
-                NextValue(cmddone, 0),
-                NextValue(cerrtimeout, 0),
-                NextValue(cerrcrc_en, 0),
-                NextValue(datadone, 0),
-                NextValue(derrtimeout, 0),
-                NextValue(derrwrite, 0),
-                NextValue(derrread_en, 0),
-                NextValue(response, 0),
-                NextState("SEND_CMD")
+                NextValue(cmd_done,     0),
+                NextValue(cmd_error,    0),
+                NextValue(cmd_timeout,  0),
+                NextValue(data_done,    0),
+                NextValue(data_error,   0),
+                NextValue(data_timeout, 0),
+                NextState("CMD")
             )
         )
-        fsm.act("SEND_CMD",
+        fsm.act("CMD",
             phy.cmdw.sink.valid.eq(1),
-            Case(csel, ccases),
+            Case(cmd_count, {
+                0: phy.cmdw.sink.data.eq(Cat(command[8:14], 1, 0)),
+                1: phy.cmdw.sink.data.eq(argument[24:32]),
+                2: phy.cmdw.sink.data.eq(argument[16:24]),
+                3: phy.cmdw.sink.data.eq(argument[ 8:16]),
+                4: phy.cmdw.sink.data.eq(argument[ 0: 8]),
+                5: [
+                    phy.cmdw.sink.data.eq(Cat(1, crc7_inserter.crc)),
+                    phy.cmdw.sink.last.eq(cmd_type == SDCARD_CTRL_RESPONSE_NONE)
+                ]
+               }
+            ),
             If(phy.cmdw.sink.valid & phy.cmdw.sink.ready,
-                If(csel < 5,
-                    NextValue(csel, csel + 1)
-                ).Else(
-                    NextValue(csel, 0),
-                    If(waitresp == SDCARD_CTRL_RESPONSE_NONE,
-                        NextValue(cmddone, 1),
+                NextValue(cmd_count, cmd_count + 1),
+                If(cmd_count == (6-1),
+                    If(cmd_type == SDCARD_CTRL_RESPONSE_NONE,
+                        NextValue(cmd_done, 1),
                         NextState("IDLE")
                     ).Else(
-                        NextValue(cerrcrc_en, 1),
-                        NextState("RECV_RESP")
+                        NextState("CMD-RESPONSE")
                     )
                 )
             )
         )
-        fsm.act("RECV_RESP",
+        fsm.act("CMD-RESPONSE",
             phy.cmdr.sink.valid.eq(1),
-            phy.cmdr.sink.last.eq(dataxfer == SDCARD_CTRL_DATA_TRANSFER_NONE),
-            If(waitresp == SDCARD_CTRL_RESPONSE_SHORT,
-                phy.cmdr.sink.length.eq(6) # 6*8 == 48bits
-            ).Elif(waitresp == SDCARD_CTRL_RESPONSE_LONG,
-                phy.cmdr.sink.length.eq(18) # 18*8 == 144bits
-                #FIXME: Setting sink data width to 17 here, results in missing 2 last bytes in LONG response
-                #Before this, example response is: 0x        000e00325b590000734f7f800a40001b
-                #After this, example response is : 0x0000003f400e00325b590000734f7f800a40001b
+            phy.cmdr.sink.last.eq(data_type == SDCARD_CTRL_DATA_TRANSFER_NONE),
+            If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
+                phy.cmdr.sink.length.eq(17) # 136bits
+            ).Else(
+                phy.cmdr.sink.length.eq(6)  # 48bits
             ),
-            If(phy.cmdr.source.valid, # Wait for resp or timeout coming from phy
+            If(phy.cmdr.source.valid,
                 phy.cmdr.source.ready.eq(1),
                 If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
-                    NextValue(cerrtimeout, 1),
-                    NextValue(cmddone, 1),
-                    NextValue(datadone, 1),
+                    NextValue(cmd_timeout, 1),
                     NextState("IDLE")
                 ).Elif(phy.cmdr.source.last,
-                    # Check response CRC
-                    NextValue(self.crc7checker.check, phy.cmdr.source.data[1:8]),
-                    NextValue(cmddone, 1),
-                    If(dataxfer == SDCARD_CTRL_DATA_TRANSFER_READ,
-                        NextValue(derrread_en, 1),
-                        NextState("RECV_DATA")
-                    ).Elif(dataxfer == SDCARD_CTRL_DATA_TRANSFER_WRITE,
-                        NextState("SEND_DATA")
+                    If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
+                        NextState("DATA-WRITE")
+                    ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
+                        NextState("DATA-READ")
                     ).Else(
-                        NextValue(datadone, 1),
                         NextState("IDLE")
                     ),
                 ).Else(
-                    NextValue(response, Cat(phy.cmdr.source.data, response[:-len(phy.cmdr.source.data)]))
+                    NextValue(response, Cat(phy.cmdr.source.data, response))
                 )
             )
         )
-        fsm.act("RECV_DATA",
-            phy.datar.sink.valid.eq(1),
-            phy.datar.sink.last.eq(blkcnt == (blockcount - 1)),
-            phy.datar.sink.data.eq(0), # Read 1 block
+        fsm.act("DATA-WRITE",
+            crc16_inserter.source.connect(phy.dataw.sink),
+            If(phy.dataw.sink.valid &
+                phy.dataw.sink.last &
+                phy.dataw.sink.ready,
+                NextValue(data_count, data_count + 1),
+                If(data_count == (blockcount-1),
+                    NextState("IDLE")
+                )
+            ),
+            phy.datar.source.ready.eq(1),
             If(phy.datar.source.valid,
-                phy.datar.source.ready.eq(1),
+                If(phy.datar.source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
+                    NextValue(data_error, 1)
+                )
+            )
+        )
+        fsm.act("DATA-READ",
+            phy.datar.sink.valid.eq(1),
+            phy.datar.sink.last.eq(data_count == (blockcount - 1)),
+            phy.datar.source.ready.eq(1),
+            If(phy.datar.source.valid,
                 If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
-                    self.crc16checker.sink.data.eq(phy.datar.source.data),
-                    self.crc16checker.sink.valid.eq(phy.datar.source.valid),
-                    self.crc16checker.sink.last.eq(phy.datar.source.last),
-                    phy.datar.source.ready.eq(self.crc16checker.sink.ready),
-                    If(phy.datar.source.last & phy.datar.source.ready, # End of block
-                        If(blkcnt < (blockcount - 1),
-                            NextValue(blkcnt, blkcnt + 1),
-                            NextState("RECV_DATA")
-                        ).Else(
-                            NextValue(blkcnt, 0),
-                            NextValue(datadone, 1),
+                    phy.datar.source.connect(crc16_checker.sink, omit={"status"}),
+                    If(phy.datar.source.last & phy.datar.source.ready,
+                        NextValue(data_count, data_count + 1),
+                        If(data_count == (blockcount - 1),
                             NextState("IDLE")
                         )
                     )
                 ).Elif(phy.datar.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
-                    NextValue(derrtimeout, 1),
-                    NextValue(blkcnt, 0),
-                    NextValue(datadone, 1),
+                    NextValue(data_timeout, 1),
+                    NextValue(data_count, 0),
                     phy.datar.source.ready.eq(1),
                     NextState("IDLE")
-                )
-            )
-        )
-        fsm.act("SEND_DATA",
-            phy.dataw.sink.valid.eq(self.crc16inserter.source.valid),
-            phy.dataw.sink.last.eq(self.crc16inserter.source.last),
-            phy.dataw.sink.data.eq(self.crc16inserter.source.data),
-            self.crc16inserter.source.ready.eq(phy.dataw.sink.ready),
-            If(self.crc16inserter.source.valid &
-               self.crc16inserter.source.last &
-               self.crc16inserter.source.ready,
-                If(blkcnt < (blockcount - 1),
-                    NextValue(blkcnt, blkcnt + 1)
-                ).Else(
-                    NextValue(blkcnt, 0),
-                    NextValue(datadone, 1),
-                    NextState("IDLE")
-                )
-            ),
-
-            If(phy.datar.source.valid,
-                phy.datar.source.ready.eq(1),
-                If(phy.datar.source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
-                    NextValue(derrwrite, 1)
                 )
             )
         )
