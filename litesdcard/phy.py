@@ -41,6 +41,61 @@ class SDPHYCFG(Module, AutoCSR):
         self.timeout   = Signal(32)
         self.blocksize = Signal(16)
 
+# SDCard PHY Command Write -------------------------------------------------------------------------
+
+class SDPHYCMDW(Module):
+    def __init__(self):
+        self.pads = pads = _sdpads()
+        self.sink = sink = stream.Endpoint([("data", 8)])
+
+        # # #
+
+        initialized = Signal() # FIXME: should be controlled by software.
+        count       = Signal(8)
+        fsm = FSM(reset_state="IDLE")
+        self.submodules += fsm
+        fsm.act("IDLE",
+            NextValue(count, 0),
+            If(sink.valid,
+                If(~initialized,
+                    NextState("INIT")
+                ).Else(
+                    NextState("WRITE")
+                )
+            )
+        )
+        fsm.act("INIT",
+            pads.clk.eq(1),
+            pads.data.oe.eq(1),
+            pads.data.o.eq(0xf),
+            NextValue(count, count + 1),
+            If(count == (80-1),
+                NextValue(initialized, 1),
+                NextState("IDLE")
+            )
+        )
+        fsm.act("WRITE",
+            pads.clk.eq(1),
+            Case(count, {i: pads.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
+            NextValue(count, count + 1),
+            If(count == (8-1),
+                If(sink.last,
+                    NextState("CLK8")
+                ).Else(
+                    sink.ready.eq(1),
+                    NextState("IDLE")
+                )
+            )
+        )
+        fsm.act("CLK8",
+            pads.clk.eq(1),
+            NextValue(count, count + 1),
+            If(count == (8-1),
+                sink.ready.eq(1),
+                NextState("IDLE")
+            )
+        )
+
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
 @ResetInserter()
@@ -141,139 +196,7 @@ class SDPHYCMDR(Module):
             )
         )
 
-# SDCard PHY Command Write -------------------------------------------------------------------------
-
-class SDPHYCMDW(Module):
-    def __init__(self):
-        self.pads = pads = _sdpads()
-        self.sink = sink = stream.Endpoint([("data", 8)])
-
-        # # #
-
-        initialized = Signal() # FIXME: should be controlled by software.
-        count       = Signal(8)
-        fsm = FSM(reset_state="IDLE")
-        self.submodules += fsm
-        fsm.act("IDLE",
-            NextValue(count, 0),
-            If(sink.valid,
-                If(~initialized,
-                    NextState("INIT")
-                ).Else(
-                    NextState("WRITE")
-                )
-            )
-        )
-        fsm.act("INIT",
-            pads.clk.eq(1),
-            pads.data.oe.eq(1),
-            pads.data.o.eq(0xf),
-            NextValue(count, count + 1),
-            If(count == (80-1),
-                NextValue(initialized, 1),
-                NextState("IDLE")
-            )
-        )
-        fsm.act("WRITE",
-            pads.clk.eq(1),
-            Case(count, {i: pads.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
-            NextValue(count, count + 1),
-            If(count == (8-1),
-                If(sink.last,
-                    NextState("CLK8")
-                ).Else(
-                    sink.ready.eq(1),
-                    NextState("IDLE")
-                )
-            )
-        )
-        fsm.act("CLK8",
-            pads.clk.eq(1),
-            NextValue(count, count + 1),
-            If(count == (8-1),
-                sink.ready.eq(1),
-                NextState("IDLE")
-            )
-        )
-
-# SDCard PHY Data Read -----------------------------------------------------------------------------
-
-class SDPHYDATAR(Module):
-    def __init__(self, cfg):
-        self.pads   = pads   = _sdpads()
-        self.sink   = sink   = stream.Endpoint([("data", 8)])
-        self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
-
-        # # #
-
-        timeout = Signal(32)
-        count   = Signal(10)
-
-        datar = SDPHYR(pads.data.i, skip_start_bit=True)
-        fsm   = FSM(reset_state="IDLE")
-        self.submodules += datar, fsm
-        fsm.act("IDLE",
-            NextValue(count, 0),
-            pads.data.oe.eq(0),
-            pads.clk.eq(1),
-            If(sink.valid,
-                NextValue(timeout, 0),
-                NextValue(count, 0),
-                NextValue(datar.reset, 1),
-                NextState("WAIT")
-            )
-        )
-        fsm.act("WAIT",
-            pads.data.oe.eq(0),
-            pads.clk.eq(1),
-            NextValue(datar.reset, 0),
-            NextValue(timeout, timeout + 1),
-            If(datar.source.valid,
-                NextState("DATA")
-            ).Elif(timeout > cfg.timeout,
-                NextState("TIMEOUT")
-            )
-        )
-        fsm.act("DATA",
-            pads.data.oe.eq(0),
-            pads.clk.eq(1),
-            source.valid.eq(datar.source.valid),
-            source.status.eq(SDCARD_STREAM_STATUS_OK),
-            source.last.eq(count == (cfg.blocksize + 8 - 1)), # 1 block + 64-bit CRC
-            source.data.eq(datar.source.data),
-            If(source.valid & source.ready,
-                datar.source.ready.eq(1),
-                NextValue(count, count + 1),
-                If(source.last,
-                    If(sink.last,
-                        NextValue(count, 0),
-                        NextState("CLK40")
-                    ).Else(
-                        sink.ready.eq(1),
-                        NextState("IDLE")
-                    )
-                )
-            )
-        )
-        fsm.act("CLK40",
-            pads.clk.eq(1),
-            NextValue(count, count + 1),
-            If(count == (40-1),
-                sink.ready.eq(1),
-                NextState("IDLE")
-            )
-        )
-        fsm.act("TIMEOUT",
-            source.valid.eq(1),
-            source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
-            source.last.eq(1),
-            If(source.valid & source.ready,
-                sink.ready.eq(1),
-                NextState("IDLE")
-            )
-        )
-
-# SDCard PHY CRC Read ------------------------------------------------------------------------------
+# SDCard PHY CRC Response --------------------------------------------------------------------------
 
 class SDPHYCRCR(Module):
     def __init__(self, idata):
@@ -368,6 +291,83 @@ class SDPHYDATAW(Module):
                     sink.ready.eq(1),
                     NextState("IDLE")
                 )
+            )
+        )
+
+# SDCard PHY Data Read -----------------------------------------------------------------------------
+
+class SDPHYDATAR(Module):
+    def __init__(self, cfg):
+        self.pads   = pads   = _sdpads()
+        self.sink   = sink   = stream.Endpoint([("data", 8)])
+        self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
+
+        # # #
+
+        timeout = Signal(32)
+        count   = Signal(10)
+
+        datar = SDPHYR(pads.data.i, skip_start_bit=True)
+        fsm   = FSM(reset_state="IDLE")
+        self.submodules += datar, fsm
+        fsm.act("IDLE",
+            NextValue(count, 0),
+            pads.data.oe.eq(0),
+            pads.clk.eq(1),
+            If(sink.valid,
+                NextValue(timeout, 0),
+                NextValue(count, 0),
+                NextValue(datar.reset, 1),
+                NextState("WAIT")
+            )
+        )
+        fsm.act("WAIT",
+            pads.data.oe.eq(0),
+            pads.clk.eq(1),
+            NextValue(datar.reset, 0),
+            NextValue(timeout, timeout + 1),
+            If(datar.source.valid,
+                NextState("DATA")
+            ).Elif(timeout > cfg.timeout,
+                NextState("TIMEOUT")
+            )
+        )
+        fsm.act("DATA",
+            pads.data.oe.eq(0),
+            pads.clk.eq(1),
+            source.valid.eq(datar.source.valid),
+            source.status.eq(SDCARD_STREAM_STATUS_OK),
+            source.last.eq(count == (cfg.blocksize + 8 - 1)), # 1 block + 64-bit CRC
+            source.data.eq(datar.source.data),
+            If(source.valid & source.ready,
+                datar.source.ready.eq(1),
+                NextValue(count, count + 1),
+                If(source.last,
+                    If(sink.last,
+                        NextValue(count, 0),
+                        NextState("CLK40")
+                    ).Else(
+                        sink.ready.eq(1),
+                        NextState("IDLE")
+                    )
+                )
+            )
+        )
+        fsm.act("CLK40",
+            pads.clk.eq(1),
+            NextValue(count, count + 1),
+            If(count == (40-1),
+                sink.ready.eq(1),
+                NextState("IDLE")
+            )
+        )
+        fsm.act("TIMEOUT",
+            source.valid.eq(1),
+            source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
+            source.last.eq(1),
+            If(source.valid & source.ready,
+                sink.ready.eq(1),
+                NextState("IDLE")
             )
         )
 
