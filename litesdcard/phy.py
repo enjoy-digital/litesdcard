@@ -375,6 +375,9 @@ class SDPHYDATAW(Module):
 
 class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
+        self.comb += ClockSignal("sd").eq(ClockSignal("sdcard"))
+        self.comb += ResetSignal("sd").eq(ResetSignal("sdcard"))
+
         # Data tristate
         self.data_t = TSTriple(4)
         self.specials += self.data_t.get_tristate(pads.data)
@@ -393,17 +396,52 @@ class SDPHYIOGen(Module):
         self.sync.sd += sdpads_clk.eq(sdpads.clk)
         self.comb += If(sdpads_clk, pads.clk.eq(~ClockSignal("sd")))
 
+        # Cmd output
+        self.sync.sd += self.cmd_t.oe.eq(sdpads.cmd.oe)
+        self.sync.sd += self.cmd_t.o.eq(sdpads.cmd.o)
+
         # Cmd input
         self.specials += SDRInput(self.cmd_t.i, sdpads.cmd.i, ClockSignal("sd"))
+
+        # Data output
+        self.sync += self.data_t.oe.eq(sdpads.data.oe)
+        self.sync += self.data_t.o.eq(sdpads.data.o)
 
         # Data input
         for i in range(4):
             self.specials += SDRInput(self.data_t.i[i], sdpads.data.i[i], ClockSignal("sd"))
 
+# SDCard PHY Emulator ------------------------------------------------------------------------------
+
+class SDPHYIOEmulator(Module):
+    def __init__(self, sdpads, pads):
+        self.comb += ClockSignal("sd").eq(ClockSignal())
+        self.comb += ResetSignal("sd").eq(ResetSignal())
+
+        # Clk
+        self.comb += If(sdpads.clk, pads.clk.eq(~ClockSignal("sd")))
+
+        # Cmd
+        self.comb += [
+            pads.cmd_i.eq(1),
+            If(sdpads.cmd.oe, pads.cmd_i.eq(sdpads.cmd.o)),
+            sdpads.cmd.i.eq(1),
+            If(~pads.cmd_t, sdpads.cmd.i.eq(pads.cmd_o)),
+        ]
+
+        # Data
+        self.comb += [
+            pads.dat_i.eq(0b1111),
+            If(sdpads.data.oe, pads.dat_i.eq(sdpads.data.o)),
+            sdpads.data.i.eq(0b1111),
+        ]
+        for i in range(4):
+            self.comb += If(~pads.dat_t[i], sdpads.data.i[i].eq(pads.dat_o[i]))
+
 # SDCard PHY ---------------------------------------------------------------------------------------
 
 class SDPHY(Module, AutoCSR):
-    def __init__(self, pads, device, **kwargs):
+    def __init__(self, pads, device):
         self.sink   = sink   = stream.Endpoint([("data", 8), ("cmd_data_n", 1), ("rd_wr_n", 1)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
         if hasattr(pads, "sel"):
@@ -418,38 +456,11 @@ class SDPHY(Module, AutoCSR):
 
         self.clock_domains.cd_sd = ClockDomain()
 
-        # IOs (device specific)
+        # IOs
         if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
-            # emulator phy
-            self.comb += ClockSignal("sd").eq(ClockSignal())
-            self.comb += ResetSignal("sd").eq(ResetSignal())
-            self.comb += [
-                If(sdpads.clk, pads.clk.eq(~ClockSignal("sd"))),
-
-                pads.cmd_i.eq(1),
-                If(sdpads.cmd.oe, pads.cmd_i.eq(sdpads.cmd.o)),
-                sdpads.cmd.i.eq(1),
-                If(~pads.cmd_t, sdpads.cmd.i.eq(pads.cmd_o)),
-
-                pads.dat_i.eq(0b1111),
-                If(sdpads.data.oe, pads.dat_i.eq(sdpads.data.o)),
-                sdpads.data.i.eq(0b1111),
-                If(~pads.dat_t[0], sdpads.data.i[0].eq(pads.dat_o[0])),
-                If(~pads.dat_t[1], sdpads.data.i[1].eq(pads.dat_o[1])),
-                If(~pads.dat_t[2], sdpads.data.i[2].eq(pads.dat_o[2])),
-                If(~pads.dat_t[3], sdpads.data.i[3].eq(pads.dat_o[3]))
-            ]
+            self.submodules.io = SDPHYIOEmulator(sdpads, pads)
         else:
-            self.comb += ClockSignal("sd").eq(ClockSignal("sdcard"))
-            self.comb += ResetSignal("sd").eq(ResetSignal("sdcard"))
-            self.submodules.io = io = SDPHYIOGen(sdpads, pads, **kwargs)
-            self.sync.sd += [
-                io.cmd_t.oe.eq(sdpads.cmd.oe),
-                io.cmd_t.o.eq(sdpads.cmd.o),
-
-                io.data_t.oe.eq(sdpads.data.oe),
-                io.data_t.o.eq(sdpads.data.o)
-            ]
+            self.submodules.io = SDPHYIOGen(sdpads, pads)
 
         # PHY submodules
         self.submodules.cfg   = cfg   = ClockDomainsRenamer("sd")(SDPHYCFG())
