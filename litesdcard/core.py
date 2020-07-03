@@ -3,12 +3,11 @@
 # This file is Copyright (c) 2018 bunnie <bunnie@kosagi.com>
 # License: BSD
 
-
 from migen import *
-from migen.genlib.cdc import MultiReg, BusSynchronizer, PulseSynchronizer
+from migen.genlib.cdc import MultiReg
 
-from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
+from litex.soc.interconnect import stream
 
 from litesdcard.common import *
 from litesdcard.crc import CRC, CRCChecker
@@ -30,73 +29,38 @@ class SDCore(Module, AutoCSR):
         self.cmdevt     = CSRStatus(4)
         self.dataevt    = CSRStatus(4)
 
-        self.blocksize  = CSRStorage(16)
+        self.blocksize  = CSRStorage(10)
         self.blockcount = CSRStorage(32)
-
-        self.timeout    = CSRStorage(32, reset=2**16)
 
         # # #
 
-        argument    = Signal(32)
-        command     = Signal(32)
+        argument    = self.argument.storage
+        command     = self.command.storage
         response    = Signal(136)
         cmdevt      = Signal(4)
         dataevt     = Signal(4)
-        blocksize   = Signal(16)
-        blockcount  = Signal(32)
-        timeout     = Signal(32)
-
-        # sys to sd cdc
-        self.specials += [
-            MultiReg(self.argument.storage,    argument,    "sd"),
-            MultiReg(self.command.storage,     command,     "sd"),
-            MultiReg(self.blocksize.storage,   blocksize,   "sd"),
-            MultiReg(self.blockcount.storage,  blockcount,  "sd"),
-            MultiReg(self.timeout.storage,     timeout,     "sd"),
-        ]
-
-        # sd to sys cdc
-        response_cdc = BusSynchronizer(136, "sd", "sys")
-        cmdevt_cdc   = BusSynchronizer(4, "sd", "sys")
-        dataevt_cdc  = BusSynchronizer(4, "sd", "sys")
-        self.submodules += response_cdc, cmdevt_cdc, dataevt_cdc
-        self.comb += [
-            response_cdc.i.eq(response),
-            self.response.status.eq(response_cdc.o[:128]),
-            cmdevt_cdc.i.eq(cmdevt),
-            self.cmdevt.status.eq(cmdevt_cdc.o),
-            dataevt_cdc.i.eq(dataevt),
-            self.dataevt.status.eq(dataevt_cdc.o)
-        ]
-
-        self.submodules.new_command = PulseSynchronizer("sys", "sd")
-        self.comb += self.new_command.i.eq(self.send.re)
-
-        self.comb += phy.cfg.timeout.eq(timeout)
-        self.comb += phy.cfg.blocksize.eq(blocksize)
-
-        self.submodules.crc7_inserter  = crc7_inserter  = ClockDomainsRenamer("sd")(CRC(9, 7, 40))
-        self.submodules.crc16_inserter = crc16_inserter = ClockDomainsRenamer("sd")(CRCUpstreamInserter())
-        self.submodules.crc16_checker  = crc16_checker  = ClockDomainsRenamer("sd")(CRCDownstreamChecker())
-
-        self.submodules.upstream_cdc = ClockDomainsRenamer({"write": "sys", "read": "sd"})(
-            stream.AsyncFIFO(self.sink.description, 4))
-        self.submodules.downstream_cdc = ClockDomainsRenamer({"write": "sd", "read": "sys"})(
-            stream.AsyncFIFO(self.source.description, 4))
-
-        self.submodules.upstream_converter = ClockDomainsRenamer("sd")(
-            stream.StrideConverter([('data', 32)], [('data', 8)], reverse=True))
-        self.submodules.downstream_converter = ClockDomainsRenamer("sd")(
-            stream.StrideConverter([('data', 8)], [('data', 32)], reverse=True))
+        blocksize   = self.blocksize.storage
+        blockcount  = self.blockcount.storage
 
         self.comb += [
-            self.sink.connect(self.upstream_cdc.sink),
-            self.upstream_cdc.source.connect(self.upstream_converter.sink),
+            self.response.status.eq(response),
+            self.cmdevt.status.eq(cmdevt),
+            self.dataevt.status.eq(dataevt),
+        ]
+
+        self.submodules.crc7_inserter  = crc7_inserter  = CRC(9, 7, 40)
+        self.submodules.crc16_inserter = crc16_inserter = CRCUpstreamInserter()
+        self.submodules.crc16_checker  = crc16_checker  = CRCDownstreamChecker()
+
+        self.submodules.upstream_converter   = stream.StrideConverter([('data', 32)], [('data', 8)], reverse=True)
+        self.submodules.downstream_converter = stream.StrideConverter([('data', 8)], [('data', 32)], reverse=True)
+
+        self.comb += [
+            self.sink.connect(self.upstream_converter.sink),
             self.upstream_converter.source.connect(crc16_inserter.sink),
 
             crc16_checker.source.connect(self.downstream_converter.sink),
-            self.downstream_converter.source.connect(self.downstream_cdc.sink),
-            self.downstream_cdc.source.connect(self.source)
+            self.downstream_converter.source.connect(self.source),
         ]
 
         cmd_type    = Signal(2)
@@ -133,13 +97,13 @@ class SDCore(Module, AutoCSR):
             crc7_inserter.enable.eq(1),
         ]
 
-        self.submodules.fsm = fsm = ClockDomainsRenamer("sd")(FSM())
+        self.submodules.fsm = fsm = FSM()
         fsm.act("IDLE",
             NextValue(cmd_done,   1),
             NextValue(data_done,  1),
             NextValue(cmd_count,  0),
             NextValue(data_count, 0),
-            If(self.new_command.o,
+            If(self.send.re,
                 NextValue(cmd_done,     0),
                 NextValue(cmd_error,    0),
                 NextValue(cmd_timeout,  0),
@@ -157,10 +121,8 @@ class SDCore(Module, AutoCSR):
                 2: phy.cmdw.sink.data.eq(argument[16:24]),
                 3: phy.cmdw.sink.data.eq(argument[ 8:16]),
                 4: phy.cmdw.sink.data.eq(argument[ 0: 8]),
-                5: [
-                    phy.cmdw.sink.data.eq(Cat(1, crc7_inserter.crc)),
-                    phy.cmdw.sink.last.eq(cmd_type == SDCARD_CTRL_RESPONSE_NONE)
-                ]
+                5: [phy.cmdw.sink.data.eq(Cat(1, crc7_inserter.crc)),
+                    phy.cmdw.sink.last.eq(cmd_type == SDCARD_CTRL_RESPONSE_NONE)]
                }
             ),
             If(phy.cmdw.sink.valid & phy.cmdw.sink.ready,
@@ -170,12 +132,12 @@ class SDCore(Module, AutoCSR):
                         NextValue(cmd_done, 1),
                         NextState("IDLE")
                     ).Else(
-                        NextState("CMD-RESPONSE")
+                        NextState("CMD-RESPONSE-0"),
                     )
                 )
             )
         )
-        fsm.act("CMD-RESPONSE",
+        fsm.act("CMD-RESPONSE-0",
             phy.cmdr.sink.valid.eq(1),
             phy.cmdr.sink.last.eq(data_type == SDCARD_CTRL_DATA_TRANSFER_NONE),
             If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
@@ -183,8 +145,13 @@ class SDCore(Module, AutoCSR):
             ).Else(
                 phy.cmdr.sink.length.eq(6)  # 48bits
             ),
+            If(phy.cmdr.sink.valid & phy.cmdr.sink.ready,
+                NextState("CMD-RESPONSE-1")
+            )
+        )
+        fsm.act("CMD-RESPONSE-1",
+            phy.cmdr.source.ready.eq(1),
             If(phy.cmdr.source.valid,
-                phy.cmdr.source.ready.eq(1),
                 If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
                     NextValue(cmd_timeout, 1),
                     NextState("IDLE")
@@ -192,7 +159,7 @@ class SDCore(Module, AutoCSR):
                     If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
                         NextState("DATA-WRITE")
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
-                        NextState("DATA-READ")
+                        NextState("DATA-READ-0")
                     ).Else(
                         NextState("IDLE")
                     ),
@@ -218,9 +185,15 @@ class SDCore(Module, AutoCSR):
                 )
             )
         )
-        fsm.act("DATA-READ",
+        fsm.act("DATA-READ-0",
             phy.datar.sink.valid.eq(1),
+            phy.datar.sink.blocksize.eq(blocksize),
             phy.datar.sink.last.eq(data_count == (blockcount - 1)),
+            If(phy.datar.sink.valid & phy.datar.sink.ready,
+                NextState("DATA-READ-1")
+            ),
+        )
+        fsm.act("DATA-READ-1",
             phy.datar.source.ready.eq(1),
             If(phy.datar.source.valid,
                 If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
@@ -229,6 +202,8 @@ class SDCore(Module, AutoCSR):
                         NextValue(data_count, data_count + 1),
                         If(data_count == (blockcount - 1),
                             NextState("IDLE")
+                        ).Else(
+                            NextState("DATA-READ-0")
                         )
                     )
                 ).Elif(phy.datar.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
