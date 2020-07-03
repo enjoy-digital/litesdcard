@@ -31,6 +31,26 @@ _sdpads_layout = [
     ]),
 ]
 
+# SDCard PHY Clocker -------------------------------------------------------------------------------
+
+class SDPHYClocker(Module, AutoCSR):
+    def __init__(self):
+        self.divider = CSRStorage(8, reset=128)
+
+        # # #
+
+        self.clock_domains.cd_sd = ClockDomain()
+        self.comb += self.cd_sd.rst.eq(ResetSignal())
+
+        divider = Signal(8)
+        self.sync += divider.eq(divider + 1)
+
+        cases = {}
+        cases["default"] = self.cd_sd.clk.eq(ClockSignal())
+        for i in range(1, 8):
+            cases[2**i] = self.cd_sd.clk.eq(divider[i-1])
+        self.comb += Case(self.divider.storage, cases)
+
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
 @ResetInserter()
@@ -474,10 +494,6 @@ class SDPHYIOGen(Module):
 
 class SDPHYIOEmulator(Module):
     def __init__(self, sdpads, pads):
-        self.clock_domains.cd_sd = ClockDomain()
-        self.comb += ClockSignal("sd").eq(ClockSignal())
-        self.comb += ResetSignal("sd").eq(ResetSignal())
-
         # Clk
         self.comb += If(sdpads.clk, pads.clk.eq(~ClockSignal("sd")))
 
@@ -505,11 +521,12 @@ class SDPHY(Module, AutoCSR):
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
 
-        self.submodules.init  = init  = SDPHYInit()
-        self.submodules.cmdw  = cmdw  = SDPHYCMDW()
-        self.submodules.cmdr  = cmdr  = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
-        self.submodules.dataw = dataw = SDPHYDATAW()
-        self.submodules.datar = datar = SDPHYDATAR(sys_clk_freq, data_timeout)
+        self.submodules.clocker = clocker = SDPHYClocker()
+        self.submodules.init    = init    = SDPHYInit()
+        self.submodules.cmdw    = cmdw    = SDPHYCMDW()
+        self.submodules.cmdr    = cmdr    = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
+        self.submodules.dataw   = dataw   = SDPHYDATAW()
+        self.submodules.datar   = datar   = SDPHYDATAR(sys_clk_freq, data_timeout)
 
         # # #
 
