@@ -54,7 +54,7 @@ _sdpads_layout = [
 
 # Configuration ------------------------------------------------------------------------------------
 
-class SDPHYCFG(Module, AutoCSR):
+class SDPHYCFG(Module):
     def __init__(self):
         self.timeout   = Signal(32)
         self.blocksize = Signal(16)
@@ -72,6 +72,7 @@ class SDPHYCMDW(Module):
         initialized = Signal() # FIXME: should be controlled by software.
         count       = Signal(8)
         fsm = FSM(reset_state="IDLE")
+        fsm = ClockDomainsRenamer("sd")(fsm)
         self.submodules += fsm
         fsm.act("IDLE",
             NextValue(count, 0),
@@ -132,17 +133,18 @@ class SDPHYR(Module):
         # # #
 
         pads_in_data = pads_in.cmd.i[:data_width] if cmd else pads_in.data.i[:data_width]
-        print(len(pads_in_data))
 
         # Xfer starts when data == 0
         start = Signal()
         run   = Signal()
         self.comb += start.eq(pads_in_data == 0)
-        self.sync += run.eq(start | run)
+        self.sync.sd += run.eq(start | run)
 
         # Convert data to 8-bit stream
         converter = stream.Converter(data_width, 8, reverse=True)
+        converter = ClockDomainsRenamer("sd")(converter)
         buf       = stream.Buffer([("data", 8)])
+        buf       = ClockDomainsRenamer("sd")(buf)
         self.submodules += converter, buf
         self.comb += [
             converter.sink.valid.eq(run if skip_start_bit else (start | run)),
@@ -166,8 +168,10 @@ class SDPHYCMDR(Module):
         count   = Signal(8)
 
         cmdr = SDPHYR(cmd=True, data_width=1, skip_start_bit=False)
+        cmdr = ClockDomainsRenamer("sd")(cmdr)
         self.comb += pads_in.connect(cmdr.pads_in)
         fsm  = FSM(reset_state="IDLE")
+        fsm  = ClockDomainsRenamer("sd")(fsm)
         self.submodules += cmdr, fsm
         fsm.act("IDLE",
             NextValue(count,   0),
@@ -239,8 +243,10 @@ class SDPHYCRCR(Module):
         # # #
 
         crcr = SDPHYR(data=True, data_width=1, skip_start_bit=True)
+        crcr = ClockDomainsRenamer("sd")(crcr)
         self.comb += pads_in.connect(crcr.pads_in)
-        fsm  = FSM(reset_state="IDLE")
+        fsm = FSM(reset_state="IDLE")
+        fsm = ClockDomainsRenamer("sd")(fsm)
         self.submodules += crcr, fsm
         fsm.act("IDLE",
             If(self.start,
@@ -272,8 +278,10 @@ class SDPHYDATAW(Module):
         count     = Signal(8)
 
         crc = SDPHYCRCR() # FIXME: Report valid/errors to software.
+        crc = ClockDomainsRenamer("sd")(crc)
         self.comb += pads_in.connect(crc.pads_in)
-        fsm = fsm = FSM(reset_state="IDLE")
+        fsm = FSM(reset_state="IDLE")
+        fsm = ClockDomainsRenamer("sd")(fsm)
         self.submodules += crc, fsm
         fsm.act("IDLE",
             If(sink.valid,
@@ -343,8 +351,10 @@ class SDPHYDATAR(Module):
         count   = Signal(10)
 
         datar = SDPHYR(data=True, data_width=4, skip_start_bit=True)
+        datar = ClockDomainsRenamer("sd")(datar)
         self.comb += pads_in.connect(datar.pads_in)
-        fsm   = FSM(reset_state="IDLE")
+        fsm = FSM(reset_state="IDLE")
+        fsm = ClockDomainsRenamer("sd")(fsm)
         self.submodules += datar, fsm
         fsm.act("IDLE",
             NextValue(count, 0),
@@ -478,11 +488,11 @@ class SDPHY(Module, AutoCSR):
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
 
-        self.submodules.cfg   = cfg   = ClockDomainsRenamer("sd")(SDPHYCFG())
-        self.submodules.cmdw  = cmdw  = ClockDomainsRenamer("sd")(SDPHYCMDW())
-        self.submodules.cmdr  = cmdr  = ClockDomainsRenamer("sd")(SDPHYCMDR(cfg))
-        self.submodules.dataw = dataw = ClockDomainsRenamer("sd")(SDPHYDATAW())
-        self.submodules.datar = datar = ClockDomainsRenamer("sd")(SDPHYDATAR(cfg))
+        self.submodules.cfg   = cfg   = SDPHYCFG()
+        self.submodules.cmdw  = cmdw  = SDPHYCMDW()
+        self.submodules.cmdr  = cmdr  = SDPHYCMDR(cfg)
+        self.submodules.dataw = dataw = SDPHYDATAW()
+        self.submodules.datar = datar = SDPHYDATAR(cfg)
 
         # # #
 
