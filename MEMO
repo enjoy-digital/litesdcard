@@ -22,7 +22,7 @@ CMD6     -set driver strength
 CMD19    -send tuning block to the host (mandatory for SDR104,  -optional for SDR50)
 
 SD speeds (3.9.6):
--------------------------
+------------------
 SDR104: 104MB/s, 208MHz clk, 1.8v
 SDR50:   50MB/s, 100MHz clk, 1.8v
 DDR50:   50MB/s,  50MHz clk, 1.8v
