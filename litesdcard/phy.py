@@ -6,7 +6,7 @@ from functools import reduce
 from operator import or_
 
 from migen import *
-from migen.genlib.cdc import MultiReg
+from migen.genlib.cdc import MultiReg, PulseSynchronizer
 
 from litex.build.io import SDRInput, SDROutput
 
@@ -30,78 +30,6 @@ _sdpads_layout = [
         ("oe", 1)
     ]),
 ]
-
-# SDCard PHY Command Write -------------------------------------------------------------------------
-
-class SDPHYCMDW(Module):
-    def __init__(self):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink     = sink     = stream.Endpoint([("data", 8)])
-
-        self.done = Signal()
-
-        # # #
-
-        self.submodules.sink_cdc = stream.ClockDomainCrossing(sink.description, "sys", "sd")
-        self.comb += sink.connect(self.sink_cdc.sink)
-        sink = self.sink_cdc.source
-
-        initialized = Signal() # FIXME: should be controlled by software.
-        count       = Signal(8)
-        fsm = FSM(reset_state="IDLE")
-        fsm = ClockDomainsRenamer("sd")(fsm)
-        self.submodules += fsm
-        fsm.act("IDLE",
-            NextValue(count, 0),
-            If(sink.valid,
-                If(~initialized,
-                    NextState("INIT")
-                ).Else(
-                    NextState("WRITE")
-                )
-            ).Else(
-                self.done.eq(1),
-            )
-        )
-        fsm.act("INIT",
-            pads_out.clk.eq(1),
-            pads_out.cmd.oe.eq(1),
-            pads_out.cmd.o.eq(1),
-            pads_out.data.oe.eq(1),
-            pads_out.data.o.eq(0b1111),
-            NextValue(count, count + 1),
-            If(count == (80-1),
-                NextValue(initialized, 1),
-                NextState("IDLE")
-            )
-        )
-        fsm.act("WRITE",
-            pads_out.clk.eq(1),
-            pads_out.cmd.oe.eq(1),
-            Case(count, {i: pads_out.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
-            NextValue(count, count + 1),
-            If(count == (8-1),
-                If(sink.last,
-                    NextState("CLK8")
-                ).Else(
-                    sink.ready.eq(1),
-                    NextState("IDLE")
-                )
-            )
-        )
-        fsm.act("CLK8",
-            pads_out.clk.eq(1),
-            pads_out.cmd.oe.eq(1),
-            pads_out.cmd.o.eq(1),
-            NextValue(count, count + 1),
-            If(count == (8-1),
-                sink.ready.eq(1),
-                NextState("IDLE")
-            )
-        )
-        self.sync.sd += If(sink.valid & sink.ready, Display("Data %02x", sink.data))
-        self.sync.sd += If(~fsm.ongoing("IDLE") & ~sink.valid, Display("Error"))
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -134,6 +62,95 @@ class SDPHYR(Module):
             converter.source.connect(buf.sink),
             buf.source.connect(source)
         ]
+
+# SDCard PHY Init ----------------------------------------------------------------------------------
+
+class SDPHYInit(Module, AutoCSR):
+    def __init__(self):
+        self.initialize  = CSR()
+        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+
+        # # #
+
+        ps_initialize = PulseSynchronizer("sys", "sd")
+        self.submodules += ps_initialize
+        self.comb += ps_initialize.i.eq(self.initialize.re)
+
+        count = Signal(8)
+        fsm = FSM(reset_state="IDLE")
+        fsm = ClockDomainsRenamer("sd")(fsm)
+        self.submodules += fsm
+        fsm.act("IDLE",
+            NextValue(count, 0),
+            If(ps_initialize.o,
+                NextState("INITIALIZE")
+            )
+        )
+        fsm.act("INITIALIZE",
+            pads_out.clk.eq(1),
+            pads_out.cmd.oe.eq(1),
+            pads_out.cmd.o.eq(1),
+            pads_out.data.oe.eq(1),
+            pads_out.data.o.eq(0b1111),
+            NextValue(count, count + 1),
+            If(count == (80-1),
+                 NextState("IDLE")
+            )
+        )
+
+# SDCard PHY Command Write -------------------------------------------------------------------------
+
+class SDPHYCMDW(Module):
+    def __init__(self):
+        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+        self.sink     = sink     = stream.Endpoint([("data", 8)])
+
+        self.done = Signal()
+
+        # # #
+
+        self.submodules.sink_cdc = stream.ClockDomainCrossing(sink.description, "sys", "sd")
+        self.comb += sink.connect(self.sink_cdc.sink)
+        sink = self.sink_cdc.source
+
+        count       = Signal(8)
+        fsm = FSM(reset_state="IDLE")
+        fsm = ClockDomainsRenamer("sd")(fsm)
+        self.submodules += fsm
+        fsm.act("IDLE",
+            NextValue(count, 0),
+            If(sink.valid,
+                NextState("WRITE")
+            ).Else(
+                self.done.eq(1),
+            )
+        )
+        fsm.act("WRITE",
+            pads_out.clk.eq(1),
+            pads_out.cmd.oe.eq(1),
+            Case(count, {i: pads_out.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
+            NextValue(count, count + 1),
+            If(count == (8-1),
+                If(sink.last,
+                    NextState("CLK8")
+                ).Else(
+                    sink.ready.eq(1),
+                    NextState("IDLE")
+                )
+            )
+        )
+        fsm.act("CLK8",
+            pads_out.clk.eq(1),
+            pads_out.cmd.oe.eq(1),
+            pads_out.cmd.o.eq(1),
+            NextValue(count, count + 1),
+            If(count == (8-1),
+                sink.ready.eq(1),
+                NextState("IDLE")
+            )
+        )
 
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
@@ -336,7 +353,7 @@ class SDPHYDATAR(Module):
     def __init__(self, sys_clk_freq, data_timeout):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink   = sink   = stream.Endpoint([("blocksize", 10)])
+        self.sink   = sink   = stream.Endpoint([("block_length", 10)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
@@ -382,7 +399,7 @@ class SDPHYDATAR(Module):
             pads_out.clk.eq(1),
             source.valid.eq(datar.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
-            source.last.eq(count == (sink.blocksize + 8 - 1)), # 1 block + 64-bit CRC
+            source.last.eq(count == (sink.block_length + 8 - 1)), # 1 block + 64-bit CRC
             source.data.eq(datar.source.data),
             If(source.valid & source.ready,
                 datar.source.ready.eq(1),
@@ -488,6 +505,7 @@ class SDPHY(Module, AutoCSR):
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
 
+        self.submodules.init  = init  = SDPHYInit()
         self.submodules.cmdw  = cmdw  = SDPHYCMDW()
         self.submodules.cmdr  = cmdr  = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
         self.submodules.dataw = dataw = SDPHYDATAW()
@@ -505,14 +523,14 @@ class SDPHY(Module, AutoCSR):
 
         # Connect pads_out of submodules to physical pads ----------------------------------------
         self.comb += [
-            sdpads.clk.eq(    reduce(or_, [m.pads_out.clk     for m in [cmdw, cmdr, dataw, datar]])),
-            sdpads.cmd.oe.eq( reduce(or_, [m.pads_out.cmd.oe  for m in [cmdw, cmdr, dataw, datar]])),
-            sdpads.cmd.o.eq(  reduce(or_, [m.pads_out.cmd.o   for m in [cmdw, cmdr, dataw, datar]])),
-            sdpads.data.oe.eq(reduce(or_, [m.pads_out.data.oe for m in [cmdw, cmdr, dataw, datar]])),
-            sdpads.data.o.eq( reduce(or_, [m.pads_out.data.o  for m in [cmdw, cmdr, dataw, datar]])),
+            sdpads.clk.eq(    reduce(or_, [m.pads_out.clk     for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.cmd.oe.eq( reduce(or_, [m.pads_out.cmd.oe  for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.cmd.o.eq(  reduce(or_, [m.pads_out.cmd.o   for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.data.oe.eq(reduce(or_, [m.pads_out.data.oe for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.data.o.eq( reduce(or_, [m.pads_out.data.o  for m in [init, cmdw, cmdr, dataw, datar]])),
         ]
 
         # Connect physical pads to pads_in of submodules -------------------------------------------
-        for m in [cmdw, cmdr, dataw, datar]:
+        for m in [init, cmdw, cmdr, dataw, datar]:
             self.comb += m.pads_in.cmd.i.eq(sdpads.cmd.i)
             self.comb += m.pads_in.data.i.eq(sdpads.data.i)
