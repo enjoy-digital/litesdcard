@@ -36,17 +36,11 @@ class SDCore(Module, AutoCSR):
 
         argument    = self.argument.storage
         command     = self.command.storage
-        response    = Signal(136)
-        cmdevt      = Signal(4)
-        dataevt     = Signal(4)
+        response    = self.response.status
+        cmdevt      = self.cmdevt.status
+        dataevt     = self.dataevt.status
         blocksize   = self.blocksize.storage
         blockcount  = self.blockcount.storage
-
-        self.comb += [
-            self.response.status.eq(response),
-            self.cmdevt.status.eq(cmdevt),
-            self.dataevt.status.eq(dataevt),
-        ]
 
         self.submodules.crc7_inserter  = crc7_inserter  = CRC(9, 7, 40)
         self.submodules.crc16_inserter = crc16_inserter = CRCUpstreamInserter()
@@ -174,7 +168,7 @@ class SDCore(Module, AutoCSR):
                 phy.dataw.sink.last &
                 phy.dataw.sink.ready,
                 NextValue(data_count, data_count + 1),
-                If(data_count == (blockcount-1),
+                If(data_count == (blockcount - 1),
                     NextState("IDLE")
                 )
             ),
