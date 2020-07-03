@@ -20,27 +20,27 @@ class SDCore(Module, AutoCSR):
         self.sink   = stream.Endpoint([("data", 32)])
         self.source = stream.Endpoint([("data", 32)])
 
-        self.argument   = CSRStorage(32)
-        self.command    = CSRStorage(32)
-        self.send       = CSR()
+        self.cmd_argument = CSRStorage(32)
+        self.cmd_command  = CSRStorage(32)
+        self.cmd_send     = CSR()
+        self.cmd_response = CSRStatus(128)
 
-        self.response   = CSRStatus(128)
+        self.cmd_event    = CSRStatus(4)
+        self.data_event   = CSRStatus(4)
 
-        self.cmdevt     = CSRStatus(4)
-        self.dataevt    = CSRStatus(4)
-
-        self.blocksize  = CSRStorage(10)
-        self.blockcount = CSRStorage(32)
+        self.block_length = CSRStorage(10)
+        self.block_count  = CSRStorage(32)
 
         # # #
 
-        argument    = self.argument.storage
-        command     = self.command.storage
-        response    = self.response.status
-        cmdevt      = self.cmdevt.status
-        dataevt     = self.dataevt.status
-        blocksize   = self.blocksize.storage
-        blockcount  = self.blockcount.storage
+        cmd_argument = self.cmd_argument.storage
+        cmd_command  = self.cmd_command.storage
+        cmd_send     = self.cmd_send.re
+        cmd_response = self.cmd_response.status
+        cmd_event    = self.cmd_event.status
+        data_event   = self.data_event.status
+        block_length = self.block_length.storage
+        block_count  = self.block_count.storage
 
         self.submodules.crc7_inserter  = crc7_inserter  = CRC(9, 7, 40)
         self.submodules.crc16_inserter = crc16_inserter = CRCUpstreamInserter()
@@ -70,21 +70,21 @@ class SDCore(Module, AutoCSR):
         data_timeout = Signal()
 
         self.comb += [
-            cmd_type.eq(command[0:2]),
-            data_type.eq(command[5:7]),
-            cmdevt.eq(Cat(
+            cmd_type.eq(cmd_command[0:2]),
+            data_type.eq(cmd_command[5:7]),
+            cmd_event.eq(Cat(
                 cmd_done,
                 cmd_error,
                 cmd_timeout,
-                0)), # FIXME cmd response CRC.
-            dataevt.eq(Cat(
+                0)), # FIXME cmd_response CRC.
+            data_event.eq(Cat(
                 data_done,
                 data_error,
                 data_timeout,
                 ~crc16_checker.valid)),
             crc7_inserter.val.eq(Cat(
-                argument,
-                command[8:14],
+                cmd_argument,
+                cmd_command[8:14],
                 1,
                 0)),
             crc7_inserter.clr.eq(1),
@@ -97,7 +97,7 @@ class SDCore(Module, AutoCSR):
             NextValue(data_done,  1),
             NextValue(cmd_count,  0),
             NextValue(data_count, 0),
-            If(self.send.re,
+            If(cmd_send,
                 NextValue(cmd_done,     0),
                 NextValue(cmd_error,    0),
                 NextValue(cmd_timeout,  0),
@@ -110,11 +110,11 @@ class SDCore(Module, AutoCSR):
         fsm.act("CMD",
             phy.cmdw.sink.valid.eq(1),
             Case(cmd_count, {
-                0: phy.cmdw.sink.data.eq(Cat(command[8:14], 1, 0)),
-                1: phy.cmdw.sink.data.eq(argument[24:32]),
-                2: phy.cmdw.sink.data.eq(argument[16:24]),
-                3: phy.cmdw.sink.data.eq(argument[ 8:16]),
-                4: phy.cmdw.sink.data.eq(argument[ 0: 8]),
+                0: phy.cmdw.sink.data.eq(Cat(cmd_command[8:14], 1, 0)),
+                1: phy.cmdw.sink.data.eq(cmd_argument[24:32]),
+                2: phy.cmdw.sink.data.eq(cmd_argument[16:24]),
+                3: phy.cmdw.sink.data.eq(cmd_argument[ 8:16]),
+                4: phy.cmdw.sink.data.eq(cmd_argument[ 0: 8]),
                 5: [phy.cmdw.sink.data.eq(Cat(1, crc7_inserter.crc)),
                     phy.cmdw.sink.last.eq(cmd_type == SDCARD_CTRL_RESPONSE_NONE)]
                }
@@ -158,7 +158,7 @@ class SDCore(Module, AutoCSR):
                         NextState("IDLE")
                     ),
                 ).Else(
-                    NextValue(response, Cat(phy.cmdr.source.data, response))
+                    NextValue(cmd_response, Cat(phy.cmdr.source.data, cmd_response))
                 )
             )
         )
@@ -168,7 +168,7 @@ class SDCore(Module, AutoCSR):
                 phy.dataw.sink.last &
                 phy.dataw.sink.ready,
                 NextValue(data_count, data_count + 1),
-                If(data_count == (blockcount - 1),
+                If(data_count == (block_count - 1),
                     NextState("IDLE")
                 )
             ),
@@ -181,8 +181,8 @@ class SDCore(Module, AutoCSR):
         )
         fsm.act("DATA-READ-0",
             phy.datar.sink.valid.eq(1),
-            phy.datar.sink.blocksize.eq(blocksize),
-            phy.datar.sink.last.eq(data_count == (blockcount - 1)),
+            phy.datar.sink.block_length.eq(block_length),
+            phy.datar.sink.last.eq(data_count == (block_count - 1)),
             If(phy.datar.sink.valid & phy.datar.sink.ready,
                 NextState("DATA-READ-1")
             ),
@@ -194,7 +194,7 @@ class SDCore(Module, AutoCSR):
                     phy.datar.source.connect(crc16_checker.sink, omit={"status"}),
                     If(phy.datar.source.last & phy.datar.source.ready,
                         NextValue(data_count, data_count + 1),
-                        If(data_count == (blockcount - 1),
+                        If(data_count == (block_count - 1),
                             NextState("IDLE")
                         ).Else(
                             NextState("DATA-READ-0")
