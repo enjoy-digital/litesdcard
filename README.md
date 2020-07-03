@@ -30,18 +30,17 @@ design flow by generating the verilog rtl that you will use as a standard core.
 [> Features
 -----------
 PHY:
-  - Xilinx Spartan 6 and 7-Series FPGA
-  - optional clock feedback (UHS-I)
+  - Generic PHY validated on Xilinx, Altera, Lattice FPGAs
 
 Core:
-  - Command & Data CRC inserters/checkers
-  - Single and multiple blocks write/read
+  - Command & Data CRC Inserters/Checkers
+  - Single and Multiple blocks write/read
   - Errors detection and reporting
   - Dynamically configurable clock speed
 
 Frontend:
   - Synthetizable BIST
-  - 32 <--> 8 bits stream converters
+  - DMAs
 
 [> Performances
 ---------------
@@ -63,7 +62,7 @@ W/R(MB/s) performance vs SD frequency:
 - add vendor agnostic phy for low speeds
 - add support for Altera FPGAs.
 - add support for Lattice FPGAs.
-- add Zynq Linux drivers.
+- add Linux drivers.
 - ... See below Support and consulting :)
 
 If you want to support these features, please contact us.
