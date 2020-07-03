@@ -10,33 +10,12 @@ from migen.genlib.cdc import MultiReg
 
 from litex.build.io import SDRInput, SDROutput
 
-from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
+from litex.soc.interconnect import stream
 
 from litesdcard.common import *
 
 # Pads ---------------------------------------------------------------------------------------------
-
-_sdpads_out_layout = [
-    ("clk", 1),
-    ("cmd", [
-        ("o",  1),
-        ("oe", 1)
-    ]),
-    ("data", [
-        ("o",  4),
-        ("oe", 1)
-    ]),
-]
-
-_sdpads_in_layout = [
-    ("cmd", [
-        ("i",  1)
-    ]),
-    ("data", [
-        ("i",  4)
-    ]),
-]
 
 _sdpads_layout = [
     ("clk", 1),
@@ -52,22 +31,21 @@ _sdpads_layout = [
     ]),
 ]
 
-# Configuration ------------------------------------------------------------------------------------
-
-class SDPHYCFG(Module):
-    def __init__(self):
-        self.timeout   = Signal(32)
-        self.blocksize = Signal(16)
-
 # SDCard PHY Command Write -------------------------------------------------------------------------
 
 class SDPHYCMDW(Module):
     def __init__(self):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_in_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_out_layout)
+        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("data", 8)])
 
+        self.done = Signal()
+
         # # #
+
+        self.submodules.sink_cdc = stream.ClockDomainCrossing(sink.description, "sys", "sd")
+        self.comb += sink.connect(self.sink_cdc.sink)
+        sink = self.sink_cdc.source
 
         initialized = Signal() # FIXME: should be controlled by software.
         count       = Signal(8)
@@ -82,6 +60,8 @@ class SDPHYCMDW(Module):
                 ).Else(
                     NextState("WRITE")
                 )
+            ).Else(
+                self.done.eq(1),
             )
         )
         fsm.act("INIT",
@@ -120,6 +100,8 @@ class SDPHYCMDW(Module):
                 NextState("IDLE")
             )
         )
+        self.sync.sd += If(sink.valid & sink.ready, Display("Data %02x", sink.data))
+        self.sync.sd += If(~fsm.ongoing("IDLE") & ~sink.valid, Display("Error"))
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -127,7 +109,7 @@ class SDPHYCMDW(Module):
 class SDPHYR(Module):
     def __init__(self, cmd=False, data=False, data_width=1, skip_start_bit=False):
         assert cmd or data
-        self.pads_in  = pads_in = stream.Endpoint(_sdpads_in_layout)
+        self.pads_in  = pads_in = stream.Endpoint(_sdpads_layout)
         self.source   = source  = stream.Endpoint([("data", 8)])
 
         # # #
@@ -156,15 +138,23 @@ class SDPHYR(Module):
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
 class SDPHYCMDR(Module):
-    def __init__(self, cfg):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_in_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_out_layout)
+    def __init__(self, sys_clk_freq, cmd_timeout, cmdw):
+        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink    = sink   = stream.Endpoint([("length", 8)])
         self.source  = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
-        timeout = Signal(32)
+        self.submodules.sink_cdc = stream.ClockDomainCrossing(sink.description, "sys", "sd")
+        self.comb += sink.connect(self.sink_cdc.sink)
+        sink = self.sink_cdc.source
+
+        self.submodules.source_cdc = stream.ClockDomainCrossing(source.description, "sd", "sys")
+        self.comb += self.source_cdc.source.connect(source)
+        source = self.source_cdc.sink
+
+        timeout = Signal(32, reset=int(cmd_timeout*sys_clk_freq))
         count   = Signal(8)
 
         cmdr = SDPHYR(cmd=True, data_width=1, skip_start_bit=False)
@@ -175,8 +165,8 @@ class SDPHYCMDR(Module):
         self.submodules += cmdr, fsm
         fsm.act("IDLE",
             NextValue(count,   0),
-            NextValue(timeout, 0),
-            If(sink.valid,
+            NextValue(timeout, timeout.reset),
+            If(sink.valid & cmdw.done,
                 NextValue(cmdr.reset, 1),
                 NextState("WAIT"),
             )
@@ -184,10 +174,10 @@ class SDPHYCMDR(Module):
         fsm.act("WAIT",
             pads_out.clk.eq(1),
             NextValue(cmdr.reset, 0),
-            NextValue(timeout, timeout + 1),
+            NextValue(timeout, timeout - 1),
             If(cmdr.source.valid,
                 NextState("CMD")
-            ).Elif(timeout > cfg.timeout,
+            ).Elif(timeout == 0,
                 NextState("TIMEOUT")
             )
         )
@@ -235,7 +225,7 @@ class SDPHYCMDR(Module):
 
 class SDPHYCRCR(Module):
     def __init__(self):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_in_layout)
+        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.start = Signal()
         self.valid = Signal()
         self.error = Signal()
@@ -268,11 +258,15 @@ class SDPHYCRCR(Module):
 
 class SDPHYDATAW(Module):
     def __init__(self):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_in_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_out_layout)
+        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink = sink = stream.Endpoint([("data", 8)])
 
         # # #
+
+        self.submodules.sink_cdc = stream.ClockDomainCrossing(sink.description, "sys", "sd")
+        self.comb += sink.connect(self.sink_cdc.sink)
+        sink = self.sink_cdc.source
 
         wrstarted = Signal()
         count     = Signal(8)
@@ -339,15 +333,23 @@ class SDPHYDATAW(Module):
 # SDCard PHY Data Read -----------------------------------------------------------------------------
 
 class SDPHYDATAR(Module):
-    def __init__(self, cfg):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_in_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_out_layout)
-        self.sink   = sink   = stream.Endpoint([("length", 8)])
+    def __init__(self, sys_clk_freq, data_timeout):
+        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+        self.sink   = sink   = stream.Endpoint([("blocksize", 10)])
         self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
-        timeout = Signal(32)
+        self.submodules.sink_cdc = stream.ClockDomainCrossing(sink.description, "sys", "sd")
+        self.comb += sink.connect(self.sink_cdc.sink)
+        sink = self.sink_cdc.source
+
+        self.submodules.source_cdc = stream.ClockDomainCrossing(source.description, "sd", "sys")
+        self.comb += self.source_cdc.source.connect(source)
+        source = self.source_cdc.sink
+
+        timeout = Signal(32, reset=int(data_timeout*sys_clk_freq))
         count   = Signal(10)
 
         datar = SDPHYR(data=True, data_width=4, skip_start_bit=True)
@@ -360,7 +362,7 @@ class SDPHYDATAR(Module):
             NextValue(count, 0),
             If(sink.valid,
                 pads_out.clk.eq(1),
-                NextValue(timeout, 0),
+                NextValue(timeout, timeout.reset),
                 NextValue(count, 0),
                 NextValue(datar.reset, 1),
                 NextState("WAIT")
@@ -369,10 +371,10 @@ class SDPHYDATAR(Module):
         fsm.act("WAIT",
             pads_out.clk.eq(1),
             NextValue(datar.reset, 0),
-            NextValue(timeout, timeout + 1),
+            NextValue(timeout, timeout - 1),
             If(datar.source.valid,
                 NextState("DATA")
-            ).Elif(timeout > cfg.timeout,
+            ).Elif(timeout == 0,
                 NextState("TIMEOUT")
             )
         )
@@ -380,7 +382,7 @@ class SDPHYDATAR(Module):
             pads_out.clk.eq(1),
             source.valid.eq(datar.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
-            source.last.eq(count == (cfg.blocksize + 8 - 1)), # 1 block + 64-bit CRC
+            source.last.eq(count == (sink.blocksize + 8 - 1)), # 1 block + 64-bit CRC
             source.data.eq(datar.source.data),
             If(source.valid & source.ready,
                 datar.source.ready.eq(1),
@@ -456,9 +458,7 @@ class SDPHYIOGen(Module):
 class SDPHYIOEmulator(Module):
     def __init__(self, sdpads, pads):
         self.clock_domains.cd_sd = ClockDomain()
-        clk_divider = Signal(16)
-        self.sync += clk_divider.eq(clk_divider + 1)
-        self.comb += ClockSignal("sd").eq(clk_divider[3])
+        self.comb += ClockSignal("sd").eq(ClockSignal())
         self.comb += ResetSignal("sd").eq(ResetSignal())
 
         # Clk
@@ -484,15 +484,14 @@ class SDPHYIOEmulator(Module):
 # SDCard PHY ---------------------------------------------------------------------------------------
 
 class SDPHY(Module, AutoCSR):
-    def __init__(self, pads, device):
+    def __init__(self, pads, device, sys_clk_freq, cmd_timeout=5e-3, data_timeout=5e-3):
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
 
-        self.submodules.cfg   = cfg   = SDPHYCFG()
         self.submodules.cmdw  = cmdw  = SDPHYCMDW()
-        self.submodules.cmdr  = cmdr  = SDPHYCMDR(cfg)
+        self.submodules.cmdr  = cmdr  = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
         self.submodules.dataw = dataw = SDPHYDATAW()
-        self.submodules.datar = datar = SDPHYDATAR(cfg)
+        self.submodules.datar = datar = SDPHYDATAR(sys_clk_freq, data_timeout)
 
         # # #
 
