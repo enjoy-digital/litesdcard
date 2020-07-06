@@ -6,6 +6,7 @@ from functools import reduce
 from operator import or_
 
 from migen import *
+from migen.genlib.resetsync import AsyncResetSynchronizer
 from migen.genlib.cdc import MultiReg, PulseSynchronizer
 
 from litex.build.io import SDRInput, SDROutput
@@ -35,12 +36,13 @@ _sdpads_layout = [
 
 class SDPHYClocker(Module, AutoCSR):
     def __init__(self):
+        self.enable  = CSRStorage()
         self.divider = CSRStorage(8, reset=128)
 
         # # #
 
         self.clock_domains.cd_sd = ClockDomain()
-        self.comb += self.cd_sd.rst.eq(ResetSignal())
+        self.specials += AsyncResetSynchronizer(self.cd_sd, ~self.enable.storage)
 
         divider = Signal(8)
         self.sync += divider.eq(divider + 1)
