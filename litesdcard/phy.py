@@ -35,14 +35,17 @@ _sdpads_layout = [
 # SDCard PHY Clocker -------------------------------------------------------------------------------
 
 class SDPHYClocker(Module, AutoCSR):
-    def __init__(self):
+    def __init__(self, with_reset_synchronizer=True):
         self.enable  = CSRStorage()
         self.divider = CSRStorage(8, reset=128)
 
         # # #
 
         self.clock_domains.cd_sd = ClockDomain()
-        self.specials += AsyncResetSynchronizer(self.cd_sd, ~self.enable.storage)
+        if with_reset_synchronizer:
+            self.specials += AsyncResetSynchronizer(self.cd_sd, ~self.enable.storage)
+        else:
+            self.comb += self.cd_sd.rst.eq(~self.enable.storage)
 
         divider = Signal(8)
         self.sync += divider.eq(divider + 1)
@@ -213,10 +216,12 @@ class SDPHYCMDR(Module):
         fsm.act("WAIT",
             pads_out.clk.eq(1),
             NextValue(cmdr.reset, 0),
-            NextValue(timeout, timeout - 1),
             If(cmdr.source.valid,
                 NextState("CMD")
-            ).Elif(timeout == 0,
+            ),
+            NextValue(timeout, timeout - 1),
+            If(timeout == 0,
+                sink.ready.eq(1),
                 NextState("TIMEOUT")
             )
         )
@@ -230,15 +235,20 @@ class SDPHYCMDR(Module):
                 cmdr.source.ready.eq(1),
                 NextValue(count, count + 1),
                 If(source.last,
+                    sink.ready.eq(1),
                     If(sink.last,
                         NextValue(count, 0),
                         NextState("CLK8")
                     ).Else(
-                        sink.ready.eq(1),
                         NextState("IDLE")
                     )
                 )
-            )
+            ),
+            NextValue(timeout, timeout - 1),
+            If(timeout == 0,
+                sink.ready.eq(1),
+                NextState("TIMEOUT")
+            ),
         )
         fsm.act("CLK8",
             pads_out.clk.eq(1),
@@ -246,7 +256,6 @@ class SDPHYCMDR(Module):
             pads_out.cmd.o.eq(1),
             NextValue(count, count + 1),
             If(count == (8-1),
-                sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
@@ -255,7 +264,6 @@ class SDPHYCMDR(Module):
             source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             source.last.eq(1),
             If(source.valid & source.ready,
-                sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
@@ -413,7 +421,10 @@ class SDPHYDATAR(Module):
             NextValue(timeout, timeout - 1),
             If(datar.source.valid,
                 NextState("DATA")
-            ).Elif(timeout == 0,
+            ),
+            NextValue(timeout, timeout - 1),
+            If(timeout == 0,
+                sink.ready.eq(1),
                 NextState("TIMEOUT")
             )
         )
@@ -427,21 +438,25 @@ class SDPHYDATAR(Module):
                 datar.source.ready.eq(1),
                 NextValue(count, count + 1),
                 If(source.last,
+                    sink.ready.eq(1),
                     If(sink.last,
                         NextValue(count, 0),
                         NextState("CLK40")
                     ).Else(
-                        sink.ready.eq(1),
                         NextState("IDLE")
                     )
                 )
+            ),
+            NextValue(timeout, timeout - 1),
+            If(timeout == 0,
+                sink.ready.eq(1),
+                NextState("TIMEOUT")
             )
         )
         fsm.act("CLK40",
             pads_out.clk.eq(1),
             NextValue(count, count + 1),
             If(count == (40-1),
-                sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
@@ -450,7 +465,6 @@ class SDPHYDATAR(Module):
             source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             source.last.eq(1),
             If(source.valid & source.ready,
-                sink.ready.eq(1),
                 NextState("IDLE")
             )
         )
@@ -520,10 +534,11 @@ class SDPHYIOEmulator(Module):
 
 class SDPHY(Module, AutoCSR):
     def __init__(self, pads, device, sys_clk_freq, cmd_timeout=5e-3, data_timeout=5e-3):
+        use_emulator = hasattr(pads, "cmd_t") and hasattr(pads, "dat_t")
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
 
-        self.submodules.clocker = clocker = SDPHYClocker()
+        self.submodules.clocker = clocker = SDPHYClocker(with_reset_synchronizer=not use_emulator)
         self.submodules.init    = init    = SDPHYInit()
         self.submodules.cmdw    = cmdw    = SDPHYCMDW()
         self.submodules.cmdr    = cmdr    = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
@@ -535,10 +550,8 @@ class SDPHY(Module, AutoCSR):
         self.sdpads = sdpads = Record(_sdpads_layout)
 
         # IOs
-        if hasattr(pads, "cmd_t") and hasattr(pads, "dat_t"):
-            self.submodules.io = SDPHYIOEmulator(sdpads, pads)
-        else:
-            self.submodules.io = SDPHYIOGen(sdpads, pads)
+        sdphy_io_cls = SDPHYIOEmulator if use_emulator else SDPHYIOGen
+        self.submodules.io = sdphy_io_cls(sdpads, pads)
 
         # Connect pads_out of submodules to physical pads ----------------------------------------
         self.comb += [
