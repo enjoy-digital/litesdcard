@@ -17,8 +17,8 @@ from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
 
 class SDCore(Module, AutoCSR):
     def __init__(self, phy):
-        self.sink   = stream.Endpoint([("data", 32)])
-        self.source = stream.Endpoint([("data", 32)])
+        self.sink   = stream.Endpoint([("data", 8)])
+        self.source = stream.Endpoint([("data", 8)])
 
         self.cmd_argument = CSRStorage(32)
         self.cmd_command  = CSRStorage(32)
@@ -46,16 +46,8 @@ class SDCore(Module, AutoCSR):
         self.submodules.crc16_inserter = crc16_inserter = CRCUpstreamInserter()
         self.submodules.crc16_checker  = crc16_checker  = CRCDownstreamChecker()
 
-        self.submodules.upstream_converter   = stream.StrideConverter([('data', 32)], [('data', 8)], reverse=True)
-        self.submodules.downstream_converter = stream.StrideConverter([('data', 8)], [('data', 32)], reverse=True)
-
-        self.comb += [
-            self.sink.connect(self.upstream_converter.sink),
-            self.upstream_converter.source.connect(crc16_inserter.sink),
-
-            crc16_checker.source.connect(self.downstream_converter.sink),
-            self.downstream_converter.source.connect(self.source),
-        ]
+        self.comb += self.sink.connect(crc16_inserter.sink)
+        self.comb += crc16_checker.source.connect(self.source)
 
         cmd_type    = Signal(2)
         cmd_count   = Signal(3)
