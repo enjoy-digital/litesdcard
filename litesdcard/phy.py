@@ -473,8 +473,12 @@ class SDPHYDATAR(Module):
 
 class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
+        # Rst
+        if hasattr(sdcard_pads, "rst"):
+            self.comb += pads.rst.eq(0)
+
         # Clk
-        self.specials += SDROutput(i=sdpads.clk & ~ClockSignal("sd"), o=pads.clk)
+        self.specials += SDROutput(i=(sdpads.clk & ~ClockSignal("sd")), o=pads.clk)
 
         # Cmd
         self.specials += SDRTristate(
