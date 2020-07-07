@@ -9,7 +9,7 @@ from migen import *
 from migen.genlib.resetsync import AsyncResetSynchronizer
 from migen.genlib.cdc import MultiReg, PulseSynchronizer
 
-from litex.build.io import SDRInput, SDROutput
+from litex.build.io import SDRInput, SDROutput, SDRTristate
 
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
@@ -473,38 +473,30 @@ class SDPHYDATAR(Module):
 
 class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
-        # Data tristate
-        self.data_t = TSTriple(4)
-        self.specials += self.data_t.get_tristate(pads.data)
-
-        # Cmd tristate
-        self.cmd_t = TSTriple()
-        self.specials += self.cmd_t.get_tristate(pads.cmd)
-
-        # Clk domain feedback
-        if hasattr(pads, "clkfb"):
-            raise NotImplementedError
-
         # Clk output
         # FIXME: use DDR output for high clk freq but requires low latency or modification to the core.
         sdpads_clk = Signal()
         self.sync.sd += sdpads_clk.eq(sdpads.clk)
         self.comb += If(sdpads_clk, pads.clk.eq(~ClockSignal("sd")))
 
-        # Cmd output
-        self.sync.sd += self.cmd_t.oe.eq(sdpads.cmd.oe)
-        self.sync.sd += self.cmd_t.o.eq(sdpads.cmd.o)
+        # Cmd
+        self.specials += SDRTristate(
+            io  = pads.cmd,
+            o   = sdpads.cmd.o,
+            oe  = sdpads.cmd.oe,
+            i   = sdpads.cmd.i,
+            clk = ClockSignal("sd"),
+        )
 
-        # Cmd input
-        self.specials += SDRInput(self.cmd_t.i, sdpads.cmd.i, ClockSignal("sd"))
-
-        # Data output
-        self.sync += self.data_t.oe.eq(sdpads.data.oe)
-        self.sync += self.data_t.o.eq(sdpads.data.o)
-
-        # Data input
+        # Data
         for i in range(4):
-            self.specials += SDRInput(self.data_t.i[i], sdpads.data.i[i], ClockSignal("sd"))
+            self.specials += SDRTristate(
+                io  = pads.data[i],
+                o   = sdpads.data.o[i],
+                oe  = sdpads.data.oe,
+                i   = sdpads.data.i[i],
+                clk = ClockSignal("sd"),
+            )
 
 # SDCard PHY Emulator ------------------------------------------------------------------------------
 
