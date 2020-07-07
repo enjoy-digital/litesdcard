@@ -118,12 +118,12 @@ class SDCore(Module, AutoCSR):
                         NextValue(cmd_done, 1),
                         NextState("IDLE")
                     ).Else(
-                        NextState("CMD-RESPONSE-0"),
+                        NextState("CMD-RESPONSE"),
                     )
                 )
             )
         )
-        fsm.act("CMD-RESPONSE-0",
+        fsm.act("CMD-RESPONSE",
             phy.cmdr.sink.valid.eq(1),
             phy.cmdr.sink.last.eq(data_type == SDCARD_CTRL_DATA_TRANSFER_NONE),
             If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
@@ -131,11 +131,6 @@ class SDCore(Module, AutoCSR):
             ).Else(
                 phy.cmdr.sink.length.eq(6)  # 48bits
             ),
-            If(phy.cmdr.sink.valid & phy.cmdr.sink.ready,
-                NextState("CMD-RESPONSE-1")
-            )
-        )
-        fsm.act("CMD-RESPONSE-1",
             phy.cmdr.source.ready.eq(1),
             If(phy.cmdr.source.valid,
                 If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
@@ -145,7 +140,7 @@ class SDCore(Module, AutoCSR):
                     If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
                         NextState("DATA-WRITE")
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
-                        NextState("DATA-READ-0")
+                        NextState("DATA-READ")
                     ).Else(
                         NextState("IDLE")
                     ),
@@ -171,17 +166,11 @@ class SDCore(Module, AutoCSR):
                 )
             )
         )
-        fsm.act("DATA-READ-0",
+        fsm.act("DATA-READ",
             phy.datar.sink.valid.eq(1),
             phy.datar.sink.block_length.eq(block_length),
             phy.datar.sink.last.eq(data_count == (block_count - 1)),
-            If(phy.datar.sink.valid & phy.datar.sink.ready,
-                NextState("DATA-READ-1")
-            ),
-        )
-        fsm.act("DATA-READ-1",
-            phy.datar.source.ready.eq(1),
-            If(phy.datar.source.valid,
+             If(phy.datar.source.valid,
                 If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
                     phy.datar.source.connect(crc16_checker.sink, omit={"status"}),
                     If(phy.datar.source.last & phy.datar.source.ready,
@@ -189,7 +178,7 @@ class SDCore(Module, AutoCSR):
                         If(data_count == (block_count - 1),
                             NextState("IDLE")
                         ).Else(
-                            NextState("DATA-READ-0")
+                            NextState("DATA-READ")
                         )
                     )
                 ).Elif(phy.datar.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
