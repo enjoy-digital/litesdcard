@@ -51,7 +51,7 @@ class SDPHYClocker(Module, AutoCSR):
         self.sync += divider.eq(divider + 1)
 
         cases = {}
-        cases["default"] = self.cd_sd.clk.eq(ClockSignal())
+        cases["default"] = self.cd_sd.clk.eq(divider[0])
         for i in range(1, 8):
             cases[2**i] = self.cd_sd.clk.eq(divider[i-1])
         self.comb += Case(self.divider.storage, cases)
@@ -473,11 +473,8 @@ class SDPHYDATAR(Module):
 
 class SDPHYIOGen(Module):
     def __init__(self, sdpads, pads):
-        # Clk output
-        # FIXME: use DDR output for high clk freq but requires low latency or modification to the core.
-        sdpads_clk = Signal()
-        self.sync.sd += sdpads_clk.eq(sdpads.clk)
-        self.comb += If(sdpads_clk, pads.clk.eq(~ClockSignal("sd")))
+        # Clk
+        self.specials += SDROutput(i=sdpads.clk & ~ClockSignal("sd"), o=pads.clk)
 
         # Cmd
         self.specials += SDRTristate(
