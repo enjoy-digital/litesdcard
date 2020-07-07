@@ -1,7 +1,7 @@
 # This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # License: BSD
 
-"""Built In Self Test (BIST) modules for testing liteSDCard functionality."""
+"""Built In Self Test (BIST) modules for testing LiteSDCard functionality."""
 
 from functools import reduce
 from operator import xor
