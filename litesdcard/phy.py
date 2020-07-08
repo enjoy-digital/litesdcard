@@ -46,7 +46,7 @@ class SDPHYClocker(Module, AutoCSR):
         self.sync += clks.eq(clks + 1)
 
         cases = {}
-        for i in range(2, 8):
+        for i in range(1, 8):
             cases[2**i] = [
                 self.clk2x.eq(clks[i-1]),
                 self.clk.eq(clks[i]),
