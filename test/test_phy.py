@@ -55,11 +55,42 @@ class TestPHY(unittest.TestCase):
         dut = SDPHYClocker()
         run_simulation(dut, gen(dut))
 
-    def test_phyr_1b(self):
-        pass
+    def test_phyr_cmd(self):
+        def stim_gen(dut):
+            yield dut.pads_in.valid.eq(1)
+            #      ---s+0x55--0x00----0xff----0x00----
+            cmd = "---_-_-_-_-________--------________"
+            for i in range(len(cmd)):
+                yield dut.pads_in.cmd.i.eq(c2bool(cmd[i]))
+                yield
+        def check_gen(dut):
+            data = [0x55, 0x00, 0xff]
+            yield dut.source.ready.eq(1)
+            for i in range(len(data)):
+                while (yield dut.source.valid) == 0:
+                    yield
+                self.assertEqual(data[i], (yield dut.source.data))
+                yield
+        dut = SDPHYR(cmd=True)
+        run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
-    def test_phyr_4b(self):
-        pass
+    def test_phyr_data(self):
+        def stim_gen(dut):
+            data = [0xf, 0xf, 0x0, 0x5, 0xa, 0x5, 0x1, 0x2, 0x3]
+            yield dut.pads_in.valid.eq(1)
+            for i in range(len(data)):
+                yield dut.pads_in.data.i.eq(data[i])
+                yield
+        def check_gen(dut):
+            data = [0x5a, 0x51, 0x23]
+            yield dut.source.ready.eq(1)
+            for i in range(len(data)):
+                while (yield dut.source.valid) == 0:
+                    yield
+                self.assertEqual(data[i], (yield dut.source.data))
+                yield
+        dut = SDPHYR(data=True, data_width=4, skip_start_bit=True)
+        run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phyinit(self):
         pass
