@@ -91,7 +91,7 @@ class SDPHYR(Module):
 
 class SDPHYInit(Module, AutoCSR):
     def __init__(self):
-        self.initialize  = CSR()
+        self.initialize = CSR()
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
 

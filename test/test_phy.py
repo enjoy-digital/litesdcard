@@ -40,7 +40,6 @@ class TestPHY(unittest.TestCase):
         dut = SDPHYClocker()
         run_simulation(dut, gen(dut))
 
-
     def test_clocker_div8(self):
         def gen(dut):
             yield dut.divider.storage.eq(8)
@@ -93,7 +92,18 @@ class TestPHY(unittest.TestCase):
         run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phyinit(self):
-        pass
+        def gen(dut):
+            for n in range(4):
+                yield dut.initialize.re.eq(1)
+                yield
+                yield dut.initialize.re.eq(0)
+                yield dut.pads_out.ready.eq(1)
+                clk   = "_" + "-"*80 + "__"
+                for i in range(len(clk)):
+                    self.assertEqual(c2bool(clk[i]), (yield dut.pads_out.clk))
+                    yield
+        dut = SDPHYInit()
+        run_simulation(dut, [gen(dut)])
 
     def test_phycmdw(self):
         pass
