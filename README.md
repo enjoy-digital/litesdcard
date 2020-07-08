@@ -7,8 +7,8 @@
                                Copyright 2017-2020 / EnjoyDigital
                                Copyright 2017-2018 / LambdaConcept
 
-                            A small footprint and configurable SDCard core
-                                     powered by LiteX & Migen
+                            A small footprint and configurable SDCard
+                                    core powered by Migen & LiteX
 ```
 
 [![](https://travis-ci.com/enjoy-digital/litesdcard.svg?branch=master)](https://travis-ci.com/enjoy-digital/litesdcard) ![License](https://img.shields.io/badge/License-BSD%202--Clause-orange.svg)
