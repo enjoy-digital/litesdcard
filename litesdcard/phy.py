@@ -133,7 +133,7 @@ class SDPHYCMDW(Module):
         # # #
 
         count = Signal(8)
-        fsm = FSM(reset_state="IDLE")
+        fsm   = FSM(reset_state="IDLE")
         self.submodules += fsm
         fsm.act("IDLE",
             NextValue(count, 0),

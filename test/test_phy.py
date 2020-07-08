@@ -106,7 +106,25 @@ class TestPHY(unittest.TestCase):
         run_simulation(dut, [gen(dut)])
 
     def test_phycmdw(self):
-        pass
+        def stim_gen(dut):
+            data = [0x55, 0x00, 0xff]
+            yield dut.sink.valid.eq(1)
+            for i in range(len(data)):
+                yield dut.sink.data.eq(data[i])
+                while (yield dut.sink.ready) == 0:
+                    yield
+                yield
+        def check_gen(dut):
+            yield dut.pads_out.ready.eq(1)
+            #        ---0x55----0x00------0xff----
+            cmd_o  = "___-_-_-_-__________--------"
+            cmd_oe = "__--------_--------_--------"
+            for i in range(len(cmd_o)):
+                self.assertEqual(c2bool(cmd_o[i]),  (yield dut.pads_out.cmd.o))
+                self.assertEqual(c2bool(cmd_oe[i]), (yield dut.pads_out.cmd.oe))
+                yield
+        dut = SDPHYCMDW()
+        run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phycmdr(self):
         pass
