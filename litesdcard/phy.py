@@ -36,28 +36,26 @@ _sdpads_layout = [
 class SDPHYClocker(Module, AutoCSR):
     def __init__(self):
         self.divider = CSRStorage(8, reset=128)
+        self.clk     = Signal()
+        self.clk2x   = Signal()
         self.ce      = Signal()
 
         # # #
 
-        self.clock_domains.cd_sd   = ClockDomain(reset_less=True)
-        self.clock_domains.cd_sd2x = ClockDomain(reset_less=True)
-
-        clocks = Signal(8)
-        self.sync += clocks.eq(clocks + 1)
+        clks = Signal(8)
+        self.sync += clks.eq(clks + 1)
 
         cases = {}
         for i in range(2, 8):
             cases[2**i] = [
-                self.cd_sd2x.clk.eq(clocks[i-1]),
-                self.cd_sd.clk.eq(clocks[i]),
+                self.clk2x.eq(clks[i-1]),
+                self.clk.eq(clks[i]),
             ]
         self.comb += Case(self.divider.storage, cases)
 
-        sd_clk   = ClockSignal("sd")
-        sd_clk_d = Signal(2)
-        self.sync += sd_clk_d.eq(sd_clk)
-        self.sync += self.ce.eq(sd_clk & ~sd_clk_d)
+        clk_d = Signal(2)
+        self.sync += clk_d.eq(self.clk)
+        self.sync += self.ce.eq(self.clk & ~clk_d)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -456,41 +454,41 @@ class SDPHYDATAR(Module):
 # SDCard PHY IO ------------------------------------------------------------------------------------
 
 class SDPHYIOGen(Module):
-    def __init__(self, sdpads, pads):
+    def __init__(self, clocker, sdpads, pads):
         # Rst
         if hasattr(sdpads, "rst"):
             self.comb += pads.rst.eq(0)
 
         # Clk
         sdpads_clk = Signal()
-        self.sync.sd  += sdpads_clk.eq(sdpads.clk)
-        self.specials += SDROutput(i=(sdpads_clk & ClockSignal("sd")), o=pads.clk, clk=ClockSignal("sd2x"))
+        self.sync += If(clocker.ce, sdpads_clk.eq(sdpads.clk))
+        self.specials += SDROutput(i=(sdpads_clk & clocker.clk), o=pads.clk, clk=clocker.clk2x)
 
         # Cmd
         self.specials += SDRTristate(
+            clk = clocker.clk,
             io  = pads.cmd,
             o   = sdpads.cmd.o,
             oe  = sdpads.cmd.oe,
             i   = sdpads.cmd.i,
-            clk = ClockSignal("sd"),
         )
 
         # Data
         for i in range(4):
             self.specials += SDRTristate(
+                clk = clocker.clk,
                 io  = pads.data[i],
                 o   = sdpads.data.o[i],
                 oe  = sdpads.data.oe,
                 i   = sdpads.data.i[i],
-                clk = ClockSignal("sd"),
             )
 
 # SDCard PHY Emulator ------------------------------------------------------------------------------
 
 class SDPHYIOEmulator(Module):
-    def __init__(self, sdpads, pads):
+    def __init__(self, clocker, sdpads, pads):
         # Clk
-        self.comb += If(sdpads.clk, pads.clk.eq(~ClockSignal("sd")))
+        self.comb += If(sdpads.clk, pads.clk.eq(~clocker.clk))
 
         # Cmd
         self.comb += [
@@ -530,7 +528,7 @@ class SDPHY(Module, AutoCSR):
 
         # IOs
         sdphy_io_cls = SDPHYIOEmulator if use_emulator else SDPHYIOGen
-        self.submodules.io = sdphy_io_cls(sdpads, pads)
+        self.submodules.io = sdphy_io_cls(clocker, sdpads, pads)
 
         # Connect pads_out of submodules to physical pads ----------------------------------------
         self.comb += [
