@@ -127,7 +127,31 @@ class TestPHY(unittest.TestCase):
         run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phycmdr(self):
-        pass
+        def stim_gen(dut):
+            yield dut.pads_in.valid.eq(1)
+            #      ---s+0x55--0x00----0xff----0x00----
+            cmd = "---_-_-_-_-________--------________"
+            for i in range(len(cmd)):
+                yield dut.pads_in.cmd.i.eq(c2bool(cmd[i]))
+                yield
+        def check_gen(dut):
+            yield dut.pads_out.ready.eq(1)
+            yield dut.sink.valid.eq(1)
+            yield dut.sink.length.eq(3)
+            yield dut.source.ready.eq(1)
+            data = [0x55, 0x00, 0xff]
+            last = [0b0,  0b0,  0b1]
+            yield dut.source.ready.eq(1)
+            for i in range(len(data)):
+                while (yield dut.source.valid) == 0:
+                    yield
+                self.assertEqual(data[i], (yield dut.source.data))
+                self.assertEqual(last[i], (yield dut.source.last))
+                yield
+        cmdw = Module()
+        cmdw.done = 1
+        dut  = SDPHYCMDR(1e6, 5e-3, cmdw)
+        run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phycrc(self):
         pass

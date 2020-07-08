@@ -178,8 +178,8 @@ class SDPHYCMDR(Module):
     def __init__(self, sys_clk_freq, cmd_timeout, cmdw):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink    = sink   = stream.Endpoint([("length", 8)])
-        self.source  = source = stream.Endpoint([("data", 8), ("status", 3)])
+        self.sink     = sink     = stream.Endpoint([("length", 8)])
+        self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
@@ -292,7 +292,7 @@ class SDPHYDATAW(Module):
     def __init__(self):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink = sink = stream.Endpoint([("data", 8)])
+        self.sink     = sink     = stream.Endpoint([("data", 8)])
 
         # # #
 
@@ -371,8 +371,8 @@ class SDPHYDATAR(Module):
     def __init__(self, sys_clk_freq, data_timeout):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink   = sink   = stream.Endpoint([("block_length", 10)])
-        self.source = source = stream.Endpoint([("data", 8), ("status", 3)])
+        self.sink     = sink     = stream.Endpoint([("block_length", 10)])
+        self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
