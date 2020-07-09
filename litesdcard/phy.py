@@ -136,33 +136,31 @@ class SDPHYCMDW(Module):
 
         # # #
 
-        self.submodules.converter = converter = stream.Converter(8, 1, reverse=True)
-        self.comb += sink.connect(converter.sink)
-
-        count = Signal(3)
+        count = Signal(8)
         fsm   = FSM(reset_state="IDLE")
         self.submodules += fsm
         fsm.act("IDLE",
             NextValue(count, 0),
-            If(converter.source.valid & pads_out.ready,
+            If(sink.valid & pads_out.ready,
                 NextState("WRITE")
             ).Else(
                 self.done.eq(1),
             )
         )
         fsm.act("WRITE",
-            converter.source.ready.eq(pads_out.ready),
-            If(converter.source.valid,
-                pads_out.clk.eq(1),
-                pads_out.cmd.oe.eq(1),
-                pads_out.cmd.o.eq(converter.source.data),
-                If(converter.source.ready,
-                    If(converter.source.last,
+            pads_out.clk.eq(1),
+            pads_out.cmd.oe.eq(1),
+            Case(count, {i: pads_out.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
+            If(pads_out.ready,
+                NextValue(count, count + 1),
+                If(count == (8-1),
+                    If(sink.last,
                         NextState("CLK8")
+                    ).Else(
+                        sink.ready.eq(1),
+                        NextState("IDLE")
                     )
                 )
-            ).Else(
-                NextState("IDLE")
             )
         )
         fsm.act("CLK8",
