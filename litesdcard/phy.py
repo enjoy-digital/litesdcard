@@ -300,46 +300,41 @@ class SDPHYDATAW(Module):
 
         # # #
 
-        wrstarted = Signal()
-        count     = Signal(8)
+        count = Signal(8)
 
         crc = SDPHYCRCR() # FIXME: Report valid/errors to software.
         fsm = FSM(reset_state="IDLE")
         self.submodules += crc, fsm
         fsm.act("IDLE",
+            NextValue(count, 0),
             If(sink.valid & pads_out.ready,
-                pads_out.clk.eq(1),
-                pads_out.data.oe.eq(1),
-                If(pads_out.ready,
-                    If(wrstarted,
-                        pads_out.data.o.eq(sink.data[4:8]),
-                        NextState("DATA")
-                    ).Else(
-                        pads_out.data.o.eq(0),
-                        NextState("START")
-                    )
-                )
+                NextState("START")
             )
         )
         fsm.act("START",
             pads_out.clk.eq(1),
             pads_out.data.oe.eq(1),
-            pads_out.data.o.eq(sink.data[4:8]),
+            pads_out.data.o.eq(0),
             If(pads_out.ready,
-                NextValue(wrstarted, 1),
                 NextState("DATA")
             )
         )
         fsm.act("DATA",
             pads_out.clk.eq(1),
             pads_out.data.oe.eq(1),
-            pads_out.data.o.eq(sink.data[0:4]),
+            Case(count, {
+                0: pads_out.data.o.eq(sink.data[4:8]),
+                1: pads_out.data.o.eq(sink.data[0:4]),
+            }),
             If(pads_out.ready,
-                If(sink.last,
-                    NextState("STOP")
-                ).Else(
-                    sink.ready.eq(1),
-                    NextState("IDLE")
+                NextValue(count, count + 1),
+                If(count == (2-1),
+                    NextValue(count, 0),
+                    If(sink.last,
+                        NextState("STOP")
+                    ).Else(
+                        sink.ready.eq(1)
+                    )
                 )
             )
         )
@@ -348,7 +343,6 @@ class SDPHYDATAW(Module):
             pads_out.data.oe.eq(1),
             pads_out.data.o.eq(0b1111),
             If(pads_out.ready,
-                NextValue(wrstarted, 0),
                 crc.start.eq(1),
                 NextState("RESPONSE")
             )
@@ -356,15 +350,9 @@ class SDPHYDATAW(Module):
         fsm.act("RESPONSE",
             pads_out.clk.eq(1),
             If(pads_out.ready,
-                If(count < 16,
-                    NextValue(count, count + 1),
-                ).Else(
-                    # wait while busy
-                    If(pads_in.data.i[0],
-                        NextValue(count, 0),
-                        sink.ready.eq(1),
-                        NextState("IDLE")
-                    )
+                If(pads_in.data.i[0],
+                    sink.ready.eq(1),
+                    NextState("IDLE")
                 )
             )
         )
