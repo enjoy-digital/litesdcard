@@ -47,19 +47,19 @@ class SDPHYClocker(Module, AutoCSR):
 
         cases = {}
         cases["default"] = [
-            self.clk2x.eq(ClockSignal()),
+            self.clk2x.eq(~ClockSignal("sys")),
             self.clk.eq(clks[0]),
         ]
         for i in range(2, 8):
             cases[2**i] = [
-                self.clk2x.eq(clks[i-2]),
+                self.clk2x.eq(~clks[i-2]),
                 self.clk.eq(clks[i-1]),
             ]
         self.comb += Case(self.divider.storage, cases)
 
         clk_d = Signal(2)
         self.sync += clk_d.eq(self.clk)
-        self.sync += self.ce.eq(self.clk & ~clk_d)
+        self.comb += self.ce.eq(self.clk & ~clk_d)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -454,7 +454,11 @@ class SDPHYIOGen(Module):
         # Clk
         sdpads_clk = Signal()
         self.sync += If(clocker.ce, sdpads_clk.eq(sdpads.clk))
-        self.specials += SDROutput(i=(sdpads_clk & clocker.clk), o=pads.clk, clk=clocker.clk2x)
+        self.specials += SDROutput(
+            clk = clocker.clk2x,
+            i   = sdpads_clk & clocker.clk,
+            o   = pads.clk
+        )
 
         # Cmd
         self.specials += SDRTristate(
