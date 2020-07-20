@@ -47,12 +47,12 @@ class SDPHYClocker(Module, AutoCSR):
 
         cases = {}
         cases["default"] = [
-            self.clk2x.eq(~ClockSignal("sys")),
+            self.clk2x.eq(ClockSignal("sys")),
             self.clk.eq(clks[0]),
         ]
         for i in range(2, 8):
             cases[2**i] = [
-                self.clk2x.eq(~clks[i-2]),
+                self.clk2x.eq(clks[i-2]),
                 self.clk.eq(clks[i-1]),
             ]
         self.comb += Case(self.divider.storage, cases)
@@ -446,17 +446,19 @@ class SDPHYDATAR(Module):
 # SDCard PHY IO ------------------------------------------------------------------------------------
 
 class SDPHYIOGen(Module):
-    def __init__(self, clocker, sdpads, pads):
+    def __init__(self, clocker, sdpads, pads, register_clk=False):
         # Rst
         if hasattr(sdpads, "rst"):
             self.comb += pads.rst.eq(0)
 
         # Clk
+        self.clock_domains.cd_sd = ClockDomain()
+        self.comb += self.cd_sd.clk.eq(clocker.clk)
         sdpads_clk = Signal()
-        self.sync += If(clocker.ce, sdpads_clk.eq(sdpads.clk))
+        self.sync.sd += sdpads_clk.eq(sdpads.clk)
         self.specials += SDROutput(
             clk = clocker.clk2x,
-            i   = sdpads_clk & clocker.clk,
+            i   = (sdpads_clk if register_clk else sdpads.clk) & ~clocker.clk,
             o   = pads.clk
         )
 
@@ -482,7 +484,7 @@ class SDPHYIOGen(Module):
 # SDCard PHY Emulator ------------------------------------------------------------------------------
 
 class SDPHYIOEmulator(Module):
-    def __init__(self, clocker, sdpads, pads):
+    def __init__(self, clocker, sdpads, pads, register_clk=False):
         # Clk
         self.comb += If(sdpads.clk, pads.clk.eq(~clocker.clk))
 
@@ -524,7 +526,7 @@ class SDPHY(Module, AutoCSR):
 
         # IOs
         sdphy_io_cls = SDPHYIOEmulator if use_emulator else SDPHYIOGen
-        self.submodules.io = sdphy_io_cls(clocker, sdpads, pads)
+        self.submodules.io = sdphy_io_cls(clocker, sdpads, pads, register_clk="LFE5" in device)
 
         # Connect pads_out of submodules to physical pads ----------------------------------------
         self.comb += [
