@@ -16,7 +16,7 @@ class TestPHY(unittest.TestCase):
         def gen(dut):
             yield dut.divider.storage.eq(2)
             clk   = "_-_-_-_-_-_-_-_-"
-            clk2x = "----------------"
+            clk2x = "________________"
             ce    = "_-_-_-_-_-_-_-_-"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
@@ -30,7 +30,7 @@ class TestPHY(unittest.TestCase):
         def gen(dut):
             yield dut.divider.storage.eq(4)
             clk   = "__--__--__--__--"
-            clk2x = "-_-_-_-_-_-_-_-_"
+            clk2x = "_-_-_-_-_-_-_-_-"
             ce    = "__-___-___-___-_"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
@@ -44,7 +44,7 @@ class TestPHY(unittest.TestCase):
         def gen(dut):
             yield dut.divider.storage.eq(8)
             clk   = "____----____----"
-            clk2x = "--__--__--__--__"
+            clk2x = "__--__--__--__--"
             ce    = "____-_______-___"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
