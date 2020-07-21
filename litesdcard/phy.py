@@ -486,7 +486,7 @@ class SDPHYIOGen(Module):
 class SDPHYIOEmulator(Module):
     def __init__(self, clocker, sdpads, pads, register_clk=False):
         # Clk
-        self.comb += If(sdpads.clk, pads.clk.eq(~clocker.clk))
+        self.comb += If(sdpads.clk, pads.clk.eq(clocker.clk))
 
         # Cmd
         self.comb += [
