@@ -35,14 +35,14 @@ _sdpads_layout = [
 
 class SDPHYClocker(Module, AutoCSR):
     def __init__(self):
-        self.divider = CSRStorage(8)
+        self.divider = CSRStorage(9)
         self.clk     = Signal()
         self.clk2x   = Signal()
         self.ce      = Signal()
 
         # # #
 
-        clks = Signal(8)
+        clks = Signal(9)
         self.sync += clks.eq(clks + 1)
 
         cases = {}
@@ -50,7 +50,7 @@ class SDPHYClocker(Module, AutoCSR):
             self.clk2x.eq(ClockSignal("sys")),
             self.clk.eq(clks[0]),
         ]
-        for i in range(2, 8):
+        for i in range(2, 9):
             cases[2**i] = [
                 self.clk2x.eq(clks[i-2]),
                 self.clk.eq(clks[i-1]),
