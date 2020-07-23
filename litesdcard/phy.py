@@ -448,7 +448,7 @@ class SDPHYDATAR(Module):
 class SDPHYIOGen(Module):
     def __init__(self, clocker, sdpads, pads, register_clk=False):
         # Rst
-        if hasattr(sdpads, "rst"):
+        if hasattr(pads, "rst"):
             self.comb += pads.rst.eq(0)
 
         # Clk
