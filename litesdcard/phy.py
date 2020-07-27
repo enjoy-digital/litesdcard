@@ -8,7 +8,7 @@ from operator import or_
 from migen import *
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
-from litex.build.io import SDROutput, SDRTristate
+from litex.build.io import SDRTristate
 
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
@@ -35,9 +35,8 @@ _sdpads_layout = [
 
 class SDPHYClocker(Module, AutoCSR):
     def __init__(self):
-        self.divider = CSRStorage(9)
+        self.divider = CSRStorage(9, reset=256)
         self.clk     = Signal()
-        self.clk2x   = Signal()
         self.ce      = Signal()
 
         # # #
@@ -45,21 +44,20 @@ class SDPHYClocker(Module, AutoCSR):
         clks = Signal(9)
         self.sync += clks.eq(clks + 1)
 
+        clk_d = Signal()
+        self.sync += clk_d.eq(self.clk)
+
         cases = {}
         cases["default"] = [
-            self.clk2x.eq(ClockSignal("sys")),
-            self.clk.eq(clks[0]),
+            self.ce.eq(1),
+            self.clk.eq(ClockSignal("sys"))
         ]
-        for i in range(2, 9):
+        for i in range(1, 9):
             cases[2**i] = [
-                self.clk2x.eq(clks[i-2]),
-                self.clk.eq(clks[i-1]),
+                self.ce.eq(self.clk & ~clk_d),
+                self.clk.eq(clks[i-1])
             ]
         self.comb += Case(self.divider.storage, cases)
-
-        clk_d = Signal(2)
-        self.sync += clk_d.eq(self.clk)
-        self.comb += self.ce.eq(self.clk & ~clk_d)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -452,15 +450,12 @@ class SDPHYIOGen(Module):
             self.comb += pads.rst.eq(0)
 
         # Clk
-        self.clock_domains.cd_sd = ClockDomain()
-        self.comb += self.cd_sd.clk.eq(clocker.clk)
+        # Generated without IO primitive since seems to be the best for simplificy/portability, generally
+        # not recommended, but works fine at the frequencies used with SDCard and avoid complex code to
+        # compensate latency differences between vendor's primitives.
         sdpads_clk = Signal()
-        self.sync.sd += sdpads_clk.eq(sdpads.clk)
-        self.specials += SDROutput(
-            clk = clocker.clk2x,
-            i   = (sdpads_clk if register_clk else sdpads.clk) & ~clocker.clk,
-            o   = pads.clk
-        )
+        self.sync += If(clocker.ce, sdpads_clk.eq(sdpads.clk))
+        self.comb += pads.clk.eq((sdpads_clk if register_clk else sdpads.clk) & ~clocker.clk)
 
         # Cmd
         self.specials += SDRTristate(
@@ -486,7 +481,7 @@ class SDPHYIOGen(Module):
 class SDPHYIOEmulator(Module):
     def __init__(self, clocker, sdpads, pads, register_clk=False):
         # Clk
-        self.comb += If(sdpads.clk, pads.clk.eq(clocker.clk))
+        self.comb += If(sdpads.clk, pads.clk.eq(~clocker.clk))
 
         # Cmd
         self.comb += [
