@@ -7,16 +7,16 @@ import os
 import argparse
 
 from migen import *
-from migen.genlib.cdc import MultiReg
 
 from litex.build.generic_platform import *
 
 from litex_boards.platforms import trellisboard
 from litex_boards.targets.trellisboard import BaseSoC
 
-from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
 from litex.soc.integration.builder import *
+
+from sampler import Sampler
 
 # BenchSoC -----------------------------------------------------------------------------------------
 
@@ -58,61 +58,6 @@ class BenchSoC(BaseSoC):
                 )
             ]
             self.platform.add_extension(_la_pmod_ios)
-            class Sampler(Module, AutoCSR):
-                def __init__(self, pads):
-                    self.enable        = CSRStorage()
-                    self.state         = CSRStatus(fields=[
-                        CSRField("idle",    offset=0),
-                        CSRField("trigger", offset=1),
-                        CSRField("capture", offset=2),
-                    ])
-                    self.trig_value          = CSRStorage(8)
-                    self.trig_mask           = CSRStorage(8)
-                    self.sample_count        = CSRStorage(32)
-                    self.sample_downsampling = CSRStorage(16, reset=1)
-                    self.source              = stream.Endpoint([("data", 8)])
-
-                    # # #
-
-                    # Resynchronize data in sys_clk domain.
-                    data = Signal(8)
-                    self.specials += MultiReg(pads, data, n=2)
-
-                    # Main FSM.
-                    count        = Signal(32)
-                    downsampling = Signal(16)
-                    fsm   = FSM(reset_state="IDLE")
-                    fsm   = ResetInserter()(fsm)
-                    self.submodules += fsm
-                    self.comb += fsm.reset.eq(~self.enable.storage)
-                    fsm.act("IDLE",
-                        self.state.fields.idle.eq(1),
-                        NextValue(count, 0),
-                        NextValue(downsampling, 0),
-                        NextState("TRIGGER")
-                    )
-                    fsm.act("TRIGGER",
-                        self.state.fields.trigger.eq(1),
-                        If((data & self.trig_mask.storage) == (self.trig_value.storage & self.trig_mask.storage),
-                            NextState("CAPTURE")
-                        )
-                    )
-                    fsm.act("CAPTURE",
-                        self.state.fields.capture.eq(1),
-                        If(downsampling == (self.sample_downsampling.storage - 1),
-                            self.source.valid.eq(1),
-                            NextValue(downsampling, 0)
-                        ).Else(
-                            NextValue(downsampling, downsampling + 1)
-                        ),
-                        self.source.data.eq(data),
-                        If(self.source.valid & self.source.ready,
-                            NextValue(count, count + 1),
-                            If(count == (self.sample_count.storage - 1),
-                                NextState("IDLE")
-                            )
-                        )
-                    )
             self.submodules.sampler = Sampler(self.platform.request("la_pmod"))
             self.add_csr("sampler")
 
@@ -171,12 +116,13 @@ class BenchPHY(BaseSoC):
 
 def main():
     parser = argparse.ArgumentParser(description="LiteSDCard Bench on Trellis Board")
-    parser.add_argument("--bench", default="soc",       help="Bench: soc (default) or phy")
-    parser.add_argument("--build", action="store_true", help="Build bitstream")
-    parser.add_argument("--load",  action="store_true", help="Load bitstream")
+    parser.add_argument("--bench",        default="soc",       help="Bench: soc (default) or phy")
+    parser.add_argument("--with-sampler", action="store_true", help="Add Sampler to Bench")
+    parser.add_argument("--build",        action="store_true", help="Build bitstream")
+    parser.add_argument("--load",         action="store_true", help="Load bitstream")
     args = parser.parse_args()
 
-    bench     = {"soc": BenchSoC, "phy": BenchPHY}[args.bench]()
+    bench     = {"soc": BenchSoC, "phy": BenchPHY}[args.bench](with_sampler=args.with_sampler)
     builder   = Builder(bench, csr_csv="csr.csv")
     builder.build(run=args.build)
 
