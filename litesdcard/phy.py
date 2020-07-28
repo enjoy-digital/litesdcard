@@ -472,6 +472,26 @@ class SDPHYIOGen(Module):
                 i   = sdpads.data.i[i],
             )
 
+        # Direction (optional)
+        if hasattr(pads, "cmd_dir"):
+            self.specials += [
+                SDROutput(
+                    clk = ClockSignal(),
+                    i   = sdpads.cmd.oe,
+                    o   = pads.cmd_dir,
+                ),
+                SDROutput(
+                    clk = ClockSignal(),
+                    i   = sdpads.data.oe,
+                    o   = pads.dat0_dir,
+                ),
+                SDROutput(
+                    clk = ClockSignal(),
+                    i   = sdpads.data.oe,
+                    o   = pads.dat13_dir,
+                )
+            ]
+
 # SDCard PHY Emulator ------------------------------------------------------------------------------
 
 class SDPHYIOEmulator(Module):
