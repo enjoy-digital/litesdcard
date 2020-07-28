@@ -30,6 +30,7 @@ class BenchSoC(BaseSoC):
         # SDCard on PMODD with Digilent's Pmod MicroSD ---------------------------------------------
         self.platform.add_extension(arty._sdcard_pmod_io)
         self.add_sdcard("sdcard")
+        self.add_constant("SDCARD_CLK_FREQ", 25000000)
 
         if with_sampler:
             # Etherbone ----------------------------------------------------------------------------
