@@ -18,6 +18,7 @@ from litex.soc.interconnect import stream
 class Sampler(Module, AutoCSR):
     def __init__(self, pads):
         self.enable        = CSRStorage()
+        self.pattern       = CSRStorage()
         self.state         = CSRStatus(fields=[
             CSRField("idle",    offset=0),
             CSRField("trigger", offset=1),
@@ -32,8 +33,22 @@ class Sampler(Module, AutoCSR):
         # # #
 
         # Resynchronize data in sys_clk domain.
+        data_pads = Signal(8)
+        self.specials += MultiReg(pads, data_pads, n=2)
+
+        # Generate data pattern.
+        data_pattern = Signal(8)
+        self.sync += data_pattern.eq(data_pattern + 1)
+
+        # Select data.
         data = Signal(8)
-        self.specials += MultiReg(pads, data, n=2)
+        self.sync += [
+            If(self.pattern.storage,
+                data.eq(data_pads)
+            ).Else(
+                data.eq(data_pattern)
+            )
+        ]
 
         # Main FSM.
         count        = Signal(32)
@@ -76,10 +91,11 @@ class Sampler(Module, AutoCSR):
 if __name__ == '__main__':
     from litex import RemoteClient
     parser = argparse.ArgumentParser()
-    parser.add_argument("--value",        default="0",   help="Trigger Value.")
-    parser.add_argument("--mask",         default="0",   help="Trigger Mask.")
-    parser.add_argument("--count",        default="1e6", help="Sample Count.")
-    parser.add_argument("--downsampling", default="1",   help="Sample Downsampling.")
+    parser.add_argument("--value",        default="0",         help="Trigger Value.")
+    parser.add_argument("--mask",         default="0",         help="Trigger Mask.")
+    parser.add_argument("--count",        default="1e3",       help="Sample Count.")
+    parser.add_argument("--downsampling", default="1",         help="Sample Downsampling.")
+    parser.add_argument("--pattern",      action="store_true", help="Enable Pattern.")
     args = parser.parse_args()
 
     wb = RemoteClient()
@@ -94,6 +110,9 @@ if __name__ == '__main__':
             return int(float(s))
 
     class Sampler:
+        def set_pattern(self, enable):
+            wb.regs.sampler_pattern.write(enable)
+
         def run(self, trig_value=0, trig_mask=0, sample_count=int(1e6), sample_downsampling=1):
             # Disable Sampler
             wb.regs.sampler_enable.write(0)
@@ -121,7 +140,11 @@ if __name__ == '__main__':
                 f.write(data)
                 data_count += len(data)
 
+            # Disable Sampler
+            wb.regs.sampler_enable.write(0)
+
     sampler = Sampler()
+    sampler.set_pattern(int(args.pattern))
     sampler.run(
         trig_value          = num(args.value),
         trig_mask           = num(args.mask),
