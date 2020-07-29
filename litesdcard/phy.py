@@ -519,7 +519,7 @@ class SDPHYIOEmulator(Module):
 # SDCard PHY ---------------------------------------------------------------------------------------
 
 class SDPHY(Module, AutoCSR):
-    def __init__(self, pads, device, sys_clk_freq, cmd_timeout=5e-3, data_timeout=5e-3):
+    def __init__(self, pads, device, sys_clk_freq, cmd_timeout=10e-3, data_timeout=10e-3):
         use_emulator = hasattr(pads, "cmd_t") and hasattr(pads, "dat_t")
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
