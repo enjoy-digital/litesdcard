@@ -15,13 +15,13 @@ class SDBlock2MemDMA(Module, AutoCSR):
 
     Receive a stream of blocks and write it to memory through DMA.
     """
-    def __init__(self, bus, endianness):
+    def __init__(self, bus, endianness, fifo_depth=32):
         self.sink = stream.Endpoint([("data", 8)])
 
         # # #
 
         # Submodules
-        fifo      = stream.SyncFIFO([("data", 8)], 512)
+        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth)
         converter = stream.Converter(8, bus.data_width, reverse=True)
         self.submodules += fifo, converter
         self.submodules.dma  = WishboneDMAWriter(bus, with_csr=True, endianness=endianness)
@@ -40,7 +40,7 @@ class SDMem2BlockDMA(Module, AutoCSR):
 
     Read data from memory through DMA and generate a stream of blocks.
     """
-    def __init__(self, bus, endianness):
+    def __init__(self, bus, endianness, fifo_depth=32):
         self.source = stream.Endpoint([("data", 8)])
 
         # # #
@@ -48,7 +48,7 @@ class SDMem2BlockDMA(Module, AutoCSR):
         # Submodules
         self.submodules.dma = WishboneDMAReader(bus, with_csr=True, endianness=endianness)
         converter = stream.Converter(bus.data_width, 8, reverse=True)
-        fifo      = stream.SyncFIFO([("data", 8)], 512)
+        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth)
         self.submodules += converter, fifo
 
         # Flow
