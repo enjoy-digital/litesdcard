@@ -36,13 +36,14 @@ _sdpads_layout = [
 class SDPHYClocker(Module, AutoCSR):
     def __init__(self):
         self.divider = CSRStorage(9, reset=256)
+        self.stop    = Signal()
         self.clk     = Signal()
         self.ce      = Signal()
 
         # # #
 
         clks = Signal(9)
-        self.sync += clks.eq(clks + 1)
+        self.sync += If(~self.stop, clks.eq(clks + 1))
 
         clk   = Signal()
         clk_d = Signal()
@@ -292,6 +293,7 @@ class SDPHYDATAW(Module):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("data", 8)])
+        self.stop     = Signal()
 
         # # #
 
@@ -315,6 +317,7 @@ class SDPHYDATAW(Module):
             )
         )
         fsm.act("DATA",
+            self.stop.eq(~sink.valid),
             pads_out.clk.eq(1),
             pads_out.data.oe.eq(1),
             Case(count, {
@@ -360,6 +363,7 @@ class SDPHYDATAR(Module):
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("block_length", 10)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
+        self.stop     = Signal()
 
         # # #
 
@@ -401,17 +405,21 @@ class SDPHYDATAR(Module):
             source.status.eq(SDCARD_STREAM_STATUS_OK),
             source.last.eq(count == (sink.block_length + 8 - 1)), # 1 block + 64-bit CRC
             source.data.eq(datar.source.data),
-            If(source.valid & source.ready,
-                datar.source.ready.eq(1),
-                NextValue(count, count + 1),
-                If(source.last,
-                    sink.ready.eq(1),
-                    If(sink.last,
-                        NextValue(count, 0),
-                        NextState("CLK40")
-                    ).Else(
-                        NextState("IDLE")
+            If(source.valid,
+                If(source.ready,
+                    datar.source.ready.eq(1),
+                    NextValue(count, count + 1),
+                    If(source.last,
+                        sink.ready.eq(1),
+                        If(sink.last,
+                            NextValue(count, 0),
+                            NextState("CLK40")
+                        ).Else(
+                            NextState("IDLE")
+                        )
                     )
+                ).Else(
+                     self.stop.eq(1)
                 )
             ),
             NextValue(timeout, timeout - 1),
@@ -555,3 +563,7 @@ class SDPHY(Module, AutoCSR):
             self.comb += m.pads_in.valid.eq(self.clocker.ce)
             self.comb += m.pads_in.cmd.i.eq(sdpads.cmd.i)
             self.comb += m.pads_in.data.i.eq(sdpads.data.i)
+
+
+        # Speed Throttling -------------------------------------------------------------------------
+        self.comb += clocker.stop.eq(dataw.stop | datar.stop)
