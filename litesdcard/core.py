@@ -33,6 +33,7 @@ class SDCore(Module, AutoCSR):
 
         # # #
 
+        # Register Mapping -------------------------------------------------------------------------
         cmd_argument = self.cmd_argument.storage
         cmd_command  = self.cmd_command.storage
         cmd_send     = self.cmd_send.re
@@ -42,13 +43,14 @@ class SDCore(Module, AutoCSR):
         block_length = self.block_length.storage
         block_count  = self.block_count.storage
 
+        # CRC Inserter/Checkers --------------------------------------------------------------------
         self.submodules.crc7_inserter  = crc7_inserter  = CRC(9, 7, 40)
         self.submodules.crc16_inserter = crc16_inserter = CRCUpstreamInserter()
         self.submodules.crc16_checker  = crc16_checker  = CRCDownstreamChecker()
-
         self.comb += self.sink.connect(crc16_inserter.sink)
         self.comb += crc16_checker.source.connect(self.source)
 
+        # Cmd/Data Signals -------------------------------------------------------------------------
         cmd_type    = Signal(2)
         cmd_count   = Signal(3)
         cmd_done    = Signal()
@@ -83,6 +85,7 @@ class SDCore(Module, AutoCSR):
             crc7_inserter.enable.eq(1),
         ]
 
+        # Main FSM ---------------------------------------------------------------------------------
         self.submodules.fsm = fsm = FSM()
         fsm.act("IDLE",
             NextValue(cmd_done,   1),
@@ -170,7 +173,7 @@ class SDCore(Module, AutoCSR):
             phy.datar.sink.valid.eq(1),
             phy.datar.sink.block_length.eq(block_length),
             phy.datar.sink.last.eq(data_count == (block_count - 1)),
-             If(phy.datar.source.valid,
+            If(phy.datar.source.valid,
                 If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
                     phy.datar.source.connect(crc16_checker.sink, omit={"status"}),
                     If(phy.datar.source.last & phy.datar.source.ready,
