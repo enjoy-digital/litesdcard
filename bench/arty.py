@@ -21,7 +21,7 @@ from sampler import Sampler
 # BenchSoC -----------------------------------------------------------------------------------------
 
 class BenchSoC(BaseSoC):
-    def __init__(self, with_sampler=False, host_ip="192.168.1.100", host_udp_port=2000):
+    def __init__(self, with_sampler=False, with_analyzer=False, host_ip="192.168.1.100", host_udp_port=2000):
         platform = arty.Platform()
 
         # BenchSoC ---------------------------------------------------------------------------------
@@ -32,7 +32,7 @@ class BenchSoC(BaseSoC):
         self.add_sdcard("sdcard")
         self.add_constant("SDCARD_CLK_FREQ", 25000000)
 
-        if with_sampler:
+        if with_sampler or with_analyzer:
             # Etherbone ----------------------------------------------------------------------------
             from liteeth.phy.mii import LiteEthPHYMII
             self.submodules.ethphy = LiteEthPHYMII(
@@ -41,6 +41,7 @@ class BenchSoC(BaseSoC):
             self.add_csr("ethphy")
             self.add_etherbone(phy=self.ethphy)
 
+        if with_sampler:
             # PMODB Sampler (connected to PmodTPH2 with Pmode Cable Kit) ---------------------------
             _la_pmod_ios = [
                 ("la_pmod", 0, Pins(
@@ -83,6 +84,18 @@ class BenchSoC(BaseSoC):
             self.comb += udp_cdc.source.connect(udp_streamer.sink)
             self.comb += udp_streamer.source.connect(udp_port.sink)
 
+        if with_analyzer:
+            from litescope import LiteScopeAnalyzer
+            analyzer_signals = []
+            for m in ["init", "cmdw", "cmdr", "dataw", "datar"]:
+                analyzer_signals.append(getattr(self.sdphy, m).pads_in)
+                analyzer_signals.append(getattr(self.sdphy, m).pads_out)
+            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 1024,
+                clock_domain = "sys",
+                csr_csv      = "analyzer.csv")
+            self.add_csr("analyzer")
+
 # BenchPHY -----------------------------------------------------------------------------------------
 
 class BenchPHY(BaseSoC):
@@ -110,13 +123,17 @@ class BenchPHY(BaseSoC):
 
 def main():
     parser = argparse.ArgumentParser(description="LiteSDCard Bench on Trellis Board")
-    parser.add_argument("--bench",        default="soc",       help="Bench: soc (default) or phy")
-    parser.add_argument("--with-sampler", action="store_true", help="Add Sampler to Bench")
-    parser.add_argument("--build",        action="store_true", help="Build bitstream")
-    parser.add_argument("--load",         action="store_true", help="Load bitstream")
+    parser.add_argument("--bench",         default="soc",       help="Bench: soc (default) or phy")
+    parser.add_argument("--with-sampler",  action="store_true", help="Add Sampler to Bench")
+    parser.add_argument("--with-analyzer", action="store_true", help="Add Analyzer to Bench")
+    parser.add_argument("--build",         action="store_true", help="Build bitstream")
+    parser.add_argument("--load",          action="store_true", help="Load bitstream")
     args = parser.parse_args()
 
-    bench     = {"soc": BenchSoC, "phy": BenchPHY}[args.bench](with_sampler=args.with_sampler)
+    bench     = {"soc": BenchSoC, "phy": BenchPHY}[args.bench](
+        with_sampler  = args.with_sampler,
+        with_analyzer = args.with_analyzer,
+    )
     builder   = Builder(bench, csr_csv="csr.csv")
     builder.build(run=args.build)
 
