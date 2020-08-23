@@ -1,6 +1,9 @@
-# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
-# This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
-# License: BSD
+#
+# This file is part of LiteSDCard.
+#
+# Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
+# Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
 from migen.fhdl import verilog

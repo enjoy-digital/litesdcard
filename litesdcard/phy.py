@@ -1,6 +1,9 @@
-# This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
-# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
-# License: BSD
+#
+# This file is part of LiteSDCard.
+#
+# Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
+# SPDX-License-Identifier: BSD-2-Clause
 
 from functools import reduce
 from operator import or_

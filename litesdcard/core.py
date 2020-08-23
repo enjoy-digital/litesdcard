@@ -1,7 +1,10 @@
-# This file is Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
-# This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
-# This file is Copyright (c) 2018 bunnie <bunnie@kosagi.com>
-# License: BSD
+#
+# This file is part of LiteSDCard.
+#
+# Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
+# Copyright (c) 2018 bunnie <bunnie@kosagi.com>
+# SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
 from migen.genlib.cdc import MultiReg

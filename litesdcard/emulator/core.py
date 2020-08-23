@@ -1,6 +1,6 @@
-# This file is Copyright (c) 2017 Micah Elizabeth Scott
-# This file is Copyright (c) 2020 Florent Kermarrec <florent@enjoy-digital.fr>
-# License: BSD
+# Copyright (c) 2017 Micah Elizabeth Scott
+# Copyright (c) 2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# SPDX-License-Identifier: BSD-2-Clause
 
 import os
 
