@@ -258,54 +258,40 @@ class SDPHYCMDR(Module):
             )
         )
 
-# SDCard PHY CRC Response --------------------------------------------------------------------------
-
-class SDPHYCRCR(Module):
-    def __init__(self):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
-        self.start = Signal()
-        self.valid = Signal()
-        self.error = Signal()
-
-        # # #
-
-        crcr = SDPHYR(data=True, data_width=1, skip_start_bit=True)
-        self.comb += pads_in.connect(crcr.pads_in)
-        fsm = FSM(reset_state="IDLE")
-        self.submodules += crcr, fsm
-        fsm.act("IDLE",
-            If(self.start,
-                NextValue(crcr.reset, 1),
-                NextState("WAIT-CHECK")
-            )
-        )
-        fsm.act("WAIT-CHECK",
-            NextValue(crcr.reset, 0),
-            crcr.source.ready.eq(1),
-            If(crcr.source.valid,
-                self.valid.eq(crcr.source.data != 0b101),
-                self.error.eq(crcr.source.data == 0b101),
-                NextState("IDLE")
-            )
-        )
-
 # SDCard PHY Data Write ----------------------------------------------------------------------------
 
-class SDPHYDATAW(Module):
+class SDPHYDATAW(Module, AutoCSR):
     def __init__(self):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("data", 8)])
         self.stop     = Signal()
 
+        self.status   = CSRStatus(fields=[
+            CSRField("accepted",    size=1, offset=0),
+            CSRField("crc_error",   size=1, offset=1),
+            CSRField("write_error", size=1, offset=2),
+        ])
+
         # # #
 
         count = Signal(8)
 
-        crc = SDPHYCRCR() # FIXME: Report valid/errors to software.
-        fsm = FSM(reset_state="IDLE")
-        self.submodules += crc, fsm
+        accepted    = Signal()
+        crc_error   = Signal()
+        write_error = Signal()
+        self.comb += self.status.fields.accepted.eq(accepted)
+        self.comb += self.status.fields.crc_error.eq(crc_error)
+        self.comb += self.status.fields.write_error.eq(write_error)
+
+        self.submodules.crc = SDPHYR(data=True, data_width=1, skip_start_bit=True)
+        self.comb += self.crc.pads_in.eq(pads_in)
+
+        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
+            NextValue(accepted,    0),
+            NextValue(crc_error,   0),
+            NextValue(write_error, 0),
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
                 NextState("START")
@@ -344,17 +330,24 @@ class SDPHYDATAW(Module):
             pads_out.data.oe.eq(1),
             pads_out.data.o.eq(0b1111),
             If(pads_out.ready,
-                crc.start.eq(1),
-                NextState("RESPONSE")
+                self.crc.reset.eq(1),
+                NextState("CRC")
             )
         )
-        fsm.act("RESPONSE",
+        fsm.act("CRC",
             pads_out.clk.eq(1),
-            If(pads_out.ready,
-                If(pads_in.data.i[0],
-                    sink.ready.eq(1),
-                    NextState("IDLE")
-                )
+            If(self.crc.source.valid,
+                NextValue(accepted,    self.crc.source.data[5:] == 0b010),
+                NextValue(crc_error,   self.crc.source.data[5:] == 0b101),
+                NextValue(write_error, self.crc.source.data[5:] == 0b110),
+                NextState("BUSY")
+            )
+        )
+        fsm.act("BUSY",
+            pads_out.clk.eq(1),
+            If(pads_in.valid & pads_in.data.i[0],
+                sink.ready.eq(1),
+                NextState("IDLE")
             )
         )
 
