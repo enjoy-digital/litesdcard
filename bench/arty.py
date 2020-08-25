@@ -89,12 +89,19 @@ class BenchSoC(BaseSoC):
 
         if with_analyzer:
             from litescope import LiteScopeAnalyzer
-            analyzer_signals = []
-            for m in ["init", "cmdw", "cmdr", "dataw", "datar"]:
-                analyzer_signals.append(getattr(self.sdphy, m).pads_in)
-                analyzer_signals.append(getattr(self.sdphy, m).pads_out)
+            analyzer_signals = [
+                self.sdphy.sdpads,
+                self.sdphy.cmdw.sink,
+                self.sdphy.cmdr.sink,
+                self.sdphy.cmdr.source,
+                self.sdphy.dataw.sink,
+                self.sdphy.dataw.stop,
+                self.sdphy.datar.sink,
+                self.sdphy.datar.source,
+                self.sdphy.datar.stop,
+            ]
             self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 1024,
+                depth        = 2048,
                 clock_domain = "sys",
                 csr_csv      = "analyzer.csv")
             self.add_csr("analyzer")
