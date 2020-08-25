@@ -13,8 +13,8 @@ from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
 
 from litesdcard.common import *
-from litesdcard.crc import CRC, CRCChecker
-from litesdcard.crc import CRCDownstreamChecker, CRCUpstreamInserter
+from litesdcard.crc import CRC
+from litesdcard.crc import CRC16Checker, CRC16Inserter
 
 # SDCore -------------------------------------------------------------------------------------------
 
@@ -47,9 +47,9 @@ class SDCore(Module, AutoCSR):
         block_count  = self.block_count.storage
 
         # CRC Inserter/Checkers --------------------------------------------------------------------
-        self.submodules.crc7_inserter  = crc7_inserter  = CRC(9, 7, 40)
-        self.submodules.crc16_inserter = crc16_inserter = CRCUpstreamInserter()
-        self.submodules.crc16_checker  = crc16_checker  = CRCDownstreamChecker()
+        self.submodules.crc7_inserter  = crc7_inserter  = CRC(polynom=0x9, taps=7, dw=40)
+        self.submodules.crc16_inserter = crc16_inserter = CRC16Inserter()
+        self.submodules.crc16_checker  = crc16_checker  = CRC16Checker()
         self.comb += self.sink.connect(crc16_inserter.sink)
         self.comb += crc16_checker.source.connect(self.source)
 
@@ -78,13 +78,13 @@ class SDCore(Module, AutoCSR):
                 data_done,
                 data_error,
                 data_timeout,
-                ~crc16_checker.valid)),
-            crc7_inserter.val.eq(Cat(
+                0)), # FIXME data_response CRC.
+            crc7_inserter.din.eq(Cat(
                 cmd_argument,
                 cmd_command[8:14],
                 1,
                 0)),
-            crc7_inserter.clr.eq(1),
+            crc7_inserter.reset.eq(1),
             crc7_inserter.enable.eq(1),
         ]
 

@@ -1,8 +1,8 @@
 #
 # This file is part of LiteSDCard.
 #
-# Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
@@ -14,181 +14,120 @@ from litex.soc.interconnect.csr import *
 # CRC ----------------------------------------------------------------------------------------------
 
 class CRC(Module):
-    def __init__(self, poly, size, dw, init=0):
-        crcreg = [Signal(size, reset=init) for i in range(dw+1)]
-        self.val    = val = Signal(dw)
-        self.crc    = Signal(size)
-        self.clr    = Signal()
+    def __init__(self, polynom, taps, dw, init=0):
+        self.reset  = Signal()
         self.enable = Signal()
+        self.din    = Signal(dw)
+        self.crc    = Signal(taps)
 
+        # # #
+
+        reg = [Signal(taps, reset=init) for i in range(dw+1)]
+
+        # CRC LFSR
         for i in range(dw):
-            inv = val[dw-i-1] ^ crcreg[i][size-1]
-            tmp = []
-            tmp.append(inv)
-            for j in range(size -1):
-                if((poly >> (j + 1)) & 1):
-                    tmp.append(crcreg[i][j] ^ inv)
+            inv = self.din[dw-i-1] ^ reg[i][taps-1]
+            tmp = [inv]
+            for j in range(taps -1):
+                if((polynom >> (j + 1)) & 1):
+                    tmp.append(reg[i][j] ^ inv)
                 else:
-                    tmp.append(crcreg[i][j])
-            self.comb += crcreg[i+1].eq(Cat(*tmp))
+                    tmp.append(reg[i][j])
+            self.comb += reg[i+1].eq(Cat(*tmp))
 
-        self.sync += If(self.clr,
-            crcreg[0].eq(init)
-        ).Else(
-            If(self.enable,
-               crcreg[0].eq(crcreg[dw])
+        # Control
+        self.sync += [
+            If(self.reset,
+                reg[0].eq(init)
+            ).Else(
+                If(self.enable,
+                    reg[0].eq(reg[dw])
+                )
             )
-        )
-        self.comb += If(self.enable,
-            self.crc.eq(crcreg[dw])
-        ).Else(
-            self.crc.eq(crcreg[0])
-        )
-
-# CRCChecker ---------------------------------------------------------------------------------------
-
-class CRCChecker(Module):
-    def __init__(self, poly, size, dw, init=0):
-        self.submodules.subcrc = CRC(poly, size, dw, init=init)
-        self.val   = self.subcrc.val
-        self.check = Signal(size)
-        self.valid = Signal()
-
-        self.comb += [
-            self.subcrc.clr.eq(1),
-            self.subcrc.enable.eq(1),
-            self.valid.eq(self.subcrc.crc == self.check),
         ]
 
-# CRCDownstreamChecker -----------------------------------------------------------------------------
+        # Output
+        self.comb += [
+            If(self.enable,
+                self.crc.eq(reg[dw])
+            ).Else(
+                self.crc.eq(reg[0])
+            )
+        ]
 
-class CRCDownstreamChecker(Module):
+# CRC16Checker -------------------------------------------------------------------------------------
+
+class CRC16Inserter(Module):
     def __init__(self):
         self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8)])
 
         # # #
 
-        val    = Signal(8)
-        cnt    = Signal(4)
-        tmpcnt = Signal(10)
-        crcs   = [CRC(poly=0x1021, size=16, dw=2, init=0) for i in range(4)]
-        crctmp = [Signal(16) for i in range(4)]
-        self.valid = Signal()
+        count = Signal(3)
 
+        crcs  = [CRC(polynom=0x1021, taps=16, dw=2, init=0) for i in range(4)]
         for i in range(4):
             self.submodules += crcs[i]
-            self.sync += [
-                If(sink.ready & sink.valid,
-                    crctmp[i].eq(crcs[i].crc)
-                )
+            self.comb += [
+                crcs[i].reset.eq(source.valid & source.ready & source.last),
+                crcs[i].enable.eq(sink.valid & sink.ready),
+                crcs[i].din[0].eq(sink.data[4*0 + i]),
+                crcs[i].din[1].eq(sink.data[4*1 + i]),
             ]
 
-        fifo = [Signal(16) for i in range(4)]
-        self.comb += If((fifo[0] == crctmp[0]) &
-                        (fifo[1] == crctmp[1]) &
-                        (fifo[2] == crctmp[2]) &
-                        (fifo[3] == crctmp[3]),
-            self.valid.eq(1)
+        self.submodules.fsm = fsm = FSM(reset_state="DATA")
+        fsm.act("DATA",
+            NextValue(count, 0),
+            sink.connect(source, omit={"last"}),
+            source.last.eq(0),
+            If(sink.valid & sink.ready,
+                If(sink.last,
+                    NextState("CRC"),
+                )
+            )
+        )
+        cases = {}
+        for i in range(8):
+            cases[i] = [
+                source.data[0].eq(crcs[0].crc[2*(8-1-i) + 0]),
+                source.data[1].eq(crcs[1].crc[2*(8-1-i) + 0]),
+                source.data[2].eq(crcs[2].crc[2*(8-1-i) + 0]),
+                source.data[3].eq(crcs[3].crc[2*(8-1-i) + 0]),
+                source.data[4].eq(crcs[0].crc[2*(8-1-i) + 1]),
+                source.data[5].eq(crcs[1].crc[2*(8-1-i) + 1]),
+                source.data[6].eq(crcs[2].crc[2*(8-1-i) + 1]),
+                source.data[7].eq(crcs[3].crc[2*(8-1-i) + 1]),
+            ]
+        fsm.act("CRC",
+            source.valid.eq(1),
+            source.last.eq(count == (8-1)),
+            Case(count, cases),
+            If(source.valid & source.ready,
+                NextValue(count, count + 1),
+                If(source.last,
+                    NextState("DATA")
+                )
+            )
         )
 
-        for i in range(4):
-            self.sync += [
-                If(sink.valid & sink.ready,
-                    fifo[i].eq(Cat(sink.data[3-i], sink.data[7-i], fifo[i][0:14])),
-                    val[7-i].eq(fifo[i][13]),
-                    val[3-i].eq(fifo[i][12])
-                )
-            ]
-            self.comb += [
-                crcs[i].val.eq(Cat(val[3-i], val[7-i])),
-                crcs[i].enable.eq(sink.valid & sink.ready),
-                If(cnt == 7,
-                    crcs[i].clr.eq(1),
-                ).Else(
-                    crcs[i].clr.eq(0)
-                )
-            ]
+# CRC16Checker -------------------------------------------------------------------------------------
 
-        self.sync += [
-            If(sink.valid & sink.ready,
-               If(sink.last,
-                   cnt.eq(0)
-               ).Elif(cnt != 10,
-                   cnt.eq(cnt + 1)
-               )
-            )
-        ]
-
-        self.comb += [
-            source.data.eq(val),
-            If(sink.valid & (cnt > 7),
-                source.valid.eq(1)
-            ),
-            If(cnt < 8,
-                sink.ready.eq(1)
-            ).Else(
-                sink.ready.eq(source.ready)
-            ),
-            source.last.eq(sink.last)
-        ]
-
-# CRCUpstreamChecker -------------------------------------------------------------------------------
-
-class CRCUpstreamInserter(Module):
+class CRC16Checker(Module):
+    # TODO: currently only removing CRC block, add check using CRC16Inserter
     def __init__(self):
         self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8)])
 
-        crc  = Signal(8)
-        cnt  = Signal(3)
-        crcs = [CRC(poly=0x1021, size=16, dw=2, init=0) for i in range(4)]
+        # # #
 
-        crctmp = [Signal(16) for i in range(4)]
-        for i in range(4):
-            self.submodules += crcs[i]
-            self.comb += [
-                crcs[i].val.eq(Cat(sink.data[i], sink.data[i+4])),
-                crcs[i].clr.eq(sink.last & sink.valid & sink.ready),
-                crcs[i].enable.eq(sink.valid & sink.ready)
-            ]
-
-        cases = {}
-        for i in range(8):
-            crclist = []
-            for j in range(2):
-                for k in range(4):
-                    crclist.append(crctmp[k][2*(7-i) +j])
-
-            cases[i] = source.data.eq(Cat(*crclist))
-
-        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
-        crctmpsync = [NextValue(crctmp[i], crcs[i].crc) for i in range(4)]
-
-        fsm.act("IDLE",
-            source.data.eq(sink.data),
-            source.valid.eq(sink.valid),
-            sink.ready.eq(source.ready),
-            source.last.eq(0),
-            *crctmpsync,
-            If(sink.valid & sink.last & sink.ready,
-                NextState("SENDCRC"),
-                NextValue(cnt, 0)
-            )
-        )
-
-        fsm.act("SENDCRC",
-            sink.ready.eq(0),
-            source.valid.eq(1),
-            If(cnt == 7,
-                source.last.eq(1),
-            ),
-            Case(cnt, cases),
-            If(source.ready,
-                If(cnt == 7,
-                    NextState("IDLE")
-                ).Else(
-                    NextValue(cnt, cnt+1)
-                )
-            )
-        )
+        fifo = stream.SyncFIFO([("data", 8)], 16)
+        fifo = ResetInserter()(fifo)
+        self.submodules += fifo
+        self.comb += [
+            sink.connect(fifo.sink),
+            fifo.source.connect(source, omit={"valid", "ready"}),
+            source.valid.eq(fifo.level >= 8),
+            fifo.source.ready.eq(source.valid & source.ready),
+            fifo.reset.eq(sink.valid & sink.ready & sink.last),
+        ]
