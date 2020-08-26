@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import unittest
+import random
 
 from migen import *
 
@@ -42,25 +43,36 @@ def dats2bytes(dats):
     return _b
 
 class TestCRC(unittest.TestCase):
-    def crc_inserter_test(self, data, crc):
+    def crc_inserter_test(self, data, crc,
+        valid_random=50,
+        ready_random=50):
         def stim_gen(dut):
-            yield
-            yield dut.sink.valid.eq(1)
+            prng = random.Random(42)
             for i in range(len(data)):
+                while prng.randrange(100) < valid_random:
+                    yield
+                yield dut.sink.valid.eq(1)
                 if (i == len(data) - 1):
                     yield dut.sink.last.eq(1)
                 yield dut.sink.data.eq(data[i])
                 yield
-            yield dut.sink.valid.eq(0)
-            yield dut.sink.last.eq(0)
+                while (yield dut.sink.ready) == 0:
+                    yield
+                yield dut.sink.valid.eq(0)
+                yield dut.sink.last.eq(0)
             yield
 
         def check_gen(dut):
+            prng = random.Random(42)
             data_crc = data + dats2bytes(crc)
-            yield dut.source.ready.eq(1)
             for i in range(len(data_crc)):
+                yield dut.source.ready.eq(0)
+                yield
                 while (yield dut.source.valid) == 0:
                     yield
+                while prng.randrange(100) < ready_random:
+                    yield
+                yield dut.source.ready.eq(1)
                 #print("{:02x} vs {:02x}".format(data_crc[i], (yield dut.source.data)))
                 self.assertEqual(data_crc[i], (yield dut.source.data))
                 self.assertEqual((yield dut.source.last), int(i == len(data_crc) - 1))
