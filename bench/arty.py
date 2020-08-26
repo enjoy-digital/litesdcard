@@ -24,16 +24,22 @@ from sampler import Sampler
 # BenchSoC -----------------------------------------------------------------------------------------
 
 class BenchSoC(BaseSoC):
-    def __init__(self, with_sampler=False, with_analyzer=False, host_ip="192.168.1.100", host_udp_port=2000):
+    def __init__(self, variant="minimal", with_sampler=False, with_analyzer=False, host_ip="192.168.1.100", host_udp_port=2000):
         platform = arty.Platform()
 
         # BenchSoC ---------------------------------------------------------------------------------
-        BaseSoC.__init__(self, sys_clk_freq=int(100e6), integrated_rom_size=0x10000)
+        bench_kwargs = {
+            "minimal":  dict(cpu_variant="minimal", integrated_main_ram_size=0x1000),
+            "standard": dict(),
+        }[variant]
+        BaseSoC.__init__(self, sys_clk_freq=int(100e6),
+            integrated_rom_size=0x10000,
+            integrated_rom_mode = "rw",
+            **bench_kwargs)
 
         # SDCard on PMODD with Digilent's Pmod MicroSD ---------------------------------------------
         self.platform.add_extension(arty._sdcard_pmod_io)
         self.add_sdcard("sdcard")
-        self.add_constant("SDCARD_CLK_FREQ", 25000000)
 
         if with_sampler or with_analyzer:
             # Etherbone ----------------------------------------------------------------------------
@@ -96,9 +102,12 @@ class BenchSoC(BaseSoC):
                 self.sdphy.cmdr.source,
                 self.sdphy.dataw.sink,
                 self.sdphy.dataw.stop,
+                self.sdphy.dataw.crc.source,
+                self.sdphy.dataw.status.status,
                 self.sdphy.datar.sink,
                 self.sdphy.datar.source,
-                self.sdphy.datar.stop,
+                self.sdphy.clocker.ce,
+                self.sdphy.clocker.stop,
             ]
             self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 2048,
@@ -129,18 +138,35 @@ class BenchPHY(BaseSoC):
             )
         ]
 
+# SoC Ctrl -----------------------------------------------------------------------------------------
+
+class SoCCtrl:
+    @staticmethod
+    def reboot(wb):
+        wb.regs.ctrl_reset.write(1)
+
+    @staticmethod
+    def load_rom(wb, filename):
+        from litex.soc.integration.common import get_mem_data
+        rom_data = get_mem_data(filename, "little")
+        for i, data in enumerate(rom_data):
+            wb.write(wb.mems.rom.base + 4*i, data)
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="LiteSDCard Bench on Trellis Board")
     parser.add_argument("--bench",         default="soc",       help="Bench: soc (default) or phy")
+    parser.add_argument("--variant",       default="standard",  help="Bench variant")
     parser.add_argument("--with-sampler",  action="store_true", help="Add Sampler to Bench")
     parser.add_argument("--with-analyzer", action="store_true", help="Add Analyzer to Bench")
     parser.add_argument("--build",         action="store_true", help="Build bitstream")
     parser.add_argument("--load",          action="store_true", help="Load bitstream")
+    parser.add_argument("--load-bios",     action="store_true", help="Load BIOS over Etherbone and reboot SoC")
     args = parser.parse_args()
 
     bench     = {"soc": BenchSoC, "phy": BenchPHY}[args.bench](
+        variant       = args.variant,
         with_sampler  = args.with_sampler,
         with_analyzer = args.with_analyzer,
     )
@@ -150,6 +176,15 @@ def main():
     if args.load:
         prog = bench.platform.create_programmer()
         prog.load_bitstream(os.path.join(builder.gateware_dir, bench.build_name + ".bit"))
+
+    if args.load_bios:
+        from litex import RemoteClient
+        wb = RemoteClient()
+        wb.open()
+        ctrl = SoCCtrl()
+        ctrl.load_rom(wb, os.path.join(builder.software_dir, "bios", "bios.bin"))
+        ctrl.reboot(wb)
+        wb.close()
 
 if __name__ == "__main__":
     main()
