@@ -294,7 +294,20 @@ class SDPHYDATAW(Module, AutoCSR):
             NextValue(write_error, 0),
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
-                NextState("START")
+                NextState("CLK8")
+            )
+        )
+        # CHECKME: Understand why this is needed.
+        fsm.act("CLK8",
+            pads_out.clk.eq(1),
+            pads_out.cmd.oe.eq(1),
+            pads_out.cmd.o.eq(1),
+            If(pads_out.ready,
+                NextValue(count, count + 1),
+                If(count == (8-1),
+                    NextValue(count, 0),
+                    NextState("START")
+                )
             )
         )
         fsm.act("START",
