@@ -133,7 +133,7 @@ class SDCore(Module, AutoCSR):
             phy.cmdr.sink.valid.eq(1),
             phy.cmdr.sink.last.eq(data_type == SDCARD_CTRL_DATA_TRANSFER_NONE),
             If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
-                phy.cmdr.sink.length.eq(17) # 136bits
+                phy.cmdr.sink.length.eq(17+1) # 136bits + 8bit shift to expose expected 128-bit window to software
             ).Else(
                 phy.cmdr.sink.length.eq(6)  # 48bits
             ),
