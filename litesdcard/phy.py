@@ -412,6 +412,7 @@ class SDPHYDATAR(Module):
             pads_out.clk.eq(1),
             source.valid.eq(datar.source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
+            source.first.eq(count == 0),
             source.last.eq(count == (sink.block_length + 8 - 1)), # 1 block + 64-bit CRC
             source.data.eq(datar.source.data),
             If(source.valid,

@@ -28,11 +28,25 @@ class SDBlock2MemDMA(Module, AutoCSR):
         fifo      = stream.SyncFIFO([("data", 8)], fifo_depth)
         converter = stream.Converter(8, bus.data_width, reverse=True)
         self.submodules += fifo, converter
-        self.submodules.dma  = WishboneDMAWriter(bus, with_csr=True, endianness=endianness)
+        self.submodules.dma = WishboneDMAWriter(bus, with_csr=True, endianness=endianness)
 
         # Flow
+        start   = Signal()
+        connect = Signal()
+        self.comb += start.eq(self.sink.valid & self.sink.first)
+        self.sync += [
+            If(~self.dma._enable.storage,
+                connect.eq(0)
+            ).Elif(start,
+                connect.eq(1)
+            )
+        ]
         self.comb += [
-            self.sink.connect(fifo.sink),
+            If(self.dma._enable.storage & (start | connect),
+                self.sink.connect(fifo.sink)
+            ).Else(
+                self.sink.ready.eq(1)
+            ),
             fifo.source.connect(converter.sink),
             converter.source.connect(self.dma.sink),
         ]
