@@ -155,7 +155,7 @@ class SoCCtrl:
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="LiteSDCard Bench on Trellis Board")
+    parser = argparse.ArgumentParser(description="LiteSDCard Bench on Arty")
     parser.add_argument("--bench",         default="soc",       help="Bench: soc (default) or phy")
     parser.add_argument("--variant",       default="standard",  help="Bench variant")
     parser.add_argument("--with-sampler",  action="store_true", help="Add Sampler to Bench")
