@@ -577,3 +577,9 @@ class SDPHY(Module, AutoCSR):
 
         # Speed Throttling -------------------------------------------------------------------------
         self.comb += clocker.stop.eq(dataw.stop | datar.stop)
+
+        # IRQs -------------------------------------------------------------------------------------
+        self.card_detect_irq = Signal() # Generate Card Detect IRQ on level change.
+        card_detect_d = Signal()
+        self.sync += card_detect_d.eq(self.card_detect.status)
+        self.sync += self.card_detect_irq.eq(self.card_detect.status ^ card_detect_d)
