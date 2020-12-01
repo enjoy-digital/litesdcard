@@ -21,6 +21,7 @@ class SDBlock2MemDMA(Module, AutoCSR):
     def __init__(self, bus, endianness, fifo_depth=32):
         self.bus  = bus
         self.sink = stream.Endpoint([("data", 8)])
+        self.irq  = Signal()
 
         # # #
 
@@ -51,6 +52,11 @@ class SDBlock2MemDMA(Module, AutoCSR):
             converter.source.connect(self.dma.sink),
         ]
 
+        # IRQ / Generate IRQ on DMA done rising edge
+        done_d = Signal()
+        self.sync += done_d.eq(self.dma._done.status)
+        self.sync += self.irq.eq(self.dma._done.status & ~done_d)
+
 # SD Mem2Block DMA ---------------------------------------------------------------------------------
 
 class SDMem2BlockDMA(Module, AutoCSR):
@@ -61,6 +67,7 @@ class SDMem2BlockDMA(Module, AutoCSR):
     def __init__(self, bus, endianness, fifo_depth=32):
         self.bus    = bus
         self.source = stream.Endpoint([("data", 8)])
+        self.irq    = Signal()
 
         # # #
 
@@ -76,3 +83,8 @@ class SDMem2BlockDMA(Module, AutoCSR):
             converter.source.connect(fifo.sink),
             fifo.source.connect(self.source),
         ]
+
+        # IRQ / Generate IRQ on DMA done rising edge
+        done_d = Signal()
+        self.sync += done_d.eq(self.dma._done.status)
+        self.sync += self.irq.eq(self.dma._done.status & ~done_d)
