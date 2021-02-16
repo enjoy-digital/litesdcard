@@ -143,6 +143,7 @@ class SDCore(Module, AutoCSR):
                     NextValue(cmd_timeout, 1),
                     NextState("IDLE")
                 ).Elif(phy.cmdr.source.last,
+                    NextValue(cmd_done, 1),
                     If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
                         NextState("DATA-WRITE")
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
