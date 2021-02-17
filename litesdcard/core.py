@@ -117,7 +117,7 @@ class SDCore(Module, AutoCSR):
                     phy.cmdw.sink.last.eq(cmd_type == SDCARD_CTRL_RESPONSE_NONE)]
                }
             ),
-            If(phy.cmdw.sink.valid & phy.cmdw.sink.ready,
+            If(phy.cmdw.sink.ready,
                 NextValue(cmd_count, cmd_count + 1),
                 If(cmd_count == (6-1),
                     If(cmd_type == SDCARD_CTRL_RESPONSE_NONE,
@@ -143,6 +143,7 @@ class SDCore(Module, AutoCSR):
                     NextValue(cmd_timeout, 1),
                     NextState("IDLE")
                 ).Elif(phy.cmdr.source.last,
+                    NextValue(cmd_done, 1),
                     If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
                         NextState("DATA-WRITE")
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
