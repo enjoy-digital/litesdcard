@@ -117,7 +117,7 @@ class SDCore(Module, AutoCSR):
                     phy.cmdw.sink.last.eq(cmd_type == SDCARD_CTRL_RESPONSE_NONE)]
                }
             ),
-            If(phy.cmdw.sink.valid & phy.cmdw.sink.ready,
+            If(phy.cmdw.sink.ready,
                 NextValue(cmd_count, cmd_count + 1),
                 If(cmd_count == (6-1),
                     If(cmd_type == SDCARD_CTRL_RESPONSE_NONE,
