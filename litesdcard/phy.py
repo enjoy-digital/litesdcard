@@ -253,7 +253,7 @@ class SDPHYCMDR(Module):
             source.valid.eq(1),
             source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             source.last.eq(1),
-            If(source.valid & source.ready,
+            If(source.ready,
                 NextState("IDLE")
             )
         )
@@ -387,12 +387,10 @@ class SDPHYDATAR(Module):
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
                 pads_out.clk.eq(1),
-                If(pads_out.ready,
-                    NextValue(timeout, timeout.reset),
-                    NextValue(count, 0),
-                    NextValue(datar.reset, 1),
-                    NextState("WAIT")
-                )
+                NextValue(timeout, timeout.reset),
+                NextValue(count, 0),
+                NextValue(datar.reset, 1),
+                NextState("WAIT")
             )
         )
         fsm.act("WAIT",
@@ -451,7 +449,7 @@ class SDPHYDATAR(Module):
             source.valid.eq(1),
             source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             source.last.eq(1),
-            If(source.valid & source.ready,
+            If(source.ready,
                 NextState("IDLE")
             )
         )
