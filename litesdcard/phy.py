@@ -129,7 +129,7 @@ class SDPHYCMDW(Module):
     def __init__(self):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink     = sink     = stream.Endpoint([("data", 8)])
+        self.sink     = sink     = stream.Endpoint([("data", 8), ("cmd_type", 2)])
 
         self.done = Signal()
 
@@ -153,7 +153,7 @@ class SDPHYCMDW(Module):
             If(pads_out.ready,
                 NextValue(count, count + 1),
                 If(count == (8-1),
-                    If(sink.last,
+                    If(sink.last & (sink.cmd_type == SDCARD_CTRL_RESPONSE_NONE),
                         NextState("CLK8")
                     ).Else(
                         sink.ready.eq(1),
@@ -181,7 +181,7 @@ class SDPHYCMDR(Module):
     def __init__(self, sys_clk_freq, cmd_timeout, cmdw):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink     = sink     = stream.Endpoint([("length", 8)])
+        self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("data_type", 2), ("length", 8)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
@@ -224,7 +224,7 @@ class SDPHYCMDR(Module):
                 NextValue(count, count + 1),
                 If(source.last,
                     sink.ready.eq(1),
-                    If(sink.last,
+                    If(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
                         NextState("CLK8")
                     ).Else(

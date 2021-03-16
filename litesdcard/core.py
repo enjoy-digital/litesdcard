@@ -67,18 +67,23 @@ class SDCore(Module, AutoCSR):
         data_timeout = Signal()
 
         self.comb += [
+            # Decode type of Cmd/Data from Register.
             cmd_type.eq(cmd_command[0:2]),
             data_type.eq(cmd_command[5:7]),
-            cmd_event.eq(Cat(
-                cmd_done,
-                cmd_error,
-                cmd_timeout,
-                0)), # FIXME cmd_response CRC.
-            data_event.eq(Cat(
-                data_done,
-                data_error,
-                data_timeout,
-                0)), # FIXME data_response CRC.
+
+            # Encode Cmd Event to Register. FIXME: Use CSRField.
+            cmd_event[0].eq(cmd_done),
+            cmd_event[1].eq(cmd_error),
+            cmd_event[2].eq(cmd_timeout),
+            cmd_event[3].eq(0), # FIXME Add Cmd Response CRC.
+
+            # Encode Data Event to Register. FIXME: Use CSRField.
+            data_event[0].eq(data_done),
+            data_event[1].eq(data_error),
+            data_event[2].eq(data_timeout),
+            data_event[3].eq(0), # FIXME Add Data Response CRC.
+
+            # Prepare CRCInserter Data.
             crc7_inserter.din.eq(Cat(
                 cmd_argument,
                 cmd_command[8:14],
@@ -91,38 +96,47 @@ class SDCore(Module, AutoCSR):
         # Main FSM ---------------------------------------------------------------------------------
         self.submodules.fsm = fsm = FSM()
         fsm.act("IDLE",
+            # Set Cmd/Data Done and clear Count.
             NextValue(cmd_done,   1),
             NextValue(data_done,  1),
             NextValue(cmd_count,  0),
             NextValue(data_count, 0),
+            # Wait for a valid Cmd.
             If(cmd_send,
+                # Clear Cmd/Data Done/Error/Timeout.
                 NextValue(cmd_done,     0),
                 NextValue(cmd_error,    0),
                 NextValue(cmd_timeout,  0),
                 NextValue(data_done,    0),
                 NextValue(data_error,   0),
                 NextValue(data_timeout, 0),
-                NextState("CMD")
+                NextState("CMD-SEND")
             )
         )
-        fsm.act("CMD",
+        fsm.act("CMD-SEND",
+            # Send the Cmd to the PHY.
             phy.cmdw.sink.valid.eq(1),
+            phy.cmdw.sink.last.eq(cmd_count == (6-1)), # 6 bytes / 48-bit.
+            phy.cmdw.sink.cmd_type.eq(cmd_type),
             Case(cmd_count, {
                 0: phy.cmdw.sink.data.eq(Cat(cmd_command[8:14], 1, 0)),
                 1: phy.cmdw.sink.data.eq(cmd_argument[24:32]),
                 2: phy.cmdw.sink.data.eq(cmd_argument[16:24]),
                 3: phy.cmdw.sink.data.eq(cmd_argument[ 8:16]),
                 4: phy.cmdw.sink.data.eq(cmd_argument[ 0: 8]),
-                5: [phy.cmdw.sink.data.eq(Cat(1, crc7_inserter.crc)),
-                    phy.cmdw.sink.last.eq(cmd_type == SDCARD_CTRL_RESPONSE_NONE)]
+                5: phy.cmdw.sink.data.eq(Cat(1, crc7_inserter.crc)),
                }
             ),
+            # On a valid PHY cycle:
             If(phy.cmdw.sink.ready,
+                # Increment count.
                 NextValue(cmd_count, cmd_count + 1),
-                If(cmd_count == (6-1),
+                # When the Cmd has been transfered:
+                If(phy.cmdw.sink.last,
+                    # If not expecting a response, return to Idle.
                     If(cmd_type == SDCARD_CTRL_RESPONSE_NONE,
-                        NextValue(cmd_done, 1),
                         NextState("IDLE")
+                    # Else get the CMD Response.
                     ).Else(
                         NextState("CMD-RESPONSE"),
                     )
@@ -130,67 +144,88 @@ class SDCore(Module, AutoCSR):
             )
         )
         fsm.act("CMD-RESPONSE",
+            # Set the Cmd Response information to the PHY.
             phy.cmdr.sink.valid.eq(1),
-            phy.cmdr.sink.last.eq(data_type == SDCARD_CTRL_DATA_TRANSFER_NONE),
+            phy.cmdr.sink.cmd_type.eq(cmd_type),
+            phy.cmdr.sink.data_type.eq(data_type),
             If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
-                phy.cmdr.sink.length.eq(17+1) # 136bits + 8bit shift to expose expected 128-bit window to software
+                # 136-bit + 8-bit shift to expose expected 128-bit window to software.
+                phy.cmdr.sink.length.eq((136 + 8)//8)
             ).Else(
-                phy.cmdr.sink.length.eq(6)  # 48bits
+                # 48-bit.
+                phy.cmdr.sink.length.eq(48//8)
             ),
+
+            # Receive the Cmd Response from the PHY.
             phy.cmdr.source.ready.eq(1),
             If(phy.cmdr.source.valid,
+                # On Timeout: set Cmd Timeout and return to Idle.
                 If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
                     NextValue(cmd_timeout, 1),
                     NextState("IDLE")
+                # On last Cmd byte:
                 ).Elif(phy.cmdr.source.last,
-                    NextValue(cmd_done, 1),
+                    # Send/Receive Data for Data Cmds.
                     If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
                         NextState("DATA-WRITE")
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
                         NextState("DATA-READ")
+                    # Else return to Idle.
                     ).Else(
                         NextState("IDLE")
                     ),
+                # Else Shift Cmd Response.
                 ).Else(
                     NextValue(cmd_response, Cat(phy.cmdr.source.data, cmd_response))
                 )
             )
         )
         fsm.act("DATA-WRITE",
+            # Send Data to the PHY (through CRC16 Inserter).
             crc16_inserter.source.connect(phy.dataw.sink),
-            If(phy.dataw.sink.valid &
-                phy.dataw.sink.last &
-                phy.dataw.sink.ready,
+            # On last PHY Data cycle:
+            If(phy.dataw.sink.valid & phy.dataw.sink.ready & phy.dataw.sink.last,
+                # Incremennt Data Count.
                 NextValue(data_count, data_count + 1),
+                # Transfer is done when Data Count reaches Block Count.
                 If(data_count == (block_count - 1),
                     NextState("IDLE")
                 )
             ),
+
+            # Receive Status from the PHY.
             phy.datar.source.ready.eq(1),
             If(phy.datar.source.valid,
+                # Set Data Error when Data has not been accepted.
                 If(phy.datar.source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
                     NextValue(data_error, 1)
                 )
             )
         )
         fsm.act("DATA-READ",
+            # Send Data Response information to the PHY.
             phy.datar.sink.valid.eq(1),
             phy.datar.sink.block_length.eq(block_length),
             phy.datar.sink.last.eq(data_count == (block_count - 1)),
+
+            # Receive Data Response and Status from the PHY.
             If(phy.datar.source.valid,
+                # On valid Data:
                 If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
+                    # Receive Data (through CRC16 Checker).
                     phy.datar.source.connect(crc16_checker.sink, omit={"status"}),
+                    # On last Data:
                     If(phy.datar.source.last & phy.datar.source.ready,
+                        # Increment Data Count.
                         NextValue(data_count, data_count + 1),
+                        # Transfer is Done when Data Count reaches Block Count.
                         If(data_count == (block_count - 1),
                             NextState("IDLE")
-                        ).Else(
-                            NextState("DATA-READ")
                         )
                     )
+                # On Timeout: set Data Timeout and return to Idle.
                 ).Elif(phy.datar.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
                     NextValue(data_timeout, 1),
-                    NextValue(data_count, 0),
                     phy.datar.source.ready.eq(1),
                     NextState("IDLE")
                 )
