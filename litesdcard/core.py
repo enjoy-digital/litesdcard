@@ -23,16 +23,33 @@ class SDCore(Module, AutoCSR):
         self.sink   = stream.Endpoint([("data", 8)])
         self.source = stream.Endpoint([("data", 8)])
 
-        self.cmd_argument = CSRStorage(32)
-        self.cmd_command  = CSRStorage(32)
-        self.cmd_send     = CSR()
-        self.cmd_response = CSRStatus(128)
+        # Cmd Registers.
+        self.cmd_argument = CSRStorage(32, description="SDCard Cmd Argument.")
+        self.cmd_command  = CSRStorage(32, fields=[
+            CSRField("cmd_type",  offset=0, size=2, description="Core/PHY Cmd transfer type."),
+            CSRField("data_type", offset=5, size=2, description="Core/PHY Data transfer type."),
+            CSRField("cmd",       offset=8, size=6, description="SDCard Cmd.")
+        ])
+        self.cmd_send     = CSRStorage(description="Run Cmd/Data transfer.")
+        self.cmd_response = CSRStatus(128, description="SDCard Cmd Response.")
 
-        self.cmd_event    = CSRStatus(4)
-        self.data_event   = CSRStatus(4)
+        # Cmd/Data Event Registers.
+        self.cmd_event    = CSRStatus(4, fields=[
+            CSRField("done",    size=1, description="Cmd transfer has been executed."),
+            CSRField("error",   size=1, description="Cmd transfer has failed due to error(s)."),
+            CSRField("timeout", size=1, description="Timeout error."),
+            CSRField("crc",     size=1, description="CRC Error."), # FIXME: Generate/Connect.
+        ])
+        self.data_event   = CSRStatus(4, fields=[
+            CSRField("done",    size=1, description="Data transfer has been executed."),
+            CSRField("error",   size=1, description="Data transfer has failed due to error(s)."),
+            CSRField("timeout", size=1, description="Timeout Error."),
+            CSRField("crc",     size=1, description="CRC Error."), # FIXME: Generate/Connect.
+        ])
 
-        self.block_length = CSRStorage(10)
-        self.block_count  = CSRStorage(32)
+        # Block Length/Count Registers.
+        self.block_length = CSRStorage(10, description="Data transfer Block Length (in bytes).")
+        self.block_count  = CSRStorage(32, description="Data transfer Block Count.")
 
         # # #
 
@@ -54,11 +71,11 @@ class SDCore(Module, AutoCSR):
         self.comb += crc16_checker.source.connect(self.source)
 
         # Cmd/Data Signals -------------------------------------------------------------------------
-        cmd_type    = Signal(2)
-        cmd_count   = Signal(3)
-        cmd_done    = Signal()
-        cmd_error   = Signal()
-        cmd_timeout = Signal()
+        cmd_type     = Signal(2)
+        cmd_count    = Signal(3)
+        cmd_done     = Signal()
+        cmd_error    = Signal()
+        cmd_timeout  = Signal()
 
         data_type    = Signal(2)
         data_count   = Signal(32)
@@ -66,27 +83,30 @@ class SDCore(Module, AutoCSR):
         data_error   = Signal()
         data_timeout = Signal()
 
+        cmd          = Signal(6)
+
         self.comb += [
             # Decode type of Cmd/Data from Register.
-            cmd_type.eq(cmd_command[0:2]),
-            data_type.eq(cmd_command[5:7]),
+            cmd_type.eq(self.cmd_command.fields.cmd_type),
+            data_type.eq(self.cmd_command.fields.data_type),
+            cmd.eq(self.cmd_command.fields.cmd),
 
-            # Encode Cmd Event to Register. FIXME: Use CSRField.
-            cmd_event[0].eq(cmd_done),
-            cmd_event[1].eq(cmd_error),
-            cmd_event[2].eq(cmd_timeout),
-            cmd_event[3].eq(0), # FIXME Add Cmd Response CRC.
+            # Encode Cmd Event to Register.
+            self.cmd_event.fields.done.eq(cmd_done),
+            self.cmd_event.fields.error.eq(cmd_error),
+            self.cmd_event.fields.timeout.eq(cmd_timeout),
+            self.cmd_event.fields.crc.eq(0),
 
-            # Encode Data Event to Register. FIXME: Use CSRField.
-            data_event[0].eq(data_done),
-            data_event[1].eq(data_error),
-            data_event[2].eq(data_timeout),
-            data_event[3].eq(0), # FIXME Add Data Response CRC.
+            # Encode Data Event to Register.
+            self.data_event.fields.done.eq(data_done),
+            self.data_event.fields.error.eq(data_error),
+            self.data_event.fields.timeout.eq(data_timeout),
+            self.data_event.fields.crc.eq(0),
 
             # Prepare CRCInserter Data.
             crc7_inserter.din.eq(Cat(
                 cmd_argument,
-                cmd_command[8:14],
+                cmd,
                 1,
                 0)),
             crc7_inserter.reset.eq(1),
@@ -119,7 +139,7 @@ class SDCore(Module, AutoCSR):
             phy.cmdw.sink.last.eq(cmd_count == (6-1)), # 6 bytes / 48-bit.
             phy.cmdw.sink.cmd_type.eq(cmd_type),
             Case(cmd_count, {
-                0: phy.cmdw.sink.data.eq(Cat(cmd_command[8:14], 1, 0)),
+                0: phy.cmdw.sink.data.eq(Cat(cmd, 1, 0)),
                 1: phy.cmdw.sink.data.eq(cmd_argument[24:32]),
                 2: phy.cmdw.sink.data.eq(cmd_argument[16:24]),
                 3: phy.cmdw.sink.data.eq(cmd_argument[ 8:16]),
