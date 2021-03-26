@@ -121,7 +121,7 @@ class CRC16Checker(Module):
 
         # # #
 
-        fifo = stream.SyncFIFO([("data", 8)], 16)
+        fifo = stream.SyncFIFO([("data", 8)], 8)
         fifo = ResetInserter()(fifo)
         self.submodules += fifo
         self.comb += [
