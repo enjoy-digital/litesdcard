@@ -18,7 +18,7 @@ class SDBlock2MemDMA(Module, AutoCSR):
 
     Receive a stream of blocks and write it to memory through DMA.
     """
-    def __init__(self, bus, endianness, fifo_depth=1024):
+    def __init__(self, bus, endianness, fifo_depth=512):
         self.bus  = bus
         self.sink = stream.Endpoint([("data", 8)])
         self.irq  = Signal()
@@ -64,7 +64,7 @@ class SDMem2BlockDMA(Module, AutoCSR):
 
     Read data from memory through DMA and generate a stream of blocks.
     """
-    def __init__(self, bus, endianness, fifo_depth=1024):
+    def __init__(self, bus, endianness, fifo_depth=512):
         self.bus    = bus
         self.source = stream.Endpoint([("data", 8)])
         self.irq    = Signal()
