@@ -27,6 +27,7 @@ from litex.build.altera.platform import AlteraPlatform
 from litex.build.lattice.platform import LatticePlatform
 
 from litex.soc.interconnect import wishbone
+from litex.soc.integration.soc import SoCBusHandler, SoCRegion
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 
@@ -57,17 +58,29 @@ class LiteSDCardCore(SoCMini):
         SoCMini.__init__(self, platform, clk_freq=clk_freq)
 
         # Wishbone Control -------------------------------------------------------------------------
+        # Create Wishbone Control Slave interface, expose it and connect it to the SoC.
         wb_ctrl = wishbone.Interface()
         self.add_wb_master(wb_ctrl)
         platform.add_extension(wb_ctrl.get_ios("wb_ctrl"))
         self.comb += wb_ctrl.connect_to_pads(self.platform.request("wb_ctrl"), mode="slave")
 
         # Wishbone DMA -----------------------------------------------------------------------------
-        wb_dma = self.cpu.dma_bus = wishbone.Interface()
-        platform.add_extension(wb_dma.get_ios("wb_dma"))
+        # Create Wishbone DMA Master interface and expose it.
+        wb_dma = wishbone.Interface(data_width=32)
+        platform.add_extension(wb_ctrl.get_ios("wb_dma"))
         self.comb += wb_dma.connect_to_pads(self.platform.request("wb_dma"), mode="master")
 
+        # Create DMA Bus Handler (DMAs will be added by add_sdcard to it) and connect it to Wishbone DMA.
+        self.submodules.dma_bus = SoCBusHandler(
+            name             = "SoCDMABusHandler",
+            standard         = "wishbone",
+            data_width       = 32,
+            address_width    = 32,
+        )
+        self.dma_bus.add_slave("dma", slave=wb_dma, region=SoCRegion(origin=0x00000000, size=0x100000000))
+
         # SDCard -----------------------------------------------------------------------------------
+        # Simply integrate SDCard through LiteX's add_sdcard method.
         self.add_sdcard(name="sdcard")
 
 # Build --------------------------------------------------------------------------------------------
