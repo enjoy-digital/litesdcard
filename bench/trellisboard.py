@@ -163,13 +163,13 @@ class SoCCtrl:
 
 def main():
     parser = argparse.ArgumentParser(description="LiteSDCard Bench on Trellis Board")
-    parser.add_argument("--bench",         default="soc",       help="Bench: soc (default) or phy")
-    parser.add_argument("--variant",       default="standard",  help="Bench variant")
-    parser.add_argument("--with-sampler",  action="store_true", help="Add Sampler to Bench")
-    parser.add_argument("--with-analyzer", action="store_true", help="Add Analyzer to Bench")
-    parser.add_argument("--build",         action="store_true", help="Build bitstream")
-    parser.add_argument("--load",          action="store_true", help="Load bitstream")
-    parser.add_argument("--load-bios",     action="store_true", help="Load BIOS over Etherbone and reboot SoC")
+    parser.add_argument("--bench",         default="soc",       help="Bench: soc (default) or phy.")
+    parser.add_argument("--variant",       default="standard",  help="Bench variant standard (default) or minimal.")
+    parser.add_argument("--with-sampler",  action="store_true", help="Add Sampler to Bench.")
+    parser.add_argument("--with-analyzer", action="store_true", help="Add Analyzer to Bench.")
+    parser.add_argument("--build",         action="store_true", help="Build bitstream.")
+    parser.add_argument("--load",          action="store_true", help="Load bitstream.")
+    parser.add_argument("--load-bios",     action="store_true", help="Load BIOS over Etherbone and reboot SoC.")
     args = parser.parse_args()
 
     bench     = {"soc": BenchSoC, "phy": BenchPHY}[args.bench](

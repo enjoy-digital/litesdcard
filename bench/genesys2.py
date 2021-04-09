@@ -49,8 +49,18 @@ class BenchSoC(BaseSoC):
         if with_analyzer:
             from litescope import LiteScopeAnalyzer
             analyzer_signals = [
-                self.sdblock2mem.sink,
-                self.sdblock2mem.bus,
+                self.sdphy.sdpads,
+                self.sdphy.cmdw.sink,
+                self.sdphy.cmdr.sink,
+                self.sdphy.cmdr.source,
+                self.sdphy.dataw.sink,
+                self.sdphy.dataw.stop,
+                self.sdphy.dataw.crc.source,
+                self.sdphy.dataw.status.status,
+                self.sdphy.datar.sink,
+                self.sdphy.datar.source,
+                self.sdphy.clocker.ce,
+                self.sdphy.clocker.stop,
             ]
             self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 2048,
@@ -76,10 +86,10 @@ class SoCCtrl:
 
 def main():
     parser = argparse.ArgumentParser(description="LiteSDCard Bench on Genesys2")
-    parser.add_argument("--with-analyzer", action="store_true", help="Add Analyzer to Bench")
-    parser.add_argument("--build",         action="store_true", help="Build bitstream")
-    parser.add_argument("--load",          action="store_true", help="Load bitstream")
-    parser.add_argument("--load-bios",     action="store_true", help="Load BIOS over Etherbone and reboot SoC")
+    parser.add_argument("--with-analyzer", action="store_true", help="Add Analyzer to Bench.")
+    parser.add_argument("--build",         action="store_true", help="Build bitstream.")
+    parser.add_argument("--load",          action="store_true", help="Load bitstream.")
+    parser.add_argument("--load-bios",     action="store_true", help="Load BIOS over Etherbone and reboot SoC.")
     args = parser.parse_args()
 
     bench     = BenchSoC(with_analyzer=args.with_analyzer)
