@@ -84,6 +84,16 @@ class SDMem2BlockDMA(Module, AutoCSR):
             fifo.source.connect(self.source),
         ]
 
+        # Block delimiter
+        count = Signal(9)
+        self.sync += [
+            If(self.source.valid & self.source.ready,
+                count.eq(count + 1),
+                If(self.source.last, count.eq(0))
+            )
+        ]
+        self.comb += If(count == (512 - 1), self.source.last.eq(1))
+
         # IRQ / Generate IRQ on DMA done rising edge
         done_d = Signal()
         self.sync += done_d.eq(self.dma._done.status)
