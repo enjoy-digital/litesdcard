@@ -178,16 +178,19 @@ class SDPHYCMDW(Module):
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
 class SDPHYCMDR(Module):
-    def __init__(self, sys_clk_freq, cmd_timeout, cmdw):
+    def __init__(self, sys_clk_freq, cmd_timeout, cmdw, busy_timeout=1):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("data_type", 2), ("length", 8)])
+        self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("busy_wait", 1), ("data_type", 2), ("length", 8)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
         timeout = Signal(32, reset=int(cmd_timeout*sys_clk_freq))
         count   = Signal(8)
+
+        busy_timeout = Signal(32, reset=int(busy_timeout * sys_clk_freq))
+        seen_not_busy = Signal()
 
         cmdr = SDPHYR(cmd=True, data_width=1, skip_start_bit=False)
         self.comb += pads_in.connect(cmdr.pads_in)
@@ -196,6 +199,8 @@ class SDPHYCMDR(Module):
         fsm.act("IDLE",
             NextValue(count,   0),
             NextValue(timeout, timeout.reset),
+            NextValue(busy_timeout, busy_timeout.reset),
+            NextValue(seen_not_busy, 0),
             If(sink.valid & pads_out.ready & cmdw.done,
                 NextValue(cmdr.reset, 1),
                 NextState("WAIT"),
@@ -224,7 +229,9 @@ class SDPHYCMDR(Module):
                 NextValue(count, count + 1),
                 If(source.last,
                     sink.ready.eq(1),
-                    If(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
+                    If((sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE) & sink.busy_wait,
+                        NextState("BUSY")
+                    ).Elif(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
                         NextState("CLK8")
                     ).Else(
@@ -237,6 +244,22 @@ class SDPHYCMDR(Module):
                 sink.ready.eq(1),
                 NextState("TIMEOUT")
             ),
+        )
+        fsm.act("BUSY",
+            pads_out.clk.eq(1),
+            source.status.eq(SDCARD_STREAM_STATUS_OK),
+            source.valid.eq(seen_not_busy),
+            If(pads_in.valid & pads_in.data.i[0],
+                NextValue(seen_not_busy, 1)
+            ),
+            If(source.valid & source.ready,
+                NextValue(count, 0),
+                NextState("CLK8")
+            ),
+            NextValue(busy_timeout, busy_timeout - 1),
+            If((busy_timeout == 0) & ~seen_not_busy,
+                NextState("TIMEOUT")
+            )
         )
         fsm.act("CLK8",
             pads_out.clk.eq(1),
