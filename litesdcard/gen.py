@@ -38,6 +38,9 @@ _io = [
     ("clk", 0, Pins(1)),
     ("rst", 1, Pins(1)),
 
+    # Interrupt
+    ("irq", 0, Pins(1)),
+
     # SDCard Pads.
     ("sdcard", 0,
         Subsignal("data", Pins(4)), # Note: Requires Pullup (internal or external).
@@ -82,6 +85,10 @@ class LiteSDCardCore(SoCMini):
         # SDCard -----------------------------------------------------------------------------------
         # Simply integrate SDCard through LiteX's add_sdcard method.
         self.add_sdcard(name="sdcard")
+
+        # IRQ
+        irq_pad = platform.request("irq")
+        self.comb += irq_pad.eq(self.sdirq.irq)
 
 # Build --------------------------------------------------------------------------------------------
 
