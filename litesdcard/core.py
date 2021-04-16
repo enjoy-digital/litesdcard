@@ -48,6 +48,8 @@ class SDCore(Module, AutoCSR):
             CSRField("crc",     size=1, description="CRC Error."), # FIXME: Generate/Connect.
         ])
 
+        self.cmd_done = Signal()
+
         # Block Length/Count Registers.
         self.block_length = CSRStorage(10, description="Data transfer Block Length (in bytes).")
         self.block_count  = CSRStorage(32, description="Data transfer Block Count.")
@@ -100,6 +102,9 @@ class SDCore(Module, AutoCSR):
             self.cmd_event.fields.error.eq(cmd_error),
             self.cmd_event.fields.timeout.eq(cmd_timeout),
             self.cmd_event.fields.crc.eq(0),
+
+            # Publish command done signal so it can be used for an interrupt
+            self.cmd_done.eq(cmd_done),
 
             # Encode Data Event to Register.
             self.data_event.fields.done.eq(data_done),
