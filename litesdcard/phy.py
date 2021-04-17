@@ -42,6 +42,8 @@ class SDPHYClocker(Module, AutoCSR):
         self.stop    = Signal()
         self.clk     = Signal()
         self.ce      = Signal()
+        self.sd_clk  = Signal()
+        self.clk_enb = Signal()
 
         # # #
 
@@ -59,6 +61,13 @@ class SDPHYClocker(Module, AutoCSR):
         self.comb += Case(self.divider.storage, cases)
         self.sync += self.clk.eq(clk)
         self.comb += self.ce.eq(clk & ~clk_d)
+
+        # Ensure we don't get short pulses on the SD card clock output
+        ce_delayed = Signal()
+        ce_latched = Signal()
+        self.sync += If(clk_d, ce_delayed.eq(self.clk_enb))
+        self.comb += If(clk_d, ce_latched.eq(self.clk_enb)).Else(ce_latched.eq(ce_delayed))
+        self.comb += self.sd_clk.eq(~clk & ce_latched)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -502,7 +511,7 @@ class SDPHYIOGen(Module):
         # Clk
         self.specials += SDROutput(
             clk = ClockSignal(),
-            i   = ~clocker.clk & sdpads.clk,
+            i   = clocker.sd_clk,
             o   = pads.clk
         )
 
@@ -550,7 +559,7 @@ class SDPHYIOGen(Module):
 class SDPHYIOEmulator(Module):
     def __init__(self, clocker, sdpads, pads):
         # Clk
-        self.comb += If(sdpads.clk, pads.clk.eq(~clocker.clk))
+        self.comb += pads.clk.eq(clocker.sd_clk)
 
         # Cmd
         self.comb += [
@@ -602,6 +611,7 @@ class SDPHY(Module, AutoCSR):
         ]
         for m in [init, cmdw, cmdr, dataw, datar]:
             self.comb += m.pads_out.ready.eq(self.clocker.ce)
+        self.comb += self.clocker.clk_enb.eq(sdpads.clk)
 
         # Connect physical pads to pads_in of submodules -------------------------------------------
         for m in [init, cmdw, cmdr, dataw, datar]:
