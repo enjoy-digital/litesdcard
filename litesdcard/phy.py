@@ -32,6 +32,7 @@ _sdpads_layout = [
         ("o",  4),
         ("oe", 1)
     ]),
+    ("data_i_ce", 1),
 ]
 
 # SDCard PHY Clocker -------------------------------------------------------------------------------
@@ -43,7 +44,6 @@ class SDPHYClocker(Module, AutoCSR):
         self.ce      = Signal()        # CE output  (for logic running in sys_clk domain).
         self.clk_en  = Signal(reset=1) # Clk enable input (from logic running in sys_clk domain).
         self.clk     = Signal()        # Clk output (for SDCard pads).
-        self.recv    = Signal()
 
         # # #
 
@@ -70,17 +70,6 @@ class SDPHYClocker(Module, AutoCSR):
         self.sync += If(clk_d, ce_delayed.eq(self.clk_en))
         self.comb += If(clk_d, ce_latched.eq(self.clk_en)).Else(ce_latched.eq(ce_delayed))
         self.comb += self.clk.eq(~clk & ce_latched)
-
-        # Generate recv pulse two clocks after sd_clk goes high,
-        # so the external data input effectively gets sampled on the
-        # first system clock edge after the SD card clock goes high.
-        sd_clk_d1 = Signal()
-        sd_clk_d2 = Signal()
-        self.sync += [
-            sd_clk_d1.eq(self.sd_clk),
-            sd_clk_d2.eq(sd_clk_d1),
-            self.recv.eq(sd_clk_d1 & ~sd_clk_d2)
-        ]
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -515,8 +504,18 @@ class SDPHYDATAR(Module):
 
 # SDCard PHY IO ------------------------------------------------------------------------------------
 
-class SDPHYIOGen(Module):
+class SDPHYIO(Module):
+    def __init__(self, clocker, sdpads, round_trip_latency=2):
+        # Generate a data_i_ce pulse round_trip_latency cycles after clocker.clk goes high so that
+        # the data input effectively get sampled on the first sys_clk after the SDCard clk goes high.
+        clocker_clk_delay = Signal(round_trip_latency)
+        self.sync += clocker_clk_delay.eq(Cat(clocker.clk, clocker_clk_delay))
+        self.sync += sdpads.data_i_ce.eq(clocker_clk_delay[-1] & ~clocker_clk_delay[-2])
+
+
+class SDPHYIOGen(SDPHYIO):
     def __init__(self, clocker, sdpads, pads):
+        SDPHYIO.__init__(self, clocker, sdpads, round_trip_latency=2)
         # Rst
         if hasattr(pads, "rst"):
             self.comb += pads.rst.eq(0)
@@ -569,8 +568,9 @@ class SDPHYIOGen(Module):
 
 # SDCard PHY Emulator ------------------------------------------------------------------------------
 
-class SDPHYIOEmulator(Module):
+class SDPHYIOEmulator(SDPHYIO):
     def __init__(self, clocker, sdpads, pads):
+        SDPHYIO.__init__(self, clocker, sdpads, round_trip_latency=2) # FIXME: check round_trip_latency.
         # Clk
         self.comb += pads.clk.eq(clocker.clk)
 
@@ -628,7 +628,7 @@ class SDPHY(Module, AutoCSR):
 
         # Connect physical pads to pads_in of submodules -------------------------------------------
         for m in [init, cmdw, cmdr, dataw, datar]:
-            self.comb += m.pads_in.valid.eq(self.clocker.recv)
+            self.comb += m.pads_in.valid.eq(sdpads.data_i_ce)
             self.comb += m.pads_in.cmd.i.eq(sdpads.cmd.i)
             self.comb += m.pads_in.data.i.eq(sdpads.data.i)
 
