@@ -39,35 +39,36 @@ _sdpads_layout = [
 class SDPHYClocker(Module, AutoCSR):
     def __init__(self):
         self.divider = CSRStorage(9, reset=256)
-        self.stop    = Signal()
-        self.clk     = Signal()
-        self.ce      = Signal()
-        self.sd_clk  = Signal()
-        self.clk_enb = Signal()
+        self.stop    = Signal() # Stop input (for speed handling/backpressure).
+        self.ce      = Signal() # CE output  (for logic running in sys_clk domain).
+        self.clk_en  = Signal() # Clk enable input (from logic running in sys_clk domain).
+        self.clk     = Signal() # Clk output (for SDCard pads).
 
         # # #
 
+        # Generate divided versions of sys_clk that will be used as SDCard clk.
         clks = Signal(9)
         self.sync += If(~self.stop, clks.eq(clks + 1))
 
+        # Generate delayed version of the SDCard clk (to do specific actions on change).
         clk   = Signal()
         clk_d = Signal()
         self.sync += clk_d.eq(clk)
 
+        # Select SDCard clk based on divider CSR value.
         cases = {}
         cases["default"] = clk.eq(clks[0])
         for i in range(2, 9):
             cases[2**i] = clk.eq(clks[i-1])
         self.comb += Case(self.divider.storage, cases)
-        self.sync += self.clk.eq(clk)
         self.comb += self.ce.eq(clk & ~clk_d)
 
-        # Ensure we don't get short pulses on the SD card clock output
+        # Ensure we don't get short pulses on the SDCard Clk.
         ce_delayed = Signal()
         ce_latched = Signal()
-        self.sync += If(clk_d, ce_delayed.eq(self.clk_enb))
-        self.comb += If(clk_d, ce_latched.eq(self.clk_enb)).Else(ce_latched.eq(ce_delayed))
-        self.comb += self.sd_clk.eq(~clk & ce_latched)
+        self.sync += If(clk_d, ce_delayed.eq(self.clk_en))
+        self.comb += If(clk_d, ce_latched.eq(self.clk_en)).Else(ce_latched.eq(ce_delayed))
+        self.comb += self.clk.eq(~clk & ce_latched)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -220,7 +221,7 @@ class SDPHYCMDR(Module):
             pads_out.clk.eq(1),
             # Reset CMDR.
             NextValue(cmdr.reset, 0),
-            # Change state when on response start.
+            # Change state on Cmd response start.
             If(cmdr.source.valid,
                 NextState("CMD")
             ),
@@ -511,7 +512,7 @@ class SDPHYIOGen(Module):
         # Clk
         self.specials += SDROutput(
             clk = ClockSignal(),
-            i   = clocker.sd_clk,
+            i   = clocker.clk,
             o   = pads.clk
         )
 
@@ -559,7 +560,7 @@ class SDPHYIOGen(Module):
 class SDPHYIOEmulator(Module):
     def __init__(self, clocker, sdpads, pads):
         # Clk
-        self.comb += pads.clk.eq(clocker.sd_clk)
+        self.comb += pads.clk.eq(clocker.clk)
 
         # Cmd
         self.comb += [
@@ -611,7 +612,7 @@ class SDPHY(Module, AutoCSR):
         ]
         for m in [init, cmdw, cmdr, dataw, datar]:
             self.comb += m.pads_out.ready.eq(self.clocker.ce)
-        self.comb += self.clocker.clk_enb.eq(sdpads.clk)
+        self.comb += self.clocker.clk_en.eq(sdpads.clk)
 
         # Connect physical pads to pads_in of submodules -------------------------------------------
         for m in [init, cmdw, cmdr, dataw, datar]:
