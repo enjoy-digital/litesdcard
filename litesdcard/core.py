@@ -27,7 +27,6 @@ class SDCore(Module, AutoCSR):
         self.cmd_argument = CSRStorage(32, description="SDCard Cmd Argument.")
         self.cmd_command  = CSRStorage(32, fields=[
             CSRField("cmd_type",  offset=0, size=2, description="Core/PHY Cmd transfer type."),
-            CSRField("busy_wait", offset=2, size=1, description="Core/PHY Cmd busy wait."),
             CSRField("data_type", offset=5, size=2, description="Core/PHY Data transfer type."),
             CSRField("cmd",       offset=8, size=6, description="SDCard Cmd.")
         ])
@@ -84,15 +83,12 @@ class SDCore(Module, AutoCSR):
         data_error   = Signal()
         data_timeout = Signal()
 
-        busy_wait    = Signal()
-
         cmd          = Signal(6)
 
         self.comb += [
             # Decode type of Cmd/Data from Register.
             cmd_type.eq(self.cmd_command.fields.cmd_type),
             data_type.eq(self.cmd_command.fields.data_type),
-            busy_wait.eq(self.cmd_command.fields.busy_wait),
             cmd.eq(self.cmd_command.fields.cmd),
 
             # Encode Cmd Event to Register.
@@ -172,7 +168,6 @@ class SDCore(Module, AutoCSR):
             phy.cmdr.sink.valid.eq(1),
             phy.cmdr.sink.cmd_type.eq(cmd_type),
             phy.cmdr.sink.data_type.eq(data_type),
-            phy.cmdr.sink.busy_wait.eq(busy_wait),
             If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
                 # 136-bit + 8-bit shift to expose expected 128-bit window to software.
                 phy.cmdr.sink.length.eq((136 + 8)//8)
@@ -195,9 +190,6 @@ class SDCore(Module, AutoCSR):
                         NextState("DATA-WRITE")
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
                         NextState("DATA-READ")
-                    # Wait for busy if required
-                    ).Elif(busy_wait,
-                        NextState("BUSY-WAIT")
                     # Else return to Idle.
                     ).Else(
                         NextState("IDLE")
@@ -206,17 +198,6 @@ class SDCore(Module, AutoCSR):
                 ).Else(
                     NextValue(cmd_response, Cat(phy.cmdr.source.data, cmd_response))
                 )
-            )
-        )
-        fsm.act("BUSY-WAIT",
-            # Wait for one more byte from the phy to indicate that the
-            # card is not busy
-            phy.cmdr.source.ready.eq(1),
-            If(phy.cmdr.source.valid,
-                If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
-                    NextValue(cmd_timeout, 1)
-                ),
-                NextState("IDLE")
             )
         )
         fsm.act("DATA-WRITE",

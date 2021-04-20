@@ -181,40 +181,43 @@ class SDPHYCMDR(Module):
     def __init__(self, sys_clk_freq, cmd_timeout, cmdw, busy_timeout=1):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
-        self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("busy_wait", 1), ("data_type", 2), ("length", 8)])
+        self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("data_type", 2), ("length", 8)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
         # # #
 
         timeout = Signal(32, reset=int(cmd_timeout*sys_clk_freq))
         count   = Signal(8)
-
-        busy_timeout = Signal(32, reset=int(busy_timeout * sys_clk_freq))
-        seen_not_busy = Signal()
+        busy    = Signal()
 
         cmdr = SDPHYR(cmd=True, data_width=1, skip_start_bit=False)
         self.comb += pads_in.connect(cmdr.pads_in)
         fsm  = FSM(reset_state="IDLE")
         self.submodules += cmdr, fsm
         fsm.act("IDLE",
-            NextValue(count,   0),
-            NextValue(timeout, timeout.reset),
-            NextValue(busy_timeout, busy_timeout.reset),
-            NextValue(seen_not_busy, 0),
+            # Preload Timeout with Cmd Timeout.
+            NextValue(timeout, int(cmd_timeout*sys_clk_freq)),
+            # Reset Count/Busy flags.
+            NextValue(count, 0),
+            NextValue(busy, 1),
+            # When the Cmd has been sent to the SDCard, get the response.
             If(sink.valid & pads_out.ready & cmdw.done,
                 NextValue(cmdr.reset, 1),
                 NextState("WAIT"),
             )
         )
         fsm.act("WAIT",
+            # Drive Clk.
             pads_out.clk.eq(1),
+            # Reset CMDR.
             NextValue(cmdr.reset, 0),
+            # Change state when on response start.
             If(cmdr.source.valid,
                 NextState("CMD")
             ),
+            # Timeout.
             NextValue(timeout, timeout - 1),
             If(timeout == 0,
-                sink.ready.eq(1),
                 NextState("TIMEOUT")
             )
         )
@@ -224,12 +227,16 @@ class SDPHYCMDR(Module):
             source.status.eq(SDCARD_STREAM_STATUS_OK),
             source.last.eq(count == (sink.length - 1)),
             source.data.eq(cmdr.source.data),
-            If(source.valid & source.ready,
+            If(cmdr.source.valid & source.ready,
                 cmdr.source.ready.eq(1),
                 NextValue(count, count + 1),
                 If(source.last,
                     sink.ready.eq(1),
-                    If((sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE) & sink.busy_wait,
+                    If(sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY,
+                        # Generate the last valid cycle in BUSY state.
+                        source.valid.eq(0),
+                        # Preload Timeout with Busy Timeout.
+                        NextValue(timeout, int(busy_timeout*sys_clk_freq)),
                         NextState("BUSY")
                     ).Elif(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
@@ -239,25 +246,31 @@ class SDPHYCMDR(Module):
                     )
                 )
             ),
+            # Timeout.
             NextValue(timeout, timeout - 1),
             If(timeout == 0,
-                sink.ready.eq(1),
                 NextState("TIMEOUT")
             ),
         )
         fsm.act("BUSY",
             pads_out.clk.eq(1),
-            source.status.eq(SDCARD_STREAM_STATUS_OK),
-            source.valid.eq(seen_not_busy),
+            # D0 is kept low by the SDCard while busy.
             If(pads_in.valid & pads_in.data.i[0],
-                NextValue(seen_not_busy, 1)
+                NextValue(busy, 0),
             ),
-            If(source.valid & source.ready,
-                NextValue(count, 0),
-                NextState("CLK8")
+            # Generate the last cycle of the Cmd Response when no longer busy.
+            If(~busy,
+                source.valid.eq(1),
+                source.last.eq(1),
+                source.status.eq(SDCARD_STREAM_STATUS_OK),
+                If(source.ready,
+                    NextValue(count, 0),
+                    NextState("CLK8")
+                )
             ),
-            NextValue(busy_timeout, busy_timeout - 1),
-            If((busy_timeout == 0) & ~seen_not_busy,
+            # Timeout.
+            NextValue(timeout, timeout - 1),
+            If(timeout == 0,
                 NextState("TIMEOUT")
             )
         )
@@ -273,9 +286,10 @@ class SDPHYCMDR(Module):
             )
         )
         fsm.act("TIMEOUT",
+            sink.ready.eq(1), # Ack Cmd.
             source.valid.eq(1),
-            source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             source.last.eq(1),
+            source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
             If(source.ready,
                 NextState("IDLE")
             )
