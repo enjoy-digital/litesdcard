@@ -39,10 +39,10 @@ _sdpads_layout = [
 class SDPHYClocker(Module, AutoCSR):
     def __init__(self):
         self.divider = CSRStorage(9, reset=256)
-        self.stop    = Signal() # Stop input (for speed handling/backpressure).
-        self.ce      = Signal() # CE output  (for logic running in sys_clk domain).
-        self.clk_en  = Signal() # Clk enable input (from logic running in sys_clk domain).
-        self.clk     = Signal() # Clk output (for SDCard pads).
+        self.stop    = Signal()        # Stop input (for speed handling/backpressure).
+        self.ce      = Signal()        # CE output  (for logic running in sys_clk domain).
+        self.clk_en  = Signal(reset=1) # Clk enable input (from logic running in sys_clk domain).
+        self.clk     = Signal()        # Clk output (for SDCard pads).
 
         # # #
 
