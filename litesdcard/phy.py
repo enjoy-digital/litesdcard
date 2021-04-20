@@ -43,6 +43,7 @@ class SDPHYClocker(Module, AutoCSR):
         self.ce      = Signal()        # CE output  (for logic running in sys_clk domain).
         self.clk_en  = Signal(reset=1) # Clk enable input (from logic running in sys_clk domain).
         self.clk     = Signal()        # Clk output (for SDCard pads).
+        self.recv    = Signal()
 
         # # #
 
@@ -69,6 +70,17 @@ class SDPHYClocker(Module, AutoCSR):
         self.sync += If(clk_d, ce_delayed.eq(self.clk_en))
         self.comb += If(clk_d, ce_latched.eq(self.clk_en)).Else(ce_latched.eq(ce_delayed))
         self.comb += self.clk.eq(~clk & ce_latched)
+
+        # Generate recv pulse two clocks after sd_clk goes high,
+        # so the external data input effectively gets sampled on the
+        # first system clock edge after the SD card clock goes high.
+        sd_clk_d1 = Signal()
+        sd_clk_d2 = Signal()
+        self.sync += [
+            sd_clk_d1.eq(self.sd_clk),
+            sd_clk_d2.eq(sd_clk_d1),
+            self.recv.eq(sd_clk_d1 & ~sd_clk_d2)
+        ]
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
@@ -616,7 +628,7 @@ class SDPHY(Module, AutoCSR):
 
         # Connect physical pads to pads_in of submodules -------------------------------------------
         for m in [init, cmdw, cmdr, dataw, datar]:
-            self.comb += m.pads_in.valid.eq(self.clocker.ce)
+            self.comb += m.pads_in.valid.eq(self.clocker.recv)
             self.comb += m.pads_in.cmd.i.eq(sdpads.cmd.i)
             self.comb += m.pads_in.data.i.eq(sdpads.data.i)
 
