@@ -522,14 +522,14 @@ class SDPHYIOGen(SDPHYIO):
 
         # Clk
         self.specials += SDROutput(
-            clk = ClockSignal(),
+            clk = ClockSignal("sys"),
             i   = clocker.clk,
             o   = pads.clk
         )
 
         # Cmd
         self.specials += SDRTristate(
-            clk = ClockSignal(),
+            clk = ClockSignal("sys"),
             io  = pads.cmd,
             o   = sdpads.cmd.o,
             oe  = sdpads.cmd.oe,
@@ -539,7 +539,7 @@ class SDPHYIOGen(SDPHYIO):
         # Data
         for i in range(4):
             self.specials += SDRTristate(
-                clk = ClockSignal(),
+                clk = ClockSignal("sys"),
                 io  = pads.data[i],
                 o   = sdpads.data.o[i],
                 oe  = sdpads.data.oe,
@@ -550,17 +550,17 @@ class SDPHYIOGen(SDPHYIO):
         if hasattr(pads, "cmd_dir"):
             self.specials += [
                 SDROutput(
-                    clk = ClockSignal(),
+                    clk = ClockSignal("sys"),
                     i   = sdpads.cmd.oe,
                     o   = pads.cmd_dir,
                 ),
                 SDROutput(
-                    clk = ClockSignal(),
+                    clk = ClockSignal("sys"),
                     i   = sdpads.data.oe,
                     o   = pads.dat0_dir,
                 ),
                 SDROutput(
-                    clk = ClockSignal(),
+                    clk = ClockSignal("sys"),
                     i   = sdpads.data.oe,
                     o   = pads.dat13_dir,
                 )
