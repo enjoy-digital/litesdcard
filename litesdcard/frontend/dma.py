@@ -26,7 +26,7 @@ class SDBlock2MemDMA(Module, AutoCSR):
         # # #
 
         # Submodules
-        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth)
+        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True)
         converter = stream.Converter(8, bus.data_width, reverse=True)
         self.submodules += fifo, converter
         self.submodules.dma = WishboneDMAWriter(bus, with_csr=True, endianness=endianness)
@@ -74,7 +74,7 @@ class SDMem2BlockDMA(Module, AutoCSR):
         # Submodules
         self.submodules.dma = WishboneDMAReader(bus, with_csr=True, endianness=endianness)
         converter = stream.Converter(bus.data_width, 8, reverse=True)
-        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth)
+        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True)
         self.submodules += converter, fifo
 
         # Flow
