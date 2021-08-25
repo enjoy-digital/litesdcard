@@ -59,9 +59,7 @@ W/R(MB/s) performance vs SD frequency:
 [> Possible improvements
 ------------------------
 - add standardized interfaces (AXI, Avalon-ST)
-- add vendor agnostic phy for low speeds
-- add support for Altera FPGAs.
-- add support for Lattice FPGAs.
+- add UHS-I/II PHYs.
 - add Linux drivers.
 - ... See below Support and consulting :)
 
