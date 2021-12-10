@@ -523,7 +523,7 @@ class SDPHYIOGen(SDPHYIO):
         # Clk
         self.specials += SDROutput(
             clk = ClockSignal("sys"),
-            i   = clocker.clk,
+            i   = ~clocker.clk,
             o   = pads.clk
         )
 
