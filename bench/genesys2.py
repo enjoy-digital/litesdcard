@@ -13,8 +13,8 @@ from migen import *
 
 from litex.build.generic_platform import *
 
-from litex_boards.platforms import genesys2
-from litex_boards.targets.genesys2 import BaseSoC
+from litex_boards.platforms import digilent_genesys2
+from litex_boards.targets.digilent_genesys2 import BaseSoC
 
 from litex.soc.interconnect import stream
 from litex.soc.integration.builder import *
@@ -25,7 +25,7 @@ from litex.soc.integration.builder import *
 
 class BenchSoC(BaseSoC):
     def __init__(self, with_analyzer=False, host_ip="192.168.1.100", host_udp_port=2000):
-        platform = genesys2.Platform()
+        platform = digilent_genesys2.Platform()
 
         # BenchSoC ---------------------------------------------------------------------------------
         BaseSoC.__init__(self, sys_clk_freq=int(100e6),

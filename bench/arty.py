@@ -13,8 +13,8 @@ from migen import *
 
 from litex.build.generic_platform import *
 
-from litex_boards.platforms import arty
-from litex_boards.targets.arty import BaseSoC
+from litex_boards.platforms import digilent_arty
+from litex_boards.targets.digilent_arty import BaseSoC
 
 from litex.soc.interconnect import stream
 from litex.soc.integration.builder import *
@@ -25,7 +25,7 @@ from sampler import Sampler
 
 class BenchSoC(BaseSoC):
     def __init__(self, variant="minimal", with_sampler=False, with_analyzer=False, host_ip="192.168.1.100", host_udp_port=2000):
-        platform = arty.Platform()
+        platform = digilent_arty.Platform()
 
         # BenchSoC ---------------------------------------------------------------------------------
         bench_kwargs = {
@@ -38,7 +38,7 @@ class BenchSoC(BaseSoC):
             **bench_kwargs)
 
         # SDCard on PMODD with Digilent's Pmod MicroSD ---------------------------------------------
-        self.platform.add_extension(arty._sdcard_pmod_io)
+        self.platform.add_extension(digilent_arty._sdcard_pmod_io)
         self.add_sdcard("sdcard")
 
         if with_sampler or with_analyzer:
@@ -119,13 +119,13 @@ class BenchSoC(BaseSoC):
 
 class BenchPHY(BaseSoC):
     def __init__(self, **kwargs):
-        platform = arty.Platform()
+        platform = digilent_arty.Platform()
 
         # BenchPHY ---------------------------------------------------------------------------------
         BaseSoC.__init__(self, sys_clk_freq=int(100e6), cpu_type=None, integrated_main_ram_size=0x100)
 
         # SDCard on PMODD with Digilent's Pmod MicroSD ---------------------------------------------
-        self.platform.add_extension(arty._sdcard_pmod_io)
+        self.platform.add_extension(digilent_arty._sdcard_pmod_io)
         from litesdcard.phy import SDPHY
         self.submodules.sd_phy = SDPHY(self.platform.request("sdcard"), platform.device, self.clk_freq)
         self.add_csr("sd_phy")
