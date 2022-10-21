@@ -47,7 +47,6 @@ class BenchSoC(BaseSoC):
             self.submodules.ethphy = LiteEthPHYMII(
                 clock_pads         = self.platform.request("eth_clocks"),
                 pads               = self.platform.request("eth"))
-            self.add_csr("ethphy")
             self.add_etherbone(phy=self.ethphy)
 
         if with_sampler:
@@ -61,7 +60,6 @@ class BenchSoC(BaseSoC):
             ]
             self.platform.add_extension(_la_pmod_ios)
             self.submodules.sampler = Sampler(self.platform.request("la_pmod"))
-            self.add_csr("sampler")
 
             # DRAMFIFO -----------------------------------------------------------------------------
             from litedram.frontend.fifo import LiteDRAMFIFO
@@ -113,7 +111,6 @@ class BenchSoC(BaseSoC):
                 depth        = 2048,
                 clock_domain = "sys",
                 csr_csv      = "analyzer.csv")
-            self.add_csr("analyzer")
 
 # BenchPHY -----------------------------------------------------------------------------------------
 
@@ -128,7 +125,6 @@ class BenchPHY(BaseSoC):
         self.platform.add_extension(digilent_arty._sdcard_pmod_io)
         from litesdcard.phy import SDPHY
         self.submodules.sd_phy = SDPHY(self.platform.request("sdcard"), platform.device, self.clk_freq)
-        self.add_csr("sd_phy")
 
         # Send a command with button to verify timings ---------------------------------------------
         self.comb += [

@@ -43,7 +43,6 @@ class BenchSoC(BaseSoC):
                 clock_pads         = self.platform.request("eth_clocks"),
                 pads               = self.platform.request("eth"),
                 with_hw_init_reset = False)
-            self.add_csr("ethphy")
             self.add_etherbone(phy=self.ethphy)
 
         if with_analyzer:
@@ -66,7 +65,6 @@ class BenchSoC(BaseSoC):
                 depth        = 2048,
                 clock_domain = "sys",
                 csr_csv      = "analyzer.csv")
-            self.add_csr("analyzer")
 
 # SoC Ctrl -----------------------------------------------------------------------------------------
 

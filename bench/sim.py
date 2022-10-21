@@ -35,7 +35,6 @@ class BenchSim(SimSoC):
         data = Signal(8)
         self.sync += data.eq(data + 1)
         self.submodules.sampler = Sampler(data)
-        self.add_csr("sampler")
 
         # DRAMFIFO ---------------------------------------------------------------------------------
         from litedram.frontend.fifo import LiteDRAMFIFO
