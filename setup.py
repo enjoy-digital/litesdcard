@@ -15,6 +15,9 @@ setup(
     license="BSD",
     python_requires="~=3.6",
     packages=find_packages(exclude=("test*", "sim*", "doc*", "examples*")),
+    package_data={
+        "litesdcard": ["emulator/verilog/**"],
+    },
     include_package_data=True,
     entry_points={
         "console_scripts": [
