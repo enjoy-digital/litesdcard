@@ -1,15 +1,14 @@
 #
 # This file is part of LiteSDCard.
 #
-# Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2017-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
 """Built In Self Test (BIST) modules for testing LiteSDCard functionality."""
 
-from functools import reduce
-from operator import xor
-
 from migen import *
+
+from litex.gen import *
 
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
@@ -17,7 +16,7 @@ from litex.soc.interconnect.csr import *
 # LFSR/Counter -------------------------------------------------------------------------------------
 
 @CEInserter()
-class LFSR(Module):
+class LFSR(LiteXModule):
     def __init__(self, n_out, n_state=31, taps=[27, 30]):
         self.o = Signal(n_out)
 
@@ -27,7 +26,7 @@ class LFSR(Module):
         curval = [state[i] for i in range(n_state)]
         curval += [0]*(n_out - n_state)
         for i in range(n_out):
-            nv = ~reduce(xor, [curval[tap] for tap in taps])
+            nv = ~Reduce("XOR", [curval[tap] for tap in taps])
             curval.insert(0, nv)
             curval.pop()
 
@@ -38,7 +37,7 @@ class LFSR(Module):
 
 
 @CEInserter()
-class Counter(Module):
+class Counter(LiteXModule):
     def __init__(self, n_out):
         self.o = Signal(n_out)
 
@@ -49,7 +48,7 @@ class Counter(Module):
 # BISTBlockGenerator -------------------------------------------------------------------------------
 
 @ResetInserter()
-class _BISTBlockGenerator(Module):
+class _BISTBlockGenerator(LiteXModule):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
         self.start  = Signal()
@@ -65,7 +64,7 @@ class _BISTBlockGenerator(Module):
         blkcnt = Signal(32)
         datcnt = Signal(9)
 
-        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
+        self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             If(self.start,
                 NextValue(blkcnt, 0),
@@ -96,7 +95,7 @@ class _BISTBlockGenerator(Module):
         self.comb += source.data.eq(gen.o)
 
 
-class BISTBlockGenerator(Module, AutoCSR):
+class BISTBlockGenerator(LiteXModule):
     def __init__(self, random):
         self.source = source = stream.Endpoint([("data", 32)])
         self.reset  = CSR()
@@ -106,7 +105,7 @@ class BISTBlockGenerator(Module, AutoCSR):
 
         # # #
 
-        self.submodules.core = core = _BISTBlockGenerator(random)
+        self.core = core = _BISTBlockGenerator(random)
         self.comb += [
             core.source.connect(source),
             core.reset.eq(self.reset.re),
@@ -118,7 +117,7 @@ class BISTBlockGenerator(Module, AutoCSR):
 # BISTBlockChecker ---------------------------------------------------------------------------------
 
 @ResetInserter()
-class _BISTBlockChecker(Module):
+class _BISTBlockChecker(LiteXModule):
     def __init__(self, random):
         self.sink   = sink = stream.Endpoint([("data", 32)])
         self.start  = Signal()
@@ -135,7 +134,7 @@ class _BISTBlockChecker(Module):
         blkcnt = Signal(32)
         datcnt = Signal(9)
 
-        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
+        self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             sink.ready.eq(1),
             self.done.eq(1),
@@ -171,7 +170,7 @@ class _BISTBlockChecker(Module):
         )
 
 
-class BISTBlockChecker(Module, AutoCSR):
+class BISTBlockChecker(LiteXModule):
     def __init__(self, random):
         self.sink   = sink = stream.Endpoint([("data", 32)])
         self.reset  = CSR()
@@ -182,7 +181,7 @@ class BISTBlockChecker(Module, AutoCSR):
 
         # # #
 
-        self.submodules.core = core = _BISTBlockChecker(random)
+        self.core = core = _BISTBlockChecker(random)
         self.comb += [
             sink.connect(core.sink),
             core.reset.eq(self.reset.re),
