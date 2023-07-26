@@ -1,15 +1,14 @@
 #
 # This file is part of LiteSDCard.
 #
-# Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2017-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
-from functools import reduce
-from operator import or_
-
 from migen import *
 from migen.genlib.resetsync import AsyncResetSynchronizer
+
+from litex.gen import *
 
 from litex.build.io import SDROutput, SDRTristate
 
@@ -37,7 +36,7 @@ _sdpads_layout = [
 
 # SDCard PHY Clocker -------------------------------------------------------------------------------
 
-class SDPHYClocker(Module, AutoCSR):
+class SDPHYClocker(LiteXModule):
     def __init__(self):
         self.divider = CSRStorage(9, reset=256)
         self.stop    = Signal()        # Stop input (for speed handling/backpressure).
@@ -74,7 +73,7 @@ class SDPHYClocker(Module, AutoCSR):
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
 @ResetInserter()
-class SDPHYR(Module):
+class SDPHYR(LiteXModule):
     def __init__(self, cmd=False, data=False, data_width=1, skip_start_bit=False):
         assert cmd or data
         self.pads_in  = pads_in = stream.Endpoint(_sdpads_layout)
@@ -103,7 +102,7 @@ class SDPHYR(Module):
 
 # SDCard PHY Init ----------------------------------------------------------------------------------
 
-class SDPHYInit(Module, AutoCSR):
+class SDPHYInit(LiteXModule):
     def __init__(self):
         self.initialize = CSR()
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
@@ -136,7 +135,7 @@ class SDPHYInit(Module, AutoCSR):
 
 # SDCard PHY Command Write -------------------------------------------------------------------------
 
-class SDPHYCMDW(Module):
+class SDPHYCMDW(LiteXModule):
     def __init__(self):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
@@ -188,7 +187,7 @@ class SDPHYCMDW(Module):
 
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
-class SDPHYCMDR(Module):
+class SDPHYCMDR(LiteXModule):
     def __init__(self, sys_clk_freq, cmd_timeout, cmdw, busy_timeout=1):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
@@ -308,7 +307,7 @@ class SDPHYCMDR(Module):
 
 # SDCard PHY Data Write ----------------------------------------------------------------------------
 
-class SDPHYDATAW(Module, AutoCSR):
+class SDPHYDATAW(LiteXModule):
     def __init__(self):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
@@ -332,10 +331,10 @@ class SDPHYDATAW(Module, AutoCSR):
         self.comb += self.status.fields.crc_error.eq(crc_error)
         self.comb += self.status.fields.write_error.eq(write_error)
 
-        self.submodules.crc = SDPHYR(data=True, data_width=1, skip_start_bit=True)
+        self.crc = SDPHYR(data=True, data_width=1, skip_start_bit=True)
         self.comb += self.crc.pads_in.eq(pads_in)
 
-        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
+        self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(accepted,    0),
             NextValue(crc_error,   0),
@@ -414,7 +413,7 @@ class SDPHYDATAW(Module, AutoCSR):
 
 # SDCard PHY Data Read -----------------------------------------------------------------------------
 
-class SDPHYDATAR(Module):
+class SDPHYDATAR(LiteXModule):
     def __init__(self, sys_clk_freq, data_timeout):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
@@ -504,7 +503,7 @@ class SDPHYDATAR(Module):
 
 # SDCard PHY IO ------------------------------------------------------------------------------------
 
-class SDPHYIO(Module):
+class SDPHYIO(LiteXModule):
     def __init__(self, clocker, sdpads, round_trip_latency=2):
         # Generate a data_i_ce pulse round_trip_latency cycles after clocker.clk goes high so that
         # the data input effectively get sampled on the first sys_clk after the SDCard clk goes high.
@@ -593,18 +592,18 @@ class SDPHYIOEmulator(SDPHYIO):
 
 # SDCard PHY ---------------------------------------------------------------------------------------
 
-class SDPHY(Module, AutoCSR):
+class SDPHY(LiteXModule):
     def __init__(self, pads, device, sys_clk_freq, cmd_timeout=10e-3, data_timeout=10e-3):
         use_emulator = hasattr(pads, "cmd_t") and hasattr(pads, "dat_t")
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
 
-        self.submodules.clocker = clocker = SDPHYClocker()
-        self.submodules.init    = init    = SDPHYInit()
-        self.submodules.cmdw    = cmdw    = SDPHYCMDW()
-        self.submodules.cmdr    = cmdr    = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
-        self.submodules.dataw   = dataw   = SDPHYDATAW()
-        self.submodules.datar   = datar   = SDPHYDATAR(sys_clk_freq, data_timeout)
+        self.clocker = clocker = SDPHYClocker()
+        self.init    = init    = SDPHYInit()
+        self.cmdw    = cmdw    = SDPHYCMDW()
+        self.cmdr    = cmdr    = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
+        self.dataw   = dataw   = SDPHYDATAW()
+        self.datar   = datar   = SDPHYDATAR(sys_clk_freq, data_timeout)
 
         # # #
 
@@ -612,15 +611,15 @@ class SDPHY(Module, AutoCSR):
 
         # IOs
         sdphy_cls = SDPHYIOEmulator if use_emulator else SDPHYIOGen
-        self.submodules.io = sdphy_cls(clocker, sdpads, pads)
+        self.io = sdphy_cls(clocker, sdpads, pads)
 
         # Connect pads_out of submodules to physical pads ----------------------------------------
         self.comb += [
-            sdpads.clk.eq(    reduce(or_, [m.pads_out.clk     for m in [init, cmdw, cmdr, dataw, datar]])),
-            sdpads.cmd.oe.eq( reduce(or_, [m.pads_out.cmd.oe  for m in [init, cmdw, cmdr, dataw, datar]])),
-            sdpads.cmd.o.eq(  reduce(or_, [m.pads_out.cmd.o   for m in [init, cmdw, cmdr, dataw, datar]])),
-            sdpads.data.oe.eq(reduce(or_, [m.pads_out.data.oe for m in [init, cmdw, cmdr, dataw, datar]])),
-            sdpads.data.o.eq( reduce(or_, [m.pads_out.data.o  for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.clk.eq(    Reduce("OR", [m.pads_out.clk     for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.cmd.oe.eq( Reduce("OR", [m.pads_out.cmd.oe  for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.cmd.o.eq(  Reduce("OR", [m.pads_out.cmd.o   for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.data.oe.eq(Reduce("OR", [m.pads_out.data.oe for m in [init, cmdw, cmdr, dataw, datar]])),
+            sdpads.data.o.eq( Reduce("OR", [m.pads_out.data.o  for m in [init, cmdw, cmdr, dataw, datar]])),
         ]
         for m in [init, cmdw, cmdr, dataw, datar]:
             self.comb += m.pads_out.ready.eq(self.clocker.ce)
