@@ -1,19 +1,20 @@
 #
 # This file is part of LiteSDCard.
 #
-# Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2017-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
-from migen.fhdl import verilog
+
+from litex.gen import *
 
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
 # CRC ----------------------------------------------------------------------------------------------
 
-class CRC(Module):
+class CRC(LiteXModule):
     def __init__(self, polynom, taps, dw, init=0):
         self.reset  = Signal()
         self.enable = Signal()
@@ -57,7 +58,7 @@ class CRC(Module):
 
 # CRC16Checker -------------------------------------------------------------------------------------
 
-class CRC16Inserter(Module):
+class CRC16Inserter(LiteXModule):
     def __init__(self):
         self.sink   = sink   = stream.Endpoint([("data", 8)])
         self.source = source = stream.Endpoint([("data", 8)])
@@ -76,7 +77,7 @@ class CRC16Inserter(Module):
                 crcs[i].din[1].eq(sink.data[4*1 + i]),
             ]
 
-        self.submodules.fsm = fsm = FSM(reset_state="DATA")
+        self.fsm = fsm = FSM(reset_state="DATA")
         fsm.act("DATA",
             NextValue(count, 0),
             sink.connect(source, omit={"last"}),
@@ -113,7 +114,7 @@ class CRC16Inserter(Module):
 
 # CRC16Checker -------------------------------------------------------------------------------------
 
-class CRC16Checker(Module):
+class CRC16Checker(LiteXModule):
     # TODO: currently only removing CRC block, add check using CRC16Inserter
     def __init__(self):
         self.sink   = sink   = stream.Endpoint([("data", 8)])
