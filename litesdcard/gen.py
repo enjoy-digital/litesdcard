@@ -3,7 +3,7 @@
 #
 # This file is part of LiteSDCard.
 #
-# Copyright (c) 2021 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2021-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
 """
@@ -20,6 +20,8 @@ for some use cases it could be interesting to generate a standalone verilog file
 import argparse
 
 from migen import *
+
+from litex.gen import *
 
 from litex.build.generic_platform import *
 from litex.build.xilinx.platform import XilinxPlatform
@@ -55,7 +57,7 @@ _io = [
 class LiteSDCardCore(SoCMini):
     def __init__(self, platform, clk_freq=int(100e6)):
         # CRG --------------------------------------------------------------------------------------
-        self.submodules.crg = CRG(platform.request("clk"), platform.request("rst"))
+        self.crg = CRG(platform.request("clk"), platform.request("rst"))
 
         # SoCMini ----------------------------------------------------------------------------------
         SoCMini.__init__(self, platform, clk_freq=clk_freq)
@@ -63,7 +65,7 @@ class LiteSDCardCore(SoCMini):
         # Wishbone Control -------------------------------------------------------------------------
         # Create Wishbone Control Slave interface, expose it and connect it to the SoC.
         wb_ctrl = wishbone.Interface()
-        self.add_wb_master(wb_ctrl)
+        self.bus.add_master(name="wb_ctrl", master=wb_ctrl)
         platform.add_extension(wb_ctrl.get_ios("wb_ctrl"))
         self.comb += wb_ctrl.connect_to_pads(self.platform.request("wb_ctrl"), mode="slave")
 
@@ -74,7 +76,7 @@ class LiteSDCardCore(SoCMini):
         self.comb += wb_dma.connect_to_pads(self.platform.request("wb_dma"), mode="master")
 
         # Create DMA Bus Handler (DMAs will be added by add_sdcard to it) and connect it to Wishbone DMA.
-        self.submodules.dma_bus = SoCBusHandler(
+        self.dma_bus = SoCBusHandler(
             name             = "SoCDMABusHandler",
             standard         = "wishbone",
             data_width       = 32,
@@ -88,7 +90,7 @@ class LiteSDCardCore(SoCMini):
 
         # IRQ
         irq_pad = platform.request("irq")
-        self.comb += irq_pad.eq(self.sdirq.irq)
+        self.comb += irq_pad.eq(self.sdcard_irq.irq)
 
 # Build --------------------------------------------------------------------------------------------
 
