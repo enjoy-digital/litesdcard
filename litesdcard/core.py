@@ -1,13 +1,15 @@
 #
 # This file is part of LiteSDCard.
 #
-# Copyright (c) 2017-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2017-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept.com>
 # Copyright (c) 2018 bunnie <bunnie@kosagi.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
 from migen.genlib.cdc import MultiReg
+
+from litex.gen import *
 
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
@@ -18,7 +20,7 @@ from litesdcard.crc import CRC16Checker, CRC16Inserter
 
 # SDCore -------------------------------------------------------------------------------------------
 
-class SDCore(Module, AutoCSR):
+class SDCore(LiteXModule):
     def __init__(self, phy):
         self.sink   = stream.Endpoint([("data", 8)])
         self.source = stream.Endpoint([("data", 8)])
@@ -64,9 +66,9 @@ class SDCore(Module, AutoCSR):
         block_count  = self.block_count.storage
 
         # CRC Inserter/Checkers --------------------------------------------------------------------
-        self.submodules.crc7_inserter  = crc7_inserter  = CRC(polynom=0x9, taps=7, dw=40)
-        self.submodules.crc16_inserter = crc16_inserter = CRC16Inserter()
-        self.submodules.crc16_checker  = crc16_checker  = CRC16Checker()
+        self.crc7_inserter  = crc7_inserter  = CRC(polynom=0x9, taps=7, dw=40)
+        self.crc16_inserter = crc16_inserter = CRC16Inserter()
+        self.crc16_checker  = crc16_checker  = CRC16Checker()
         self.comb += self.sink.connect(crc16_inserter.sink)
         self.comb += crc16_checker.source.connect(self.source)
 
@@ -114,7 +116,7 @@ class SDCore(Module, AutoCSR):
         ]
 
         # Main FSM ---------------------------------------------------------------------------------
-        self.submodules.fsm = fsm = FSM()
+        self.fsm = fsm = FSM()
         fsm.act("IDLE",
             # Set Cmd/Data Done and clear Count.
             NextValue(cmd_done,   1),
