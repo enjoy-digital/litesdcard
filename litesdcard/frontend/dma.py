@@ -1,10 +1,12 @@
 #
 # This file is part of LiteSDCard.
 #
-# Copyright (c) 2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2020-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
+
+from litex.gen import *
 
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
@@ -13,7 +15,7 @@ from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
 
 # SD Block2Mem DMA ---------------------------------------------------------------------------------
 
-class SDBlock2MemDMA(Module, AutoCSR):
+class SDBlock2MemDMA(LiteXModule):
     """Block to Memory DMA
 
     Receive a stream of blocks and write it to memory through DMA.
@@ -29,7 +31,7 @@ class SDBlock2MemDMA(Module, AutoCSR):
         fifo      = stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True)
         converter = stream.Converter(8, bus.data_width, reverse=True)
         self.submodules += fifo, converter
-        self.submodules.dma = WishboneDMAWriter(bus, with_csr=True, endianness=endianness)
+        self.dma = WishboneDMAWriter(bus, with_csr=True, endianness=endianness)
 
         # Flow
         start   = Signal()
@@ -59,7 +61,7 @@ class SDBlock2MemDMA(Module, AutoCSR):
 
 # SD Mem2Block DMA ---------------------------------------------------------------------------------
 
-class SDMem2BlockDMA(Module, AutoCSR):
+class SDMem2BlockDMA(LiteXModule):
     """Memory to Block DMA
 
     Read data from memory through DMA and generate a stream of blocks.
@@ -72,7 +74,7 @@ class SDMem2BlockDMA(Module, AutoCSR):
         # # #
 
         # Submodules
-        self.submodules.dma = WishboneDMAReader(bus, with_csr=True, endianness=endianness)
+        self.dma = WishboneDMAReader(bus, with_csr=True, endianness=endianness)
         converter = stream.Converter(bus.data_width, 8, reverse=True)
         fifo      = stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True)
         self.submodules += converter, fifo
