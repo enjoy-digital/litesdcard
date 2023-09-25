@@ -24,6 +24,7 @@ class SDCore(LiteXModule):
     def __init__(self, phy):
         self.sink   = stream.Endpoint([("data", 8)])
         self.source = stream.Endpoint([("data", 8)])
+        self.irq = Signal()
 
         # Cmd Registers.
         self.cmd_argument = CSRStorage(32, description="SDCard Cmd Argument.")
@@ -114,6 +115,11 @@ class SDCore(LiteXModule):
             crc7_inserter.reset.eq(1),
             crc7_inserter.enable.eq(1),
         ]
+
+        # IRQ / Generate IRQ on CMD done rising edge
+        done_d     = Signal()
+        self.sync += done_d.eq(cmd_done)
+        self.sync += self.irq.eq(cmd_done & ~done_d)
 
         # Main FSM ---------------------------------------------------------------------------------
         self.fsm = fsm = FSM()
