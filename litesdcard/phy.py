@@ -315,7 +315,7 @@ class SDPHYCMDR(LiteXModule):
 # SDCard PHY Data Write ----------------------------------------------------------------------------
 
 class SDPHYDATAW(LiteXModule):
-    def __init__(self):
+    def __init__(self, with_data_buffer=True):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("data", 8)])
@@ -328,6 +328,13 @@ class SDPHYDATAW(LiteXModule):
         ])
 
         # # #
+
+        if with_data_buffer:
+            assert sink is self.sink
+            self.data_buffer = stream.Buffer([("data", 8)], pipe_valid=True, pipe_ready=True)
+            self.comb += self.sink.connect(self.data_buffer.sink)
+            sink = self.data_buffer.source
+            assert sink is not self.sink
 
         count = Signal(8)
 
@@ -421,7 +428,7 @@ class SDPHYDATAW(LiteXModule):
 # SDCard PHY Data Read -----------------------------------------------------------------------------
 
 class SDPHYDATAR(LiteXModule):
-    def __init__(self, sys_clk_freq, data_timeout):
+    def __init__(self, sys_clk_freq, data_timeout, with_data_buffer=True):
         self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("block_length", 10)])
@@ -429,6 +436,13 @@ class SDPHYDATAR(LiteXModule):
         self.stop     = Signal()
 
         # # #
+
+        if with_data_buffer:
+            assert source is self.source
+            self.data_buffer = stream.Buffer([("data", 8), ("status", 3)], pipe_valid=True, pipe_ready=True)
+            self.comb += self.data_buffer.source.connect(self.source)
+            source = self.data_buffer.sink
+            assert source is not self.source
 
         timeout = Signal(32, reset=int(data_timeout*sys_clk_freq))
         count   = Signal(10)
