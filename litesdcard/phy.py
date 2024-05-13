@@ -60,22 +60,15 @@ class SDPHYClocker(LiteXModule):
         cases["default"] = clk.eq(clks[0])
         for i in range(2, 9):
             cases[2**i] = clk.eq(clks[i-1])
-        self.comb += Case(self.divider.storage, cases)
-
-        # FIXME: Use BUFG to improve timings on large Xilinx desings, try to improve and make it more generic.
-        from litex.gen import LiteXContext
-        from litex.build.xilinx import XilinxPlatform
-        if isinstance(LiteXContext.platform, XilinxPlatform):
-            self.specials += Instance("BUFG", i_I=clk & ~clk_d, o_O=self.ce)
-        else:
-            self.comb += self.ce.eq(clk & ~clk_d)
+        self.sync += Case(self.divider.storage, cases)
+        self.sync += self.ce.eq(clk & ~clk_d)
 
         # Ensure we don't get short pulses on the SDCard Clk.
         ce_delayed = Signal()
         ce_latched = Signal()
         self.sync += If(clk_d, ce_delayed.eq(self.clk_en))
         self.comb += If(clk_d, ce_latched.eq(self.clk_en)).Else(ce_latched.eq(ce_delayed))
-        self.comb += self.clk.eq(~clk & ce_latched)
+        self.sync += self.clk.eq(~clk & ce_latched)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
