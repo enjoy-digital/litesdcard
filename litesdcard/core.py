@@ -57,8 +57,6 @@ class SDCore(LiteXModule):
         # # #
 
         # Register Mapping -------------------------------------------------------------------------
-        cmd_argument = self.cmd_argument.storage
-        cmd_command  = self.cmd_command.storage
         cmd_send     = self.cmd_send.re
         cmd_response = self.cmd_response.status
         cmd_event    = self.cmd_event.status
@@ -80,6 +78,8 @@ class SDCore(LiteXModule):
         cmd_error    = Signal()
         cmd_timeout  = Signal()
 
+        cmd_argument = Signal(32)
+
         data_type    = Signal(2)
         data_count   = Signal(32)
         data_done    = Signal()
@@ -88,12 +88,14 @@ class SDCore(LiteXModule):
 
         cmd          = Signal(6)
 
+        self.sync += [
+            # Decode type of Cmd/Data from Register (Sync for timings).
+            cmd_argument.eq( self.cmd_argument.storage),
+            cmd_type.eq(     self.cmd_command.fields.cmd_type),
+            data_type.eq(    self.cmd_command.fields.data_type),
+            cmd.eq(          self.cmd_command.fields.cmd),
+        ]
         self.comb += [
-            # Decode type of Cmd/Data from Register.
-            cmd_type.eq(self.cmd_command.fields.cmd_type),
-            data_type.eq(self.cmd_command.fields.data_type),
-            cmd.eq(self.cmd_command.fields.cmd),
-
             # Encode Cmd Event to Register.
             self.cmd_event.fields.done.eq(cmd_done),
             self.cmd_event.fields.error.eq(cmd_error),
