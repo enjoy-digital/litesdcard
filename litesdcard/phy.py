@@ -46,21 +46,22 @@ class SDPHYClocker(LiteXModule):
 
         # # #
 
-        # Generate divided versions of sys_clk that will be used as SDCard clk.
-        clks = Signal(9)
-        self.sync += If(~self.stop, clks.eq(clks + 1))
-
-        # Generate delayed version of the SDCard clk (to do specific actions on change).
+        # SDCard Clk Divider Generation.
         clk   = Signal()
+        count = Signal(10)
+        self.sync += [
+            If(~self.stop,
+                count.eq(count + 1),
+                If(count >= (self.divider.storage[1:] - 1),
+                    clk.eq(~clk),
+                    count.eq(0),
+                )
+            )
+        ]
+
+        # SDCard CE Generation.
         clk_d = Signal()
         self.sync += clk_d.eq(clk)
-
-        # Select SDCard clk based on divider CSR value.
-        cases = {}
-        cases["default"] = clk.eq(clks[0])
-        for i in range(2, 9):
-            cases[2**i] = clk.eq(clks[i-1])
-        self.sync += Case(self.divider.storage, cases)
         self.sync += self.ce.eq(clk & ~clk_d)
 
         # Ensure we don't get short pulses on the SDCard Clk.

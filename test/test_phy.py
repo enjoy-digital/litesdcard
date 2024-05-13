@@ -30,8 +30,8 @@ class TestPHY(unittest.TestCase):
     def test_clocker_div4(self):
         def gen(dut):
             yield dut.divider.storage.eq(4)
-            clk   = "______--__--__--__-"
-            ce    = "____-___-___-___-__"
+            clk   = "_____--__--__--__-"
+            ce    = "___-___-___-___-__"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
@@ -42,8 +42,8 @@ class TestPHY(unittest.TestCase):
     def test_clocker_div8(self):
         def gen(dut):
             yield dut.divider.storage.eq(8)
-            clk   = "__________----____----"
-            ce    = "______-_______-_______"
+            clk   = "_________----____----"
+            ce    = "_____-_______-_______"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
