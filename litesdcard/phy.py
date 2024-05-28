@@ -62,14 +62,14 @@ class SDPHYClocker(LiteXModule):
         # SDCard CE Generation.
         clk_d = Signal()
         self.sync += clk_d.eq(clk)
-        self.sync += self.ce.eq(clk & ~clk_d)
+        self.comb += self.ce.eq(clk & ~clk_d)
 
         # Ensure we don't get short pulses on the SDCard Clk.
         ce_delayed = Signal()
         ce_latched = Signal()
         self.sync += If(clk_d, ce_delayed.eq(self.clk_en))
         self.comb += If(clk_d, ce_latched.eq(self.clk_en)).Else(ce_latched.eq(ce_delayed))
-        self.sync += self.clk.eq(~clk & ce_latched)
+        self.comb += self.clk.eq(~clk & ce_latched)
 
 # SDCard PHY Read ----------------------------------------------------------------------------------
 
