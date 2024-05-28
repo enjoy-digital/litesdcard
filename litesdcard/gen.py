@@ -49,6 +49,9 @@ _io = [
         Subsignal("cmd",  Pins(1)), # Note: Requires Pullup (internal or external).
         Subsignal("clk",  Pins(1)),
         Subsignal("cd",   Pins(1)),
+        Subsignal("cmd_dir",   Pins(1)),
+        Subsignal("dat0_dir",  Pins(1)),
+        Subsignal("dat13_dir", Pins(1)),
     ),
 ]
 
