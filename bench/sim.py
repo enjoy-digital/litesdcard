@@ -34,11 +34,11 @@ class BenchSim(SimSoC):
         # Sampler --------------------------------------------------------------------------------
         data = Signal(8)
         self.sync += data.eq(data + 1)
-        self.submodules.sampler = Sampler(data)
+        self.sampler = Sampler(data)
 
         # DRAMFIFO ---------------------------------------------------------------------------------
         from litedram.frontend.fifo import LiteDRAMFIFO
-        self.submodules.fifo = LiteDRAMFIFO(
+        self.fifo = LiteDRAMFIFO(
             data_width = 8,
             base       = 0x00000000,
             depth      = 0x01000000, # 16MB
@@ -49,7 +49,7 @@ class BenchSim(SimSoC):
         # UDPStreamer ------------------------------------------------------------------------------
         from liteeth.common import convert_ip
         from liteeth.frontend.stream import LiteEthStream2UDPTX
-        udp_port       = self.ethcore.udp.crossbar.get_port(host_udp_port, dw=8)
+        udp_port       = self.ethcore_etherbone.udp.crossbar.get_port(host_udp_port, dw=8)
         udp_streamer   = LiteEthStream2UDPTX(
             ip_address = convert_ip(host_ip),
             udp_port   = host_udp_port,
