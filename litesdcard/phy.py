@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
+from migen.genlib.cdc import MultiReg
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.gen import *
@@ -505,17 +506,16 @@ class SDPHYDATAR(LiteXModule):
 # SDCard PHY IO ------------------------------------------------------------------------------------
 
 class SDPHYIO(LiteXModule):
-    def __init__(self, clocker, sdpads, round_trip_latency=2):
-        # Generate a data_i_ce pulse round_trip_latency cycles after clocker.clk goes high so that
-        # the data input effectively get sampled on the first sys_clk after the SDCard clk goes high.
-        clocker_clk_delay = Signal(round_trip_latency)
-        self.sync += clocker_clk_delay.eq(Cat(clocker.clk, clocker_clk_delay))
-        self.sync += sdpads.data_i_ce.eq(clocker_clk_delay[-1] & ~clocker_clk_delay[-2])
-
+    def add_data_i_ce(self, clocker, sdpads):
+        # Sample Data on Sys Clk before SDCard Clk rising edge.
+        clk_i   = Signal()
+        clk_i_d = Signal()
+        self.specials += MultiReg(~clocker.clk, clk_i, n=1, odomain="sys") # n = 1 = SDROutput / SDRTristate delay.
+        self.sync += clk_i_d.eq(clk_i)
+        self.comb += sdpads.data_i_ce.eq(clk_i & ~clk_i_d) # Rising Edge.
 
 class SDPHYIOGen(SDPHYIO):
     def __init__(self, clocker, sdpads, pads):
-        SDPHYIO.__init__(self, clocker, sdpads, round_trip_latency=2)
         # Rst
         if hasattr(pads, "rst"):
             self.comb += pads.rst.eq(0)
@@ -545,6 +545,7 @@ class SDPHYIOGen(SDPHYIO):
                 oe  = sdpads.data.oe,
                 i   = sdpads.data.i[i],
             )
+        self.add_data_i_ce(clocker, sdpads)
 
         # Direction (optional)
         if hasattr(pads, "cmd_dir"):
@@ -570,7 +571,6 @@ class SDPHYIOGen(SDPHYIO):
 
 class SDPHYIOEmulator(SDPHYIO):
     def __init__(self, clocker, sdpads, pads):
-        SDPHYIO.__init__(self, clocker, sdpads, round_trip_latency=2) # FIXME: check round_trip_latency.
         # Clk
         self.comb += pads.clk.eq(clocker.clk)
 
@@ -588,6 +588,7 @@ class SDPHYIOEmulator(SDPHYIO):
             If(sdpads.data.oe, pads.dat_i.eq(sdpads.data.o)),
             sdpads.data.i.eq(0b1111),
         ]
+        self.data_i_ce(clocker, sdpads)
         for i in range(4):
             self.comb += If(~pads.dat_t[i], sdpads.data.i[i].eq(pads.dat_o[i]))
 
