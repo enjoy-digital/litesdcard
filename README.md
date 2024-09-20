@@ -4,7 +4,7 @@
                             / /__/ / __/ -_)\ \/ // / /__/ _ `/ __/ _  /
                            /____/_/\__/\__/___/____/\___/\_,_/_/  \_,_/
 
-                               Copyright 2017-2022 / EnjoyDigital
+                               Copyright 2017-2024 / EnjoyDigital
                                Copyright 2017-2018 / LambdaConcept
 
                             A small footprint and configurable SDCard
