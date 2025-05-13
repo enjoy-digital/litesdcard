@@ -537,14 +537,13 @@ class SDPHYIOGen(SDPHYIO):
         )
 
         # Data
-        for i in range(4):
-            self.specials += SDRTristate(
-                clk = ClockSignal("sys"),
-                io  = pads.data[i],
-                o   = sdpads.data.o[i],
-                oe  = sdpads.data.oe,
-                i   = sdpads.data.i[i],
-            )
+        self.specials += SDRTristate(
+            clk = ClockSignal("sys"),
+            io  = pads.data,
+            o   = sdpads.data.o,
+            oe  = Replicate(sdpads.data.oe, len(pads.data)),
+            i   = sdpads.data.i,
+        )
         self.add_data_i_ce(clocker, sdpads)
 
         # Direction (optional)
