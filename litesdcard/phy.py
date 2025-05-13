@@ -587,7 +587,7 @@ class SDPHYIOEmulator(SDPHYIO):
             If(sdpads.data.oe, pads.dat_i.eq(sdpads.data.o)),
             sdpads.data.i.eq(0b1111),
         ]
-        self.data_i_ce(clocker, sdpads)
+        self.add_data_i_ce(clocker, sdpads)
         for i in range(4):
             self.comb += If(~pads.dat_t[i], sdpads.data.i[i].eq(pads.dat_o[i]))
 
