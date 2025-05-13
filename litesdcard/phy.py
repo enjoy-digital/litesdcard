@@ -20,20 +20,21 @@ from litesdcard.common import *
 
 # Pads ---------------------------------------------------------------------------------------------
 
-_sdpads_layout = [
-    ("clk", 1),
-    ("cmd", [
-        ("i",  1),
-        ("o",  1),
-        ("oe", 1)
-    ]),
-    ("data", [
-        ("i",  4),
-        ("o",  4),
-        ("oe", 1)
-    ]),
-    ("data_i_ce", 1),
-]
+def _sdpads_layout(data_width=4):
+    return [
+        ("clk", 1),
+        ("cmd", [
+            ("i",  1),
+            ("o",  1),
+            ("oe", 1)
+        ]),
+        ("data", [
+            ("i",  data_width),
+            ("o",  data_width),
+            ("oe", 1)
+        ]),
+        ("data_i_ce", 1),
+    ]
 
 # SDCard PHY Clocker -------------------------------------------------------------------------------
 
@@ -76,9 +77,9 @@ class SDPHYClocker(LiteXModule):
 
 @ResetInserter()
 class SDPHYR(LiteXModule):
-    def __init__(self, cmd=False, data=False, data_width=1, skip_start_bit=False):
+    def __init__(self, sdpads_layout, cmd=False, data=False, data_width=1, skip_start_bit=False):
         assert cmd or data
-        self.pads_in  = pads_in = stream.Endpoint(_sdpads_layout)
+        self.pads_in  = pads_in = stream.Endpoint(sdpads_layout)
         self.source   = source  = stream.Endpoint([("data", 8)])
 
         # # #
@@ -105,10 +106,10 @@ class SDPHYR(LiteXModule):
 # SDCard PHY Init ----------------------------------------------------------------------------------
 
 class SDPHYInit(LiteXModule):
-    def __init__(self):
+    def __init__(self, sdpads_layout):
         self.initialize = CSR()
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+        self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
 
         # # #
 
@@ -126,7 +127,7 @@ class SDPHYInit(LiteXModule):
             pads_out.cmd.oe.eq(1),
             pads_out.cmd.o.eq(1),
             pads_out.data.oe.eq(1),
-            pads_out.data.o.eq(0b1111),
+            pads_out.data.o.eq(Replicate(C(1), len(pads_out.data.o))),
             If(pads_out.ready,
                 NextValue(count, count + 1),
                 If(count == (80-1),
@@ -138,9 +139,9 @@ class SDPHYInit(LiteXModule):
 # SDCard PHY Command Write -------------------------------------------------------------------------
 
 class SDPHYCMDW(LiteXModule):
-    def __init__(self):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+    def __init__(self, sdpads_layout):
+        self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("data", 8), ("cmd_type", 2)])
 
         self.done = Signal()
@@ -190,9 +191,9 @@ class SDPHYCMDW(LiteXModule):
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
 class SDPHYCMDR(LiteXModule):
-    def __init__(self, sys_clk_freq, cmd_timeout, cmdw, busy_timeout=1):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+    def __init__(self, sdpads_layout, sys_clk_freq, cmd_timeout, cmdw, busy_timeout=1):
+        self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("data_type", 2), ("length", 8)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
@@ -202,7 +203,7 @@ class SDPHYCMDR(LiteXModule):
         count   = Signal(8)
         busy    = Signal()
 
-        cmdr = SDPHYR(cmd=True, data_width=1, skip_start_bit=False)
+        cmdr = SDPHYR(sdpads_layout, cmd=True, data_width=1, skip_start_bit=False)
         self.comb += pads_in.connect(cmdr.pads_in)
         fsm  = FSM(reset_state="IDLE")
         self.submodules += cmdr, fsm
@@ -310,9 +311,9 @@ class SDPHYCMDR(LiteXModule):
 # SDCard PHY Data Write ----------------------------------------------------------------------------
 
 class SDPHYDATAW(LiteXModule):
-    def __init__(self):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+    def __init__(self, sdpads_layout, data_width):
+        self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("data", 8)])
         self.stop     = Signal()
 
@@ -333,7 +334,7 @@ class SDPHYDATAW(LiteXModule):
         self.comb += self.status.fields.crc_error.eq(crc_error)
         self.comb += self.status.fields.write_error.eq(write_error)
 
-        self.crc = SDPHYR(data=True, data_width=1, skip_start_bit=True)
+        self.crc = SDPHYR(sdpads_layout, data=True, data_width=1, skip_start_bit=True)
         self.comb += self.crc.pads_in.eq(pads_in)
 
         self.fsm = fsm = FSM(reset_state="IDLE")
@@ -367,30 +368,74 @@ class SDPHYDATAW(LiteXModule):
                 NextState("DATA")
             )
         )
-        fsm.act("DATA",
-            self.stop.eq(~sink.valid),
-            pads_out.clk.eq(1),
-            pads_out.data.oe.eq(1),
-            Case(count, {
-                0: pads_out.data.o.eq(sink.data[4:8]),
-                1: pads_out.data.o.eq(sink.data[0:4]),
-            }),
-            If(pads_out.ready,
-                NextValue(count, count + 1),
-                If(count == (2-1),
-                    NextValue(count, 0),
+
+        data_cases = {
+            "default": [
+                Case(count, {
+                0: pads_out.data.o[0].eq(sink.data[7]),
+                1: pads_out.data.o[0].eq(sink.data[6]),
+                2: pads_out.data.o[0].eq(sink.data[5]),
+                3: pads_out.data.o[0].eq(sink.data[4]),
+                4: pads_out.data.o[0].eq(sink.data[3]),
+                5: pads_out.data.o[0].eq(sink.data[2]),
+                6: pads_out.data.o[0].eq(sink.data[1]),
+                7: pads_out.data.o[0].eq(sink.data[0]),
+                }),
+                If(pads_out.ready,
+                    If(count == (8-1),
+                        NextValue(count, 0),
+                        If(sink.last,
+                            NextState("STOP")
+                        ).Else(
+                            sink.ready.eq(1)
+                        )
+                    ).Else(
+                        NextValue(count, count + 1),
+                    )
+                )
+            ],
+            SD_PHY_SPEED_4X: [
+                Case(count, {
+                    0: pads_out.data.o[:4].eq(sink.data[4:8]),
+                    1: pads_out.data.o[:4].eq(sink.data[0:4]),
+                }),
+                If(pads_out.ready,
+                    If(count == (2-1),
+                        NextValue(count, 0),
+                        If(sink.last,
+                            NextState("STOP")
+                        ).Else(
+                            sink.ready.eq(1)
+                        )
+                    ).Else(
+                        NextValue(count, count + 1),
+                    )
+                )
+            ],
+        }
+
+        if len(pads_out.data.o) >= 8:
+            data_cases[SD_PHY_SPEED_8X] = [
+                pads_out.data.o[:8].eq(sink.data[:8]),
+                If(pads_out.ready,
                     If(sink.last,
                         NextState("STOP")
                     ).Else(
                         sink.ready.eq(1)
                     )
                 )
-            )
+            ]
+
+        fsm.act("DATA",
+            self.stop.eq(~sink.valid),
+            pads_out.clk.eq(1),
+            pads_out.data.oe.eq(1),
+            Case(data_width, data_cases),
         )
         fsm.act("STOP",
             pads_out.clk.eq(1),
             pads_out.data.oe.eq(1),
-            pads_out.data.o.eq(0b1111),
+            pads_out.data.o.eq(Replicate(C(1), len(pads_out.data.o))),
             If(pads_out.ready,
                 self.crc.reset.eq(1),
                 NextState("CRC")
@@ -416,9 +461,9 @@ class SDPHYDATAW(LiteXModule):
 # SDCard PHY Data Read -----------------------------------------------------------------------------
 
 class SDPHYDATAR(LiteXModule):
-    def __init__(self, sys_clk_freq, data_timeout):
-        self.pads_in  = pads_in  = stream.Endpoint(_sdpads_layout)
-        self.pads_out = pads_out = stream.Endpoint(_sdpads_layout)
+    def __init__(self, sdpads_layout, data_width, sys_clk_freq, data_timeout):
+        self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
+        self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("block_length", 10)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
         self.stop     = Signal()
@@ -428,25 +473,51 @@ class SDPHYDATAR(LiteXModule):
         timeout = Signal(32, reset=int(data_timeout*sys_clk_freq))
         count   = Signal(10)
 
-        datar = SDPHYR(data=True, data_width=4, skip_start_bit=True)
-        self.comb += pads_in.connect(datar.pads_in)
-        fsm = FSM(reset_state="IDLE")
-        self.submodules += datar, fsm
+        datar_source  = stream.Endpoint([("data", 8)])
+        datar_reset   = Signal()
+
+        self.datar_1x = datar_1x = SDPHYR(sdpads_layout, data=True, data_width=1, skip_start_bit=True)
+        self.datar_4x = datar_4x = SDPHYR(sdpads_layout, data=True, data_width=4, skip_start_bit=True)
+
+        self.comb += [
+            datar_1x.reset.eq(datar_reset),
+            datar_4x.reset.eq(datar_reset),
+            pads_in.connect(datar_1x.pads_in),
+            pads_in.connect(datar_4x.pads_in),
+        ]
+
+        datar_cases = {
+            "default": datar_1x.source.connect(datar_source),
+            SD_PHY_SPEED_4X: datar_4x.source.connect(datar_source),
+        }
+
+        if len(pads_out.data.o) >= 8:
+            self.datar_8x = datar_8x = SDPHYR(sdpads_layout, data=True, data_width=8, skip_start_bit=True)
+            self.comb += [
+                datar_8x.reset.eq(datar_reset),
+                pads_in.connect(datar_8x.pads_in),
+            ]
+
+            datar_cases[SD_PHY_SPEED_8X] = datar_8x.source.connect(datar_source)
+
+        self.comb += Case(data_width, datar_cases)
+
+        self. fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
                 pads_out.clk.eq(1),
                 NextValue(timeout, timeout.reset),
                 NextValue(count, 0),
-                NextValue(datar.reset, 1),
+                NextValue(datar_reset, 1),
                 NextState("WAIT")
             )
         )
         fsm.act("WAIT",
             pads_out.clk.eq(1),
-            NextValue(datar.reset, 0),
+            NextValue(datar_reset, 0),
             NextValue(timeout, timeout - 1),
-            If(datar.source.valid,
+            If(datar_source.valid,
                 NextState("DATA")
             ),
             NextValue(timeout, timeout - 1),
@@ -457,14 +528,14 @@ class SDPHYDATAR(LiteXModule):
         )
         fsm.act("DATA",
             pads_out.clk.eq(1),
-            source.valid.eq(datar.source.valid),
+            source.valid.eq(datar_source.valid),
             source.status.eq(SDCARD_STREAM_STATUS_OK),
             source.first.eq(count == 0),
             source.last.eq(count == (sink.block_length + 8 - 1)), # 1 block + 64-bit CRC
-            source.data.eq(datar.source.data),
+            source.data.eq(datar_source.data),
             If(source.valid,
                 If(source.ready,
-                    datar.source.ready.eq(1),
+                    datar_source.ready.eq(1),
                     NextValue(count, count + 1),
                     If(source.last,
                         sink.ready.eq(1),
@@ -599,16 +670,32 @@ class SDPHY(LiteXModule):
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
 
+        pads_data_width = len(pads.dat_t) if use_emulator else len(pads.data)
+        sdpads_layout = _sdpads_layout(pads_data_width)
+
+        data_width = Signal(2)
+
         self.clocker = clocker = SDPHYClocker()
-        self.init    = init    = SDPHYInit()
-        self.cmdw    = cmdw    = SDPHYCMDW()
-        self.cmdr    = cmdr    = SDPHYCMDR(sys_clk_freq, cmd_timeout, cmdw)
-        self.dataw   = dataw   = SDPHYDATAW()
-        self.datar   = datar   = SDPHYDATAR(sys_clk_freq, data_timeout)
+        self.init    = init    = SDPHYInit(sdpads_layout)
+        self.cmdw    = cmdw    = SDPHYCMDW(sdpads_layout)
+        self.cmdr    = cmdr    = SDPHYCMDR(sdpads_layout, sys_clk_freq, cmd_timeout, cmdw)
+        self.dataw   = dataw   = SDPHYDATAW(sdpads_layout, data_width)
+        self.datar   = datar   = SDPHYDATAR(sdpads_layout, data_width, sys_clk_freq, data_timeout)
 
-        # # #
+        self.settings = CSRStorage(fields=[
+            CSRField("data_width", size=2, offset=0, values=[
+                ("0b00", "1-bit"),
+                ("0b01", "4-bit"),
+                ("0b10", "8-bit"),
+            ]),
+        ])
 
-        self.sdpads = sdpads = Record(_sdpads_layout)
+        self.comb += data_width.eq(self.settings.fields.data_width)
+
+        self.sdpads = sdpads = Record(sdpads_layout)
+
+        if len(sdpads.data.i) >= 8:
+            self.support_8x = CSRConstant(1)
 
         # IOs
         sdphy_cls = SDPHYIOEmulator if use_emulator else SDPHYIOGen
