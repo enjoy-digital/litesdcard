@@ -45,6 +45,9 @@ class SDPHYClocker(LiteXModule):
         self.clk_en  = Signal(reset=1) # Clk enable input (from logic running in sys_clk domain).
         self.clk     = Signal()        # Clk output (for SDCard pads).
 
+        divider = Signal(len(self.divider.storage))
+        self.comb += divider.eq(self.divider.storage + 1)  # + 1 to ensure the resulting frequency is not too high.
+
         # # #
 
         # SDCard Clk Divider Generation.
@@ -52,10 +55,11 @@ class SDPHYClocker(LiteXModule):
         count = Signal(10)
         self.sync += [
             If(~self.stop,
-                count.eq(count + 1),
-                If(count >= (self.divider.storage[1:] - 1),
+                If((count + 1) >= divider[1:],
                     clk.eq(~clk),
                     count.eq(0),
+                ).Else(
+                    count.eq(count + 1)
                 )
             )
         ]
