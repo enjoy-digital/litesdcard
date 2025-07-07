@@ -53,7 +53,7 @@ class SDPHYClocker(LiteXModule):
         count = Signal(10)
         self.sync += [
             # half = max(1, ceil((storage + 1) / 2)).
-            half.eq((self.divider.storage + 2) >> 1),
+            half.eq((self.divider.storage + 2) >> 1), # +2 compensates for the truncating >> 1.
 
             If(~self.stop,
                 If(count == 0,
