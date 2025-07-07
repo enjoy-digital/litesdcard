@@ -15,40 +15,96 @@ def c2bool(c):
 
 
 class TestPHY(unittest.TestCase):
-    def test_clocker_div2(self):
+    def test_clocker_div0(self):
+        # Effective Div = 2.
         def gen(dut):
-            yield dut.divider.storage.eq(2)
-            clk   = "___-_-_-_-_-_-_-_"
-            ce    = "__-_-_-_-_-_-_-_-"
+            clk   = "__-_-_-_-_-_-_-_"
+            ce    = "_-_-_-_-_-_-_-_-"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
                 yield
         dut = SDPHYClocker()
+        dut.divider.storage.reset = 0
+        run_simulation(dut, gen(dut))
+
+    def test_clocker_div1(self):
+        # Effective Div = 2.
+        def gen(dut):
+            clk   = "__-_-_-_-_-_-_-_"
+            ce    = "_-_-_-_-_-_-_-_-"
+            for i in range(len(clk)):
+                self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
+                self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
+                yield
+        dut = SDPHYClocker()
+        dut.divider.storage.reset = 1
+        run_simulation(dut, gen(dut))
+
+    def test_clocker_div2(self):
+        # Effective Div = 2.
+        def gen(dut):
+            clk   = "__-_-_-_-_-_-_-_"
+            ce    = "_-_-_-_-_-_-_-_-"
+            for i in range(len(clk)):
+                self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
+                self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
+                yield
+        dut = SDPHYClocker()
+        dut.divider.storage.reset = 2
+        run_simulation(dut, gen(dut))
+
+    def test_clocker_div3(self):
+        # Effective Div = 4.
+        def gen(dut):
+            clk   = "__--__--__--__--"
+            ce    = "_-__-___-___-___"
+            for i in range(len(clk)):
+                self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
+                self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
+                yield
+        dut = SDPHYClocker()
+        dut.divider.storage.reset = 3
         run_simulation(dut, gen(dut))
 
     def test_clocker_div4(self):
+        # Effective Div = 4.
         def gen(dut):
-            yield dut.divider.storage.eq(4)
-            clk   = "____--__--__--__-"
-            ce    = "__-___-___-___-__"
+            clk   = "__--__--__--__--"
+            ce    = "_-__-___-___-___"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
                 yield
         dut = SDPHYClocker()
+        dut.divider.storage.reset = 4
+        run_simulation(dut, gen(dut))
+
+    def test_clocker_div5(self):
+        # Effective Div = 6.
+        def gen(dut):
+            clk   = "__---___---___---_"
+            ce    = "_-___-_____-_____-"
+            for i in range(len(clk)):
+                self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
+                self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
+                yield
+        dut = SDPHYClocker()
+        dut.divider.storage.reset = 5
         run_simulation(dut, gen(dut))
 
     def test_clocker_div8(self):
+        # Effective Div = 8.
         def gen(dut):
             yield dut.divider.storage.eq(8)
-            clk   = "________----____----"
-            ce    = "____-_______-_______"
+            clk   = "__----____----___"
+            ce    = "_-____-_______-__"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
                 yield
         dut = SDPHYClocker()
+        dut.divider.storage.reset = 8
         run_simulation(dut, gen(dut))
 
     def test_phyr_cmd(self):
