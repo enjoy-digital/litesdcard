@@ -53,14 +53,11 @@ class SDPHYClocker(LiteXModule):
         count = Signal(10)
         self.sync += [
             # half = max(1, ceil((storage + 1) / 2)).
-            half.eq(Mux(self.divider.storage < 2,
-                1,                              # 0 or 1 → clamp.
-                (self.divider.storage + 1) >> 1 # ceil().
-            )),
+            half.eq((self.divider.storage + 1) >> 1),
             If(~self.stop,
-                If(count == 0,
+                If(count <= 1,
                     clk.eq(~clk),          # 50 % duty-cycle toggle.
-                    count.eq(half - 1)     # reload N-1 → total phase = N.
+                    count.eq(half)         # reload.
                 ).Else(
                     count.eq(count - 1)    # simple down-count.
                 )
