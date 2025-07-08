@@ -57,8 +57,8 @@ class TestPHY(unittest.TestCase):
     def test_clocker_div3(self):
         # Effective Div = 4.
         def gen(dut):
-            clk   = "__--__--__--__--"
-            ce    = "_-__-___-___-___"
+            clk   = "___--__--__--__--"
+            ce    = "_-___-___-___-___"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
@@ -70,8 +70,8 @@ class TestPHY(unittest.TestCase):
     def test_clocker_div4(self):
         # Effective Div = 4.
         def gen(dut):
-            clk   = "__--__--__--__--"
-            ce    = "_-__-___-___-___"
+            clk   = "___--__--__--__--"
+            ce    = "_-___-___-___-___"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
@@ -83,8 +83,8 @@ class TestPHY(unittest.TestCase):
     def test_clocker_div5(self):
         # Effective Div = 6.
         def gen(dut):
-            clk   = "__---___---___---_"
-            ce    = "_-___-_____-_____-"
+            clk   = "____---___---___---_"
+            ce    = "_-_____-_____-_____-"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
@@ -97,8 +97,8 @@ class TestPHY(unittest.TestCase):
         # Effective Div = 8.
         def gen(dut):
             yield dut.divider.storage.eq(8)
-            clk   = "__----____----___"
-            ce    = "_-____-_______-__"
+            clk   = "_____----____----___"
+            ce    = "_-_______-_______-__"
             for i in range(len(clk)):
                 self.assertEqual(c2bool(clk[i]),   (yield dut.clk))
                 self.assertEqual(c2bool(ce[i]),    (yield dut.ce))
