@@ -49,13 +49,19 @@ class SDPHYClocker(LiteXModule):
 
         # SDCard Clk Divider Generation.
         clk   = Signal()
+        half  = Signal(10) # >= 1 : half-period in sys-clk cycles.
         count = Signal(10)
+
+        # half = max(1, ceil((storage + 1) / 2)).
+        self.comb += half.eq((self.divider.storage + 1) >> 1)
+
         self.sync += [
             If(~self.stop,
-                count.eq(count + 1),
-                If(count >= (self.divider.storage[1:] - 1),
-                    clk.eq(~clk),
-                    count.eq(0),
+                If(count <= 1,
+                    clk.eq(~clk),       # 50 % duty-cycle toggle.
+                    count.eq(half)      # reload count.
+                ).Else(
+                    count.eq(count - 1) # simple down-count.
                 )
             )
         ]
