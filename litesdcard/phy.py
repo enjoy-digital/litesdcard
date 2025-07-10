@@ -683,7 +683,9 @@ class SDPHY(LiteXModule):
         self.datar   = datar   = SDPHYDATAR(sdpads_layout, data_width, sys_clk_freq, data_timeout)
 
         self.settings = CSRStorage(fields=[
-            CSRField("data_width", size=2, offset=0, values=[
+            # reset value is set to 4x speed for compatibility with existing designs.
+            # new implementations should not rely on this default value.
+            CSRField("data_width", size=2, offset=0, reset=SD_PHY_SPEED_4X, values=[
                 ("0b00", "1-bit"),
                 ("0b01", "4-bit"),
                 ("0b10", "8-bit"),
