@@ -9,6 +9,7 @@ import unittest
 from migen import *
 
 from litesdcard.phy import *
+from litesdcard.phy import _sdpads_layout
 
 def c2bool(c):
     return {"-": 1, "_": 0}[c]
@@ -123,7 +124,7 @@ class TestPHY(unittest.TestCase):
                     yield
                 self.assertEqual(data[i], (yield dut.source.data))
                 yield
-        dut = SDPHYR(cmd=True)
+        dut = SDPHYR(_sdpads_layout(4), cmd=True)
         run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phyr_data(self):
@@ -141,7 +142,7 @@ class TestPHY(unittest.TestCase):
                     yield
                 self.assertEqual(data[i], (yield dut.source.data))
                 yield
-        dut = SDPHYR(data=True, data_width=4, skip_start_bit=True)
+        dut = SDPHYR(_sdpads_layout(4), data=True, data_width=4, skip_start_bit=True)
         run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phyinit(self):
@@ -155,7 +156,7 @@ class TestPHY(unittest.TestCase):
                 for i in range(len(clk)):
                     self.assertEqual(c2bool(clk[i]), (yield dut.pads_out.clk))
                     yield
-        dut = SDPHYInit()
+        dut = SDPHYInit(_sdpads_layout(4))
         run_simulation(dut, [gen(dut)])
 
     def test_phycmdw(self):
@@ -176,7 +177,7 @@ class TestPHY(unittest.TestCase):
                 self.assertEqual(c2bool(cmd_o[i]),  (yield dut.pads_out.cmd.o))
                 self.assertEqual(c2bool(cmd_oe[i]), (yield dut.pads_out.cmd.oe))
                 yield
-        dut = SDPHYCMDW()
+        dut = SDPHYCMDW(_sdpads_layout(4))
         run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phycmdr(self):
@@ -203,7 +204,7 @@ class TestPHY(unittest.TestCase):
                 yield
         cmdw = Module()
         cmdw.done = 1
-        dut  = SDPHYCMDR(1e6, 5e-3, cmdw)
+        dut  = SDPHYCMDR(_sdpads_layout(4), 1e6, 5e-3, cmdw)
         run_simulation(dut, [stim_gen(dut), check_gen(dut)])
 
     def test_phycrc(self):

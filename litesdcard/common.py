@@ -49,3 +49,7 @@ SDCARD_TUNING_BLOCK = [
     0xfff0fff0, 0x0ffccc3c, 0xcc33cccf, 0xffefffee,
     0xfffdfffd, 0xdfffbfff, 0xbbfff7ff, 0xf77f7bde,
 ]
+
+SD_PHY_SPEED_1X = 0b00
+SD_PHY_SPEED_4X = 0b01
+SD_PHY_SPEED_8X = 0b10
