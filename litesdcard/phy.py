@@ -375,32 +375,36 @@ class SDPHYDATAW(LiteXModule):
             )
         )
 
-        data_cases = {
-            "default": [
-                Case(count, {
-                0: pads_out.data.o[0].eq(sink.data[7]),
-                1: pads_out.data.o[0].eq(sink.data[6]),
-                2: pads_out.data.o[0].eq(sink.data[5]),
-                3: pads_out.data.o[0].eq(sink.data[4]),
-                4: pads_out.data.o[0].eq(sink.data[3]),
-                5: pads_out.data.o[0].eq(sink.data[2]),
-                6: pads_out.data.o[0].eq(sink.data[1]),
-                7: pads_out.data.o[0].eq(sink.data[0]),
-                }),
-                If(pads_out.ready,
-                    If(count == (8-1),
-                        NextValue(count, 0),
-                        If(sink.last,
-                            NextState("STOP")
-                        ).Else(
-                            sink.ready.eq(1)
-                        )
+        data_cases = {}
+        # SD_PHY_SPEED_1X.
+        data_cases["default"] = [
+            Case(count, {
+                0 : pads_out.data.o[0].eq(sink.data[7]),
+                1 : pads_out.data.o[0].eq(sink.data[6]),
+                2 : pads_out.data.o[0].eq(sink.data[5]),
+                3 : pads_out.data.o[0].eq(sink.data[4]),
+                4 : pads_out.data.o[0].eq(sink.data[3]),
+                5 : pads_out.data.o[0].eq(sink.data[2]),
+                6 : pads_out.data.o[0].eq(sink.data[1]),
+                7 : pads_out.data.o[0].eq(sink.data[0]),
+            }),
+            If(pads_out.ready,
+                If(count == (8-1),
+                    NextValue(count, 0),
+                    If(sink.last,
+                        NextState("STOP")
                     ).Else(
-                        NextValue(count, count + 1),
+                        sink.ready.eq(1)
                     )
+                ).Else(
+                    NextValue(count, count + 1),
                 )
-            ],
-            SD_PHY_SPEED_4X: [
+            )
+        ]
+
+        # SD_PHY_SPEED_4X.
+        if len(pads_out.data.o) >= 4:
+            data_cases[SD_PHY_SPEED_4X] = [
                 Case(count, {
                     0: pads_out.data.o[:4].eq(sink.data[4:8]),
                     1: pads_out.data.o[:4].eq(sink.data[0:4]),
@@ -417,9 +421,9 @@ class SDPHYDATAW(LiteXModule):
                         NextValue(count, count + 1),
                     )
                 )
-            ],
-        }
+            ]
 
+        # SD_PHY_SPEED_8X.
         if len(pads_out.data.o) >= 8:
             data_cases[SD_PHY_SPEED_8X] = [
                 pads_out.data.o[:8].eq(sink.data[:8]),
@@ -482,28 +486,32 @@ class SDPHYDATAR(LiteXModule):
         datar_source  = stream.Endpoint([("data", 8)])
         datar_reset   = Signal()
 
-        self.datar_1x = datar_1x = SDPHYR(sdpads_layout, data=True, data_width=1, skip_start_bit=True)
-        self.datar_4x = datar_4x = SDPHYR(sdpads_layout, data=True, data_width=4, skip_start_bit=True)
+        datar_cases = {}
 
+        # SD_PHY_SPEED_1X.
+        self.datar_1x = datar_1x = SDPHYR(sdpads_layout, data=True, data_width=1, skip_start_bit=True)
         self.comb += [
             datar_1x.reset.eq(datar_reset),
-            datar_4x.reset.eq(datar_reset),
             pads_in.connect(datar_1x.pads_in),
-            pads_in.connect(datar_4x.pads_in),
         ]
+        datar_cases["default"] = datar_1x.source.connect(datar_source)
 
-        datar_cases = {
-            "default": datar_1x.source.connect(datar_source),
-            SD_PHY_SPEED_4X: datar_4x.source.connect(datar_source),
-        }
+        # SD_PHY_SPEED_4X.
+        if len(pads_in.data.i) >= 4:
+            self.datar_4x = datar_4x = SDPHYR(sdpads_layout, data=True, data_width=4, skip_start_bit=True)
+            self.comb += [
+                datar_4x.reset.eq(datar_reset),
+                pads_in.connect(datar_4x.pads_in),
+            ]
+            datar_cases[SD_PHY_SPEED_4X] = datar_4x.source.connect(datar_source)
 
-        if len(pads_out.data.o) >= 8:
+        # SD_PHY_SPEED_8X.
+        if len(pads_in.data.i) >= 8:
             self.datar_8x = datar_8x = SDPHYR(sdpads_layout, data=True, data_width=8, skip_start_bit=True)
             self.comb += [
                 datar_8x.reset.eq(datar_reset),
                 pads_in.connect(datar_8x.pads_in),
             ]
-
             datar_cases[SD_PHY_SPEED_8X] = datar_8x.source.connect(datar_source)
 
         self.comb += Case(data_width, datar_cases)
@@ -689,13 +697,11 @@ class SDPHY(LiteXModule):
         self.datar   = datar   = SDPHYDATAR(sdpads_layout, data_width, sys_clk_freq, data_timeout)
 
         self.settings = CSRStorage(fields=[
-            # reset value is set to 4x speed for compatibility with existing designs.
-            # new implementations should not rely on this default value.
-            CSRField("data_width", size=2, offset=0, reset=SD_PHY_SPEED_4X, values=[
+            CSRField("data_width", size=2, offset=0, values=[
                 ("0b00", "1-bit"),
                 ("0b01", "4-bit"),
                 ("0b10", "8-bit"),
-            ]),
+            ], reset=SD_PHY_SPEED_4X), # Defaults to 4x speed for retro-compatibility.
         ])
 
         self.comb += data_width.eq(self.settings.fields.data_width)
