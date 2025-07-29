@@ -116,6 +116,16 @@ class SDCore(LiteXModule):
             crc7_inserter.enable.eq(1),
         ]
 
+        # Block delimiter for DATA-WRITE
+        count = Signal(9)
+        self.sync += [
+            If(self.sink.valid & self.sink.ready,
+                count.eq(count + 1),
+                If(self.sink.last, count.eq(0))
+            )
+        ]
+        self.comb += If(count == (block_length - 1), self.sink.last.eq(1))
+
         # IRQ / Generate IRQ on CMD done rising edge
         done_d     = Signal()
         self.sync += done_d.eq(cmd_done)
