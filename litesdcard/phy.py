@@ -528,7 +528,6 @@ class SDPHYDATAR(LiteXModule):
         fsm.act("WAIT",
             pads_out.clk.eq(1),
             NextValue(datar_reset, 0),
-            NextValue(timeout, timeout - 1),
             If(datar_source.valid,
                 NextState("DATA")
             ),
