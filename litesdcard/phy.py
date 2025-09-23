@@ -197,7 +197,7 @@ class SDPHYCMDW(LiteXModule):
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
 class SDPHYCMDR(LiteXModule):
-    def __init__(self, sdpads_layout, sys_clk_freq, cmd_timeout, cmdw, busy_timeout=1):
+    def __init__(self, sdpads_layout, sys_clk_freq, cmd_timeout, cmdw):
         self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("data_type", 2), ("length", 8)])
@@ -254,8 +254,6 @@ class SDPHYCMDR(LiteXModule):
                     If(sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY,
                         # Generate the last valid cycle in BUSY state.
                         source.valid.eq(0),
-                        # Preload Timeout with Busy Timeout.
-                        NextValue(timeout, int(busy_timeout*sys_clk_freq)),
                         NextState("BUSY")
                     ).Elif(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
