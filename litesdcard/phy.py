@@ -203,9 +203,11 @@ class SDPHYCMDR(LiteXModule):
         self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("data_type", 2), ("length", 8)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
+        self.timeout  = CSRStorage(32, reset=int(cmd_timeout*sys_clk_freq))
+
         # # #
 
-        timeout = Signal(32, reset=int(cmd_timeout*sys_clk_freq))
+        timeout = Signal(32)
         count   = Signal(8)
         busy    = Signal()
 
@@ -215,7 +217,7 @@ class SDPHYCMDR(LiteXModule):
         self.submodules += cmdr, fsm
         fsm.act("IDLE",
             # Preload Timeout with Cmd Timeout.
-            NextValue(timeout, int(cmd_timeout*sys_clk_freq)),
+            NextValue(timeout, self.timeout.storage),
             # Reset Count/Busy flags.
             NextValue(count, 0),
             NextValue(busy, 1),
@@ -476,9 +478,11 @@ class SDPHYDATAR(LiteXModule):
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
         self.stop     = Signal()
 
+        self.timeout  = CSRStorage(32, reset=int(data_timeout*sys_clk_freq))
+
         # # #
 
-        timeout = Signal(32, reset=int(data_timeout*sys_clk_freq))
+        timeout = Signal(32)
         count   = Signal(10)
 
         datar_source  = stream.Endpoint([("data", 8)])
@@ -519,7 +523,7 @@ class SDPHYDATAR(LiteXModule):
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
                 pads_out.clk.eq(1),
-                NextValue(timeout, timeout.reset),
+                NextValue(timeout, self.timeout.storage),
                 NextValue(count, 0),
                 NextValue(datar_reset, 1),
                 NextState("WAIT")
