@@ -197,15 +197,17 @@ class SDPHYCMDW(LiteXModule):
 # SDCard PHY Command Read --------------------------------------------------------------------------
 
 class SDPHYCMDR(LiteXModule):
-    def __init__(self, sdpads_layout, sys_clk_freq, cmd_timeout, cmdw, busy_timeout=1):
+    def __init__(self, sdpads_layout, sys_clk_freq, cmd_timeout, cmdw):
         self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("cmd_type", 2), ("data_type", 2), ("length", 8)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
 
+        self.timeout  = CSRStorage(32, reset=int(cmd_timeout*sys_clk_freq))
+
         # # #
 
-        timeout = Signal(32, reset=int(cmd_timeout*sys_clk_freq))
+        timeout = Signal(32)
         count   = Signal(8)
         busy    = Signal()
 
@@ -215,7 +217,7 @@ class SDPHYCMDR(LiteXModule):
         self.submodules += cmdr, fsm
         fsm.act("IDLE",
             # Preload Timeout with Cmd Timeout.
-            NextValue(timeout, int(cmd_timeout*sys_clk_freq)),
+            NextValue(timeout, self.timeout.storage),
             # Reset Count/Busy flags.
             NextValue(count, 0),
             NextValue(busy, 1),
@@ -254,8 +256,6 @@ class SDPHYCMDR(LiteXModule):
                     If(sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY,
                         # Generate the last valid cycle in BUSY state.
                         source.valid.eq(0),
-                        # Preload Timeout with Busy Timeout.
-                        NextValue(timeout, int(busy_timeout*sys_clk_freq)),
                         NextState("BUSY")
                     ).Elif(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
@@ -478,9 +478,11 @@ class SDPHYDATAR(LiteXModule):
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3)])
         self.stop     = Signal()
 
+        self.timeout  = CSRStorage(32, reset=int(data_timeout*sys_clk_freq))
+
         # # #
 
-        timeout = Signal(32, reset=int(data_timeout*sys_clk_freq))
+        timeout = Signal(32)
         count   = Signal(10)
 
         datar_source  = stream.Endpoint([("data", 8)])
@@ -521,7 +523,7 @@ class SDPHYDATAR(LiteXModule):
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
                 pads_out.clk.eq(1),
-                NextValue(timeout, timeout.reset),
+                NextValue(timeout, self.timeout.storage),
                 NextValue(count, 0),
                 NextValue(datar_reset, 1),
                 NextState("WAIT")
@@ -530,7 +532,6 @@ class SDPHYDATAR(LiteXModule):
         fsm.act("WAIT",
             pads_out.clk.eq(1),
             NextValue(datar_reset, 0),
-            NextValue(timeout, timeout - 1),
             If(datar_source.valid,
                 NextState("DATA")
             ),
