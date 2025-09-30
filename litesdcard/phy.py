@@ -16,6 +16,8 @@ from litex.build.io import SDROutput, SDRTristate
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
 
+from litesdcard.crc import CRC16
+
 from litesdcard.common import *
 
 # Pads ---------------------------------------------------------------------------------------------
@@ -343,6 +345,8 @@ class SDPHYDATAW(LiteXModule):
         self.crc = SDPHYR(sdpads_layout, data=True, data_width=1, skip_start_bit=True)
         self.comb += self.crc.pads_in.eq(pads_in)
 
+        self.crc16 = crc16 = CRC16(pads_out.data.o, count)
+
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(accepted,    0),
@@ -371,6 +375,7 @@ class SDPHYDATAW(LiteXModule):
             pads_out.data.oe.eq(1),
             pads_out.data.o.eq(0),
             If(pads_out.ready,
+                crc16.reset.eq(1),
                 NextState("DATA")
             )
         )
@@ -392,7 +397,7 @@ class SDPHYDATAW(LiteXModule):
                 If(count == (8-1),
                     NextValue(count, 0),
                     If(sink.last,
-                        NextState("STOP")
+                        NextState("CRC16")
                     ).Else(
                         sink.ready.eq(1)
                     )
@@ -413,7 +418,7 @@ class SDPHYDATAW(LiteXModule):
                     If(count == (2-1),
                         NextValue(count, 0),
                         If(sink.last,
-                            NextState("STOP")
+                            NextState("CRC16")
                         ).Else(
                             sink.ready.eq(1)
                         )
@@ -429,7 +434,7 @@ class SDPHYDATAW(LiteXModule):
                 pads_out.data.o[:8].eq(sink.data[:8]),
                 If(pads_out.ready,
                     If(sink.last,
-                        NextState("STOP")
+                        NextState("CRC16")
                     ).Else(
                         sink.ready.eq(1)
                     )
@@ -441,6 +446,19 @@ class SDPHYDATAW(LiteXModule):
             pads_out.clk.eq(1),
             pads_out.data.oe.eq(1),
             Case(data_width, data_cases),
+            crc16.enable.eq(pads_out.ready),
+        )
+        fsm.act("CRC16",
+            pads_out.clk.eq(1),
+            pads_out.data.oe.eq(1),
+            pads_out.data.o.eq(crc16.data_pads_out),
+            If(pads_out.ready,
+                NextValue(count, count + 1),
+                If(count == (16-1),
+                    NextValue(count, 0),
+                    NextState("STOP")
+                )
+            )
         )
         fsm.act("STOP",
             pads_out.clk.eq(1),

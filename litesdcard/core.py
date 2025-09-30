@@ -16,7 +16,7 @@ from litex.soc.interconnect import stream
 
 from litesdcard.common import *
 from litesdcard.crc import CRC
-from litesdcard.crc import CRC16Checker, CRC16Inserter
+from litesdcard.crc import CRC16Checker
 
 # SDCore -------------------------------------------------------------------------------------------
 
@@ -68,9 +68,7 @@ class SDCore(LiteXModule):
 
         # CRC Inserter/Checkers --------------------------------------------------------------------
         self.crc7_inserter  = crc7_inserter  = CRC(polynom=0x9, taps=7, dw=40)
-        self.crc16_inserter = crc16_inserter = CRC16Inserter()
         self.crc16_checker  = crc16_checker  = CRC16Checker()
-        self.comb += self.sink.connect(crc16_inserter.sink)
         self.comb += crc16_checker.source.connect(self.source)
 
         # Cmd/Data Signals -------------------------------------------------------------------------
@@ -219,8 +217,8 @@ class SDCore(LiteXModule):
             )
         )
         fsm.act("DATA-WRITE",
-            # Send Data to the PHY (through CRC16 Inserter).
-            crc16_inserter.source.connect(phy.dataw.sink),
+            # Send Data to the PHY.
+            self.sink.connect(phy.dataw.sink),
             # On last PHY Data cycle:
             If(phy.dataw.sink.valid & phy.dataw.sink.ready & phy.dataw.sink.last,
                 # Incremennt Data Count.

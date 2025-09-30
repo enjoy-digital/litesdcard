@@ -56,7 +56,34 @@ class CRC(LiteXModule):
             )
         ]
 
-# CRC16Checker -------------------------------------------------------------------------------------
+# CRC16 -------------------------------------------------------------------------------------
+
+class CRC16(LiteXModule):
+    def __init__(self, data_pads, count):
+
+        self.data_pads_out = data_pads_out = Signal(len(data_pads))
+
+        self.enable = Signal()
+        self.reset  = Signal()
+
+        # # #
+
+        crcs  = [CRC(polynom=0x1021, taps=16, dw=1, init=0) for i in range(len(data_pads))]
+        for i in range(len(data_pads)):
+            self.submodules += crcs[i]
+            self.comb += [
+                crcs[i].reset.eq(self.reset),
+                crcs[i].enable.eq(self.enable),
+                crcs[i].din[0].eq(data_pads[i]),
+            ]
+
+        cases = {}
+        for i in range(16):
+            cases[i] = [
+                data_pads_out[n].eq(crcs[n].crc[16-1-i]) for n in range(len(data_pads_out))
+            ]
+
+        self.comb += Case(count, cases)
 
 class CRC16Inserter(LiteXModule):
     def __init__(self):
