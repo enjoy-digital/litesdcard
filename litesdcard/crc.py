@@ -9,9 +9,6 @@ from migen import *
 
 from litex.gen import *
 
-from litex.soc.interconnect import stream
-from litex.soc.interconnect.csr import *
-
 # CRC ----------------------------------------------------------------------------------------------
 
 class CRC(LiteXModule):
@@ -65,12 +62,14 @@ class CRC16(LiteXModule):
 
         self.enable = Signal()
         self.reset  = Signal()
+        self.crc = []
 
         # # #
 
         crcs  = [CRC(polynom=0x1021, taps=16, dw=1, init=0) for i in range(len(data_pads))]
         for i in range(len(data_pads)):
             self.submodules += crcs[i]
+            self.crc.append(crcs[i].crc)
             self.comb += [
                 crcs[i].reset.eq(self.reset),
                 crcs[i].enable.eq(self.enable),
@@ -84,57 +83,3 @@ class CRC16(LiteXModule):
             ]
 
         self.comb += Case(count, cases)
-
-class CRC16Inserter(LiteXModule):
-    def __init__(self):
-        self.sink   = sink   = stream.Endpoint([("data", 8)])
-        self.source = source = stream.Endpoint([("data", 8)])
-
-        # # #
-
-        count = Signal(3)
-
-        crcs  = [CRC(polynom=0x1021, taps=16, dw=2, init=0) for i in range(4)]
-        for i in range(4):
-            self.submodules += crcs[i]
-            self.comb += [
-                crcs[i].reset.eq(source.valid & source.ready & source.last),
-                crcs[i].enable.eq(sink.valid & sink.ready),
-                crcs[i].din[0].eq(sink.data[4*0 + i]),
-                crcs[i].din[1].eq(sink.data[4*1 + i]),
-            ]
-
-        self.fsm = fsm = FSM(reset_state="DATA")
-        fsm.act("DATA",
-            NextValue(count, 0),
-            sink.connect(source, omit={"last"}),
-            source.last.eq(0),
-            If(sink.valid & sink.ready,
-                If(sink.last,
-                    NextState("CRC"),
-                )
-            )
-        )
-        cases = {}
-        for i in range(8):
-            cases[i] = [
-                source.data[0].eq(crcs[0].crc[2*(8-1-i) + 0]),
-                source.data[1].eq(crcs[1].crc[2*(8-1-i) + 0]),
-                source.data[2].eq(crcs[2].crc[2*(8-1-i) + 0]),
-                source.data[3].eq(crcs[3].crc[2*(8-1-i) + 0]),
-                source.data[4].eq(crcs[0].crc[2*(8-1-i) + 1]),
-                source.data[5].eq(crcs[1].crc[2*(8-1-i) + 1]),
-                source.data[6].eq(crcs[2].crc[2*(8-1-i) + 1]),
-                source.data[7].eq(crcs[3].crc[2*(8-1-i) + 1]),
-            ]
-        fsm.act("CRC",
-            source.valid.eq(1),
-            source.last.eq(count == (8-1)),
-            Case(count, cases),
-            If(source.valid & source.ready,
-                NextValue(count, count + 1),
-                If(source.last,
-                    NextState("DATA")
-                )
-            )
-        )
