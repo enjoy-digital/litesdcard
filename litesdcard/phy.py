@@ -99,9 +99,8 @@ class SDPHYR(LiteXModule):
         self.sync += If(pads_in.valid, run.eq(start | run))
 
         # Convert data to 8-bit stream
-        converter = stream.Converter(data_width, 8, reverse=True)
-        buf       = stream.Buffer([("data", 8)])
-        self.submodules += converter, buf
+        self.converter = converter = stream.Converter(data_width, 8, reverse=True)
+        self.buf       = buf       = stream.Buffer([("data", 8)])
         self.comb += [
             converter.sink.valid.eq(pads_in.valid & (run if skip_start_bit else (start | run))),
             converter.sink.data.eq(pads_in_data),
@@ -120,8 +119,8 @@ class SDPHYInit(LiteXModule):
         # # #
 
         count = Signal(8)
-        fsm = FSM(reset_state="IDLE")
-        self.submodules += fsm
+
+        self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(count, 0),
             If(self.initialize.re,
@@ -155,8 +154,8 @@ class SDPHYCMDW(LiteXModule):
         # # #
 
         count = Signal(8)
-        fsm   = FSM(reset_state="IDLE")
-        self.submodules += fsm
+
+        self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
@@ -211,10 +210,10 @@ class SDPHYCMDR(LiteXModule):
         count   = Signal(8)
         busy    = Signal()
 
-        cmdr = SDPHYR(sdpads_layout, cmd=True, data_width=1, skip_start_bit=False)
+        self.cmdr = cmdr = SDPHYR(sdpads_layout, cmd=True, data_width=1, skip_start_bit=False)
         self.comb += pads_in.connect(cmdr.pads_in)
-        fsm  = FSM(reset_state="IDLE")
-        self.submodules += cmdr, fsm
+
+        self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             # Preload Timeout with Cmd Timeout.
             NextValue(timeout, self.timeout.storage),
