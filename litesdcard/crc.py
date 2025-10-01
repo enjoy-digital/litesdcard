@@ -138,24 +138,3 @@ class CRC16Inserter(LiteXModule):
                 )
             )
         )
-
-# CRC16Checker -------------------------------------------------------------------------------------
-
-class CRC16Checker(LiteXModule):
-    # TODO: currently only removing CRC block, add check using CRC16Inserter
-    def __init__(self):
-        self.sink   = sink   = stream.Endpoint([("data", 8)])
-        self.source = source = stream.Endpoint([("data", 8)])
-
-        # # #
-
-        fifo = stream.SyncFIFO([("data", 8)], 8)
-        fifo = ResetInserter()(fifo)
-        self.submodules += fifo
-        self.comb += [
-            sink.connect(fifo.sink),
-            fifo.source.connect(source, omit={"valid", "ready"}),
-            source.valid.eq(fifo.level >= 8),
-            fifo.source.ready.eq(source.valid & source.ready),
-            fifo.reset.eq(sink.valid & sink.ready & sink.last),
-        ]

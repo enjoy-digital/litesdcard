@@ -16,7 +16,6 @@ from litex.soc.interconnect import stream
 
 from litesdcard.common import *
 from litesdcard.crc import CRC
-from litesdcard.crc import CRC16Checker
 
 # SDCore -------------------------------------------------------------------------------------------
 
@@ -68,8 +67,6 @@ class SDCore(LiteXModule):
 
         # CRC Inserter/Checkers --------------------------------------------------------------------
         self.crc7_inserter  = crc7_inserter  = CRC(polynom=0x9, taps=7, dw=40)
-        self.crc16_checker  = crc16_checker  = CRC16Checker()
-        self.comb += crc16_checker.source.connect(self.source)
 
         # Cmd/Data Signals -------------------------------------------------------------------------
         cmd_type     = Signal(2)
@@ -248,8 +245,12 @@ class SDCore(LiteXModule):
             If(phy.datar.source.valid,
                 # On valid Data:
                 If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
-                    # Receive Data (through CRC16 Checker).
-                    phy.datar.source.connect(crc16_checker.sink, omit={"status"}),
+                    # Receive Data and drop CRC part.
+                    If(phy.datar.source.drop,
+                        phy.datar.source.ready.eq(1)
+                    ).Else(
+                        phy.datar.source.connect(self.source, omit={"status", "drop"}),
+                    ),
                     # On last Data:
                     If(phy.datar.source.last & phy.datar.source.ready,
                         # Increment Data Count.
