@@ -321,7 +321,8 @@ class SDPHYDATAW(LiteXModule):
     def __init__(self, sdpads_layout, data_width):
         self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
-        self.sink     = sink     = stream.Endpoint([("data", 8)])
+        self.sink     = sink     = stream.Endpoint([("data", 8), ("last_block", 1)])
+        self.source   = source   = stream.Endpoint([("status", 3)])
         self.stop     = Signal()
 
         self.status   = CSRStatus(fields=[
@@ -348,22 +349,22 @@ class SDPHYDATAW(LiteXModule):
 
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
-            NextValue(accepted,    0),
-            NextValue(crc_error,   0),
-            NextValue(write_error, 0),
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
-                NextState("CLK8")
+                NextValue(accepted, 0),
+                NextValue(crc_error, 0),
+                NextValue(write_error, 0),
+                NextState("CLK2")
             )
         )
-        # CHECKME: Understand why this is needed.
-        fsm.act("CLK8",
+        # after card respose on cmd, we need to wait 2 clk cycles before sending data
+        fsm.act("CLK2",
             pads_out.clk.eq(1),
             pads_out.cmd.oe.eq(1),
             pads_out.cmd.o.eq(1),
             If(pads_out.ready,
                 NextValue(count, count + 1),
-                If(count == (8-1),
+                If(count == (2-1),
                     NextValue(count, 0),
                     NextState("START")
                 )
@@ -373,8 +374,8 @@ class SDPHYDATAW(LiteXModule):
             pads_out.clk.eq(1),
             pads_out.data.oe.eq(1),
             pads_out.data.o.eq(0),
+            crc16.reset.eq(1),
             If(pads_out.ready,
-                crc16.reset.eq(1),
                 NextState("DATA")
             )
         )
@@ -471,17 +472,42 @@ class SDPHYDATAW(LiteXModule):
         fsm.act("CRC",
             pads_out.clk.eq(1),
             If(self.crc.source.valid,
-                NextValue(accepted,    self.crc.source.data[5:] == 0b010),
-                NextValue(crc_error,   self.crc.source.data[5:] == 0b101),
-                NextValue(write_error, self.crc.source.data[5:] == 0b110),
-                NextState("BUSY")
+                source.valid.eq(1),
+                Case(self.crc.source.data[5:], {
+                    0b010: [NextValue(accepted, 1), source.status.eq(SDCARD_STREAM_STATUS_DATAACCEPTED)],
+                    0b101: [NextValue(crc_error, 1), source.status.eq(SDCARD_STREAM_STATUS_CRCERROR)],
+                    0b110: [NextValue(write_error, 1), source.status.eq(SDCARD_STREAM_STATUS_WRITEERROR)],
+                }),
+                If(sink.last_block,
+                    NextState("CLK8"),
+                ).Else(
+                    NextState("BUSY"),
+                )
+            )
+        )
+        # Required 8 clk cycles before shutting down the clk.
+        fsm.act("CLK8",
+            pads_out.clk.eq(1),
+            pads_out.cmd.oe.eq(1),
+            pads_out.cmd.o.eq(1),
+            If(pads_out.ready,
+                NextValue(count, count + 1),
+                If(count == (8-1),
+                    NextValue(count, 0),
+                    NextState("BUSY")
+                )
             )
         )
         fsm.act("BUSY",
             pads_out.clk.eq(1),
+            NextValue(count, 0),
             If(pads_in.valid & pads_in.data.i[0],
                 sink.ready.eq(1),
-                NextState("IDLE")
+                If(sink.last_block,
+                    NextState("IDLE"),
+                ).Else(
+                    NextState("CLK2"),
+                )
             )
         )
 

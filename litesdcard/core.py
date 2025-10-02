@@ -80,6 +80,7 @@ class SDCore(LiteXModule):
         data_done    = Signal()
         data_error   = Signal()
         data_timeout = Signal()
+        data_crc     = Signal()
 
         cmd          = Signal(6)
 
@@ -99,7 +100,7 @@ class SDCore(LiteXModule):
             self.data_event.fields.done.eq(data_done),
             self.data_event.fields.error.eq(data_error),
             self.data_event.fields.timeout.eq(data_timeout),
-            self.data_event.fields.crc.eq(0),
+            self.data_event.fields.crc.eq(data_crc),
 
             # Prepare CRCInserter Data.
             crc7_inserter.din.eq(Cat(
@@ -142,6 +143,7 @@ class SDCore(LiteXModule):
                 NextValue(data_done,    0),
                 NextValue(data_error,   0),
                 NextValue(data_timeout, 0),
+                NextValue(data_crc,     0),
                 NextState("CMD-SEND")
             )
         )
@@ -216,21 +218,24 @@ class SDCore(LiteXModule):
         fsm.act("DATA-WRITE",
             # Send Data to the PHY.
             self.sink.connect(phy.dataw.sink),
+            phy.dataw.sink.last_block.eq(data_count == (block_count - 1)),
             # On last PHY Data cycle:
             If(phy.dataw.sink.valid & phy.dataw.sink.ready & phy.dataw.sink.last,
                 # Incremennt Data Count.
                 NextValue(data_count, data_count + 1),
                 # Transfer is done when Data Count reaches Block Count.
-                If(data_count == (block_count - 1),
+                If(phy.dataw.sink.last_block,
                     NextState("IDLE")
                 )
             ),
 
             # Receive Status from the PHY.
-            phy.datar.source.ready.eq(1),
-            If(phy.datar.source.valid,
+            phy.dataw.source.ready.eq(1),
+            If(phy.dataw.source.valid,
                 # Set Data Error when Data has not been accepted.
-                If(phy.datar.source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
+                If(phy.dataw.source.status == SDCARD_STREAM_STATUS_CRCERROR,
+                    NextValue(data_crc, 1)
+                ).Elif(phy.dataw.source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
                     NextValue(data_error, 1)
                 )
             )
