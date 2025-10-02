@@ -11,7 +11,7 @@ from litex.gen import *
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
 
-from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
+from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter, WishboneDMAReaderWriter
 
 # SD Block2Mem DMA ---------------------------------------------------------------------------------
 
@@ -90,3 +90,51 @@ class SDMem2BlockDMA(LiteXModule):
         done_d = Signal()
         self.sync += done_d.eq(self.dma._done.status)
         self.sync += self.irq.eq(self.dma._done.status & ~done_d)
+
+class SDMem2Block2WayDMA(LiteXModule):
+    """Block to Memory DMA and Memory to Block DMA
+
+    Receive a stream of blocks and write it to memory through DMA.
+    Read data from memory through DMA and generate a stream of blocks.
+    """
+    def __init__(self, bus, endianness, fifo_depth=512):
+        self.bus    = bus
+        self.sink   = stream.Endpoint([("data", 8)])
+        self.source = stream.Endpoint([("data", 8)])
+
+        # # #
+
+        # Submodules
+        fifo        = stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True)
+        w_converter = stream.Converter(8, bus.data_width, reverse=True)
+        r_converter = stream.Converter(bus.data_width, 8, reverse=True)
+        self.submodules += fifo, w_converter, r_converter
+
+        self.dma = WishboneDMAReaderWriter(bus, with_csr=True, endianness=endianness, fifo_depth=1)
+
+        # Flow
+        start   = Signal()
+        connect = Signal()
+        self.comb += start.eq(self.sink.valid & self.sink.first)
+        self.sync += [
+            If(~self.dma.enable,
+                connect.eq(0)
+            ).Elif(start,
+                connect.eq(1)
+            )
+        ]
+        self.comb += [
+            If(self.dma.enable & self.dma.we & (start | connect),
+                self.sink.connect(fifo.sink)
+            ).Else(
+                self.sink.ready.eq(1)
+            ),
+            If(self.dma.we,
+                fifo.source.connect(w_converter.sink),
+            ).Else(
+                r_converter.source.connect(fifo.sink),
+                fifo.source.connect(self.source),
+            ),
+            self.dma.source.connect(r_converter.sink),
+            w_converter.source.connect(self.dma.sink),
+        ]
