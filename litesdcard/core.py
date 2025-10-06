@@ -107,8 +107,6 @@ class SDCore(LiteXModule):
                 cmd,
                 1,
                 0)),
-            crc7_inserter.reset.eq(1),
-            crc7_inserter.enable.eq(1),
         ]
 
         # Block delimiter for DATA-WRITE
@@ -137,6 +135,7 @@ class SDCore(LiteXModule):
             # Wait for a valid Cmd.
             If(cmd_send,
                 # Clear Cmd/Data Done/Error/Timeout.
+                crc7_inserter.enable.eq(1),
                 NextValue(cmd_done,     0),
                 NextValue(cmd_error,    0),
                 NextValue(cmd_timeout,  0),
@@ -166,6 +165,7 @@ class SDCore(LiteXModule):
                 NextValue(cmd_count, cmd_count + 1),
                 # When the Cmd has been transfered:
                 If(phy.cmdw.sink.last,
+                    crc7_inserter.reset.eq(1),
                     # If not expecting a response, return to Idle.
                     If(cmd_type == SDCARD_CTRL_RESPONSE_NONE,
                         NextState("IDLE")

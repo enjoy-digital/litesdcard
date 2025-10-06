@@ -45,13 +45,7 @@ class CRC(LiteXModule):
         ]
 
         # Output
-        self.comb += [
-            If(self.enable,
-                self.crc.eq(reg[dw])
-            ).Else(
-                self.crc.eq(reg[0])
-            )
-        ]
+        self.comb += self.crc.eq(reg[0])
 
 # CRC16 -------------------------------------------------------------------------------------
 
