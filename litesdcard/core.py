@@ -46,7 +46,7 @@ class SDCore(LiteXModule):
             CSRField("done",    size=1, description="Data transfer has been executed."),
             CSRField("error",   size=1, description="Data transfer has failed due to error(s)."),
             CSRField("timeout", size=1, description="Timeout Error."),
-            CSRField("crc",     size=1, description="CRC Error."), # FIXME: Generate/Connect.
+            CSRField("crc",     size=1, description="CRC Error."),
         ])
 
         # Block Length/Count Registers.
@@ -249,7 +249,8 @@ class SDCore(LiteXModule):
             # Receive Data Response and Status from the PHY.
             If(phy.datar.source.valid,
                 # On valid Data:
-                If(phy.datar.source.status == SDCARD_STREAM_STATUS_OK,
+                If((phy.datar.source.status == SDCARD_STREAM_STATUS_OK) |
+                   (phy.datar.source.status == SDCARD_STREAM_STATUS_CRCERROR),
                     # Receive Data and drop CRC part.
                     If(phy.datar.source.drop,
                         phy.datar.source.ready.eq(1)
@@ -264,7 +265,10 @@ class SDCore(LiteXModule):
                         If(data_count == (block_count - 1),
                             NextState("IDLE")
                         )
-                    )
+                    ),
+                    If(phy.dataw.source.status == SDCARD_STREAM_STATUS_CRCERROR,
+                        NextValue(data_crc, 1),
+                    ),
                 # On Timeout: set Data Timeout and return to Idle.
                 ).Elif(phy.datar.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
                     NextValue(data_timeout, 1),

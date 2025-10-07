@@ -525,12 +525,35 @@ class SDPHYDATAR(LiteXModule):
 
         # # #
 
-        timeout = Signal(32)
-        count   = Signal(10)
-        crc_len = Signal(max=17)
+        timeout     = Signal(32)
+        count       = Signal(10)
+        crc_count   = Signal(max=17)
+        crc_len     = Signal(max=17)
+        crc_correct = Signal()
+        crc_error   = Signal()
+        data_done   = Signal()
+        data_len    = Signal(max=9)
+        data_count  = Signal(16)
 
         datar_source  = stream.Endpoint([("data", 8)])
         datar_reset   = Signal()
+        datar_valid   = Signal()
+
+        self.crc16 = crc16 = CRC16(pads_in.data.i, crc_count)
+
+        self.comb += [
+            crc16.reset.eq(datar_reset),
+            data_done.eq(data_count == 0),
+            crc16.enable.eq(datar_valid & ~data_done),
+        ]
+
+        self.sync += [
+            If(crc16.reset,
+                data_count.eq(sink.block_length * 8),
+            ).Elif(crc16.enable,
+                data_count.eq(data_count - data_len),
+            )
+        ]
 
         datar_cases = {}
 
@@ -543,6 +566,9 @@ class SDPHYDATAR(LiteXModule):
         datar_cases["default"] = [
             datar_1x.source.connect(datar_source),
             crc_len.eq(2),
+            data_len.eq(1),
+            datar_valid.eq(datar_1x.converter.sink.valid),
+            crc_correct.eq(crc16.data_pads_out[0] == pads_in.data.i[0]),
         ]
 
         # SD_PHY_SPEED_4X.
@@ -555,6 +581,9 @@ class SDPHYDATAR(LiteXModule):
             datar_cases[SD_PHY_SPEED_4X] = [
                 datar_4x.source.connect(datar_source),
                 crc_len.eq(8),
+                data_len.eq(4),
+                datar_valid.eq(datar_4x.converter.sink.valid),
+                crc_correct.eq(crc16.data_pads_out[:4] == pads_in.data.i[:4]),
             ]
 
         # SD_PHY_SPEED_8X.
@@ -567,6 +596,9 @@ class SDPHYDATAR(LiteXModule):
             datar_cases[SD_PHY_SPEED_8X] = [
                 datar_8x.source.connect(datar_source),
                 crc_len.eq(16),
+                data_len.eq(8),
+                datar_valid.eq(datar_8x.converter.sink.valid),
+                crc_correct.eq(crc16.data_pads_out[:8] == pads_in.data.i[:8]),
             ]
 
         self.comb += Case(data_width, datar_cases)
@@ -574,10 +606,11 @@ class SDPHYDATAR(LiteXModule):
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(count, 0),
+            NextValue(crc_count, 0),
             If(sink.valid & pads_out.ready,
                 pads_out.clk.eq(1),
                 NextValue(timeout, self.timeout.storage),
-                NextValue(count, 0),
+                NextValue(crc_error, 0),
                 NextValue(datar_reset, 1),
                 NextState("WAIT")
             )
@@ -597,7 +630,7 @@ class SDPHYDATAR(LiteXModule):
         fsm.act("DATA",
             pads_out.clk.eq(1),
             source.valid.eq(datar_source.valid),
-            source.status.eq(SDCARD_STREAM_STATUS_OK),
+            source.status.eq(Mux(crc_error, SDCARD_STREAM_STATUS_CRCERROR, SDCARD_STREAM_STATUS_OK)),
             source.first.eq(count == 0),
             source.last.eq(count == (sink.block_length + crc_len - 1)), # 1 block + CRC
             source.drop.eq(count > (sink.block_length - 1)), # Drop CRC
@@ -617,6 +650,12 @@ class SDPHYDATAR(LiteXModule):
                     )
                 ).Else(
                      self.stop.eq(1)
+                )
+            ),
+            If(pads_in.valid & data_done & (crc_count < 16),
+                NextValue(crc_count, crc_count + 1),
+                If(~crc_correct,
+                    NextValue(crc_error, 1),
                 )
             ),
             NextValue(timeout, timeout - 1),
