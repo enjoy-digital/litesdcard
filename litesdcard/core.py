@@ -29,6 +29,7 @@ class SDCore(LiteXModule):
         self.cmd_argument = CSRStorage(32, description="SDCard Cmd Argument.")
         self.cmd_command  = CSRStorage(32, fields=[
             CSRField("cmd_type",  offset=0, size=2, description="Core/PHY Cmd transfer type."),
+            CSRField("crc",       offset=2, size=1, description="Enable CRC7 check for response."),
             CSRField("data_type", offset=5, size=2, description="Core/PHY Data transfer type."),
             CSRField("cmd",       offset=8, size=6, description="SDCard Cmd.")
         ])
@@ -40,7 +41,7 @@ class SDCore(LiteXModule):
             CSRField("done",    size=1, description="Cmd transfer has been executed."),
             CSRField("error",   size=1, description="Cmd transfer has failed due to error(s)."),
             CSRField("timeout", size=1, description="Timeout error."),
-            CSRField("crc",     size=1, description="CRC Error."), # FIXME: Generate/Connect.
+            CSRField("crc",     size=1, description="CRC Error."),
         ])
         self.data_event   = CSRStatus(4, fields=[
             CSRField("done",    size=1, description="Data transfer has been executed."),
@@ -66,14 +67,16 @@ class SDCore(LiteXModule):
         block_count  = self.block_count.storage
 
         # CRC Inserter/Checkers --------------------------------------------------------------------
-        self.crc7_inserter  = crc7_inserter  = CRC(polynom=0x9, taps=7, dw=40)
+        self.crc7_inserter  = crc7_inserter  = CRC(polynom=0x9, taps=7, dw=8)
 
         # Cmd/Data Signals -------------------------------------------------------------------------
         cmd_type     = Signal(2)
+        cmd_crc_en   = Signal()
         cmd_count    = Signal(3)
         cmd_done     = Signal()
         cmd_error    = Signal()
         cmd_timeout  = Signal()
+        cmd_crc      = Signal()
 
         data_type    = Signal(2)
         data_count   = Signal(32)
@@ -87,6 +90,7 @@ class SDCore(LiteXModule):
         self.comb += [
             # Decode type of Cmd/Data from Register.
             cmd_type.eq(self.cmd_command.fields.cmd_type),
+            cmd_crc_en.eq(self.cmd_command.fields.crc),
             data_type.eq(self.cmd_command.fields.data_type),
             cmd.eq(self.cmd_command.fields.cmd),
 
@@ -101,13 +105,6 @@ class SDCore(LiteXModule):
             self.data_event.fields.error.eq(data_error),
             self.data_event.fields.timeout.eq(data_timeout),
             self.data_event.fields.crc.eq(data_crc),
-
-            # Prepare CRCInserter Data.
-            crc7_inserter.din.eq(Cat(
-                cmd_argument,
-                cmd,
-                1,
-                0)),
         ]
 
         # Block delimiter for DATA-WRITE
@@ -133,13 +130,14 @@ class SDCore(LiteXModule):
             NextValue(data_done,  1),
             NextValue(cmd_count,  0),
             NextValue(data_count, 0),
+            crc7_inserter.reset.eq(1),
             # Wait for a valid Cmd.
             If(cmd_send,
                 # Clear Cmd/Data Done/Error/Timeout.
-                crc7_inserter.enable.eq(1),
                 NextValue(cmd_done,     0),
                 NextValue(cmd_error,    0),
                 NextValue(cmd_timeout,  0),
+                NextValue(cmd_crc,      0),
                 NextValue(data_done,    0),
                 NextValue(data_error,   0),
                 NextValue(data_timeout, 0),
@@ -161,6 +159,7 @@ class SDCore(LiteXModule):
                 5: phy.cmdw.sink.data.eq(Cat(1, crc7_inserter.crc)),
                }
             ),
+            crc7_inserter.din.eq(phy.cmdw.sink.data),
             # On a valid PHY cycle:
             If(phy.cmdw.sink.ready,
                 # Increment count.
@@ -173,8 +172,11 @@ class SDCore(LiteXModule):
                         NextState("IDLE")
                     # Else get the CMD Response.
                     ).Else(
+                        NextValue(cmd_count,  0),
                         NextState("CMD-RESPONSE"),
                     )
+                ).Else(
+                    crc7_inserter.enable.eq(1),
                 )
             )
         )
@@ -184,15 +186,16 @@ class SDCore(LiteXModule):
             phy.cmdr.sink.cmd_type.eq(cmd_type),
             phy.cmdr.sink.data_type.eq(data_type),
             If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
-                # 136-bit + 8-bit shift to expose expected 128-bit window to software.
-                phy.cmdr.sink.length.eq((136 + 8)//8)
+                # 136-bit, 17 bytes.
+                phy.cmdr.sink.length.eq(136//8)
             ).Else(
-                # 48-bit.
+                # 48-bit 6 bytes.
                 phy.cmdr.sink.length.eq(48//8)
             ),
 
             # Receive the Cmd Response from the PHY.
             phy.cmdr.source.ready.eq(1),
+            crc7_inserter.din.eq(phy.cmdr.source.data),
             If(phy.cmdr.source.valid,
                 # On Timeout: set Cmd Timeout and return to Idle.
                 If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
@@ -209,8 +212,22 @@ class SDCore(LiteXModule):
                     ).Else(
                         NextState("IDLE")
                     ),
+                    If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
+                        # 8-bit shift to expose expected 128-bit window to software.
+                        NextValue(cmd_response, Cat(phy.cmdr.source.data, cmd_response)),
+                    ),
+                    If(cmd_crc_en & (crc7_inserter.crc != phy.cmdr.source.data[1:]),
+                        # If CRC check enabled and CRC bad, set Cmd Error/CRC and return to Idle
+                        NextValue(cmd_crc, 1),
+                        NextState("IDLE"),
+                    ),
                 # Else Shift Cmd Response.
                 ).Else(
+                    If(cmd_count == 0,
+                        NextValue(cmd_count, 1),
+                    ),
+                    # Skip first byte for long response. Forlong response, we check 120 bits only (without CRC).
+                    crc7_inserter.enable.eq(Mux(cmd_type == SDCARD_CTRL_RESPONSE_LONG, cmd_count > 0, 1)),
                     NextValue(cmd_response, Cat(phy.cmdr.source.data, cmd_response))
                 )
             )

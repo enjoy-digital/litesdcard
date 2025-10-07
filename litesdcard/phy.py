@@ -211,6 +211,7 @@ class SDPHYCMDR(LiteXModule):
         timeout = Signal(32)
         count   = Signal(8)
         busy    = Signal()
+        last_data = Signal(len(source.data))
 
         self.cmdr = cmdr = SDPHYR(sdpads_layout, cmd=True, data_width=1, skip_start_bit=False)
         self.comb += pads_in.connect(cmdr.pads_in)
@@ -257,6 +258,7 @@ class SDPHYCMDR(LiteXModule):
                     If(sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY,
                         # Generate the last valid cycle in BUSY state.
                         source.valid.eq(0),
+                        NextValue(last_data, source.data),
                         NextState("BUSY")
                     ).Elif(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
@@ -283,6 +285,7 @@ class SDPHYCMDR(LiteXModule):
                 source.valid.eq(1),
                 source.last.eq(1),
                 source.status.eq(SDCARD_STREAM_STATUS_OK),
+                source.data.eq(last_data),
                 If(source.ready,
                     NextValue(count, 0),
                     NextState("CLK8")
