@@ -211,6 +211,7 @@ class SDPHYCMDR(LiteXModule):
         timeout = Signal(32)
         count   = Signal(8)
         busy    = Signal()
+        last_data = Signal(len(source.data))
 
         self.cmdr = cmdr = SDPHYR(sdpads_layout, cmd=True, data_width=1, skip_start_bit=False)
         self.comb += pads_in.connect(cmdr.pads_in)
@@ -257,6 +258,7 @@ class SDPHYCMDR(LiteXModule):
                     If(sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY,
                         # Generate the last valid cycle in BUSY state.
                         source.valid.eq(0),
+                        NextValue(last_data, source.data),
                         NextState("BUSY")
                     ).Elif(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
@@ -283,6 +285,7 @@ class SDPHYCMDR(LiteXModule):
                 source.valid.eq(1),
                 source.last.eq(1),
                 source.status.eq(SDCARD_STREAM_STATUS_OK),
+                source.data.eq(last_data),
                 If(source.ready,
                     NextValue(count, 0),
                     NextState("CLK8")
@@ -321,7 +324,8 @@ class SDPHYDATAW(LiteXModule):
     def __init__(self, sdpads_layout, data_width):
         self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
-        self.sink     = sink     = stream.Endpoint([("data", 8)])
+        self.sink     = sink     = stream.Endpoint([("data", 8), ("last_block", 1)])
+        self.source   = source   = stream.Endpoint([("status", 3)])
         self.stop     = Signal()
 
         self.status   = CSRStatus(fields=[
@@ -348,22 +352,22 @@ class SDPHYDATAW(LiteXModule):
 
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
-            NextValue(accepted,    0),
-            NextValue(crc_error,   0),
-            NextValue(write_error, 0),
             NextValue(count, 0),
             If(sink.valid & pads_out.ready,
-                NextState("CLK8")
+                NextValue(accepted, 0),
+                NextValue(crc_error, 0),
+                NextValue(write_error, 0),
+                NextState("CLK2")
             )
         )
-        # CHECKME: Understand why this is needed.
-        fsm.act("CLK8",
+        # after card respose on cmd, we need to wait 2 clk cycles before sending data
+        fsm.act("CLK2",
             pads_out.clk.eq(1),
             pads_out.cmd.oe.eq(1),
             pads_out.cmd.o.eq(1),
             If(pads_out.ready,
                 NextValue(count, count + 1),
-                If(count == (8-1),
+                If(count == (2-1),
                     NextValue(count, 0),
                     NextState("START")
                 )
@@ -373,8 +377,8 @@ class SDPHYDATAW(LiteXModule):
             pads_out.clk.eq(1),
             pads_out.data.oe.eq(1),
             pads_out.data.o.eq(0),
+            crc16.reset.eq(1),
             If(pads_out.ready,
-                crc16.reset.eq(1),
                 NextState("DATA")
             )
         )
@@ -471,17 +475,42 @@ class SDPHYDATAW(LiteXModule):
         fsm.act("CRC",
             pads_out.clk.eq(1),
             If(self.crc.source.valid,
-                NextValue(accepted,    self.crc.source.data[5:] == 0b010),
-                NextValue(crc_error,   self.crc.source.data[5:] == 0b101),
-                NextValue(write_error, self.crc.source.data[5:] == 0b110),
-                NextState("BUSY")
+                source.valid.eq(1),
+                Case(self.crc.source.data[5:], {
+                    0b010: [NextValue(accepted, 1), source.status.eq(SDCARD_STREAM_STATUS_DATAACCEPTED)],
+                    0b101: [NextValue(crc_error, 1), source.status.eq(SDCARD_STREAM_STATUS_CRCERROR)],
+                    0b110: [NextValue(write_error, 1), source.status.eq(SDCARD_STREAM_STATUS_WRITEERROR)],
+                }),
+                If(sink.last_block,
+                    NextState("CLK8"),
+                ).Else(
+                    NextState("BUSY"),
+                )
+            )
+        )
+        # Required 8 clk cycles before shutting down the clk.
+        fsm.act("CLK8",
+            pads_out.clk.eq(1),
+            pads_out.cmd.oe.eq(1),
+            pads_out.cmd.o.eq(1),
+            If(pads_out.ready,
+                NextValue(count, count + 1),
+                If(count == (8-1),
+                    NextValue(count, 0),
+                    NextState("BUSY")
+                )
             )
         )
         fsm.act("BUSY",
             pads_out.clk.eq(1),
+            NextValue(count, 0),
             If(pads_in.valid & pads_in.data.i[0],
                 sink.ready.eq(1),
-                NextState("IDLE")
+                If(sink.last_block,
+                    NextState("IDLE"),
+                ).Else(
+                    NextState("CLK2"),
+                )
             )
         )
 
@@ -499,12 +528,35 @@ class SDPHYDATAR(LiteXModule):
 
         # # #
 
-        timeout = Signal(32)
-        count   = Signal(10)
-        crc_len = Signal(max=17)
+        timeout     = Signal(32)
+        count       = Signal(10)
+        crc_count   = Signal(max=17)
+        crc_len     = Signal(max=17)
+        crc_correct = Signal()
+        crc_error   = Signal()
+        data_done   = Signal()
+        data_len    = Signal(max=9)
+        data_count  = Signal(16)
 
         datar_source  = stream.Endpoint([("data", 8)])
         datar_reset   = Signal()
+        datar_valid   = Signal()
+
+        self.crc16 = crc16 = CRC16(pads_in.data.i, crc_count)
+
+        self.comb += [
+            crc16.reset.eq(datar_reset),
+            data_done.eq(data_count == 0),
+            crc16.enable.eq(datar_valid & ~data_done),
+        ]
+
+        self.sync += [
+            If(crc16.reset,
+                data_count.eq(sink.block_length * 8),
+            ).Elif(crc16.enable,
+                data_count.eq(data_count - data_len),
+            )
+        ]
 
         datar_cases = {}
 
@@ -517,6 +569,9 @@ class SDPHYDATAR(LiteXModule):
         datar_cases["default"] = [
             datar_1x.source.connect(datar_source),
             crc_len.eq(2),
+            data_len.eq(1),
+            datar_valid.eq(datar_1x.converter.sink.valid),
+            crc_correct.eq(crc16.data_pads_out[0] == pads_in.data.i[0]),
         ]
 
         # SD_PHY_SPEED_4X.
@@ -529,6 +584,9 @@ class SDPHYDATAR(LiteXModule):
             datar_cases[SD_PHY_SPEED_4X] = [
                 datar_4x.source.connect(datar_source),
                 crc_len.eq(8),
+                data_len.eq(4),
+                datar_valid.eq(datar_4x.converter.sink.valid),
+                crc_correct.eq(crc16.data_pads_out[:4] == pads_in.data.i[:4]),
             ]
 
         # SD_PHY_SPEED_8X.
@@ -541,6 +599,9 @@ class SDPHYDATAR(LiteXModule):
             datar_cases[SD_PHY_SPEED_8X] = [
                 datar_8x.source.connect(datar_source),
                 crc_len.eq(16),
+                data_len.eq(8),
+                datar_valid.eq(datar_8x.converter.sink.valid),
+                crc_correct.eq(crc16.data_pads_out[:8] == pads_in.data.i[:8]),
             ]
 
         self.comb += Case(data_width, datar_cases)
@@ -548,10 +609,11 @@ class SDPHYDATAR(LiteXModule):
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(count, 0),
+            NextValue(crc_count, 0),
             If(sink.valid & pads_out.ready,
                 pads_out.clk.eq(1),
                 NextValue(timeout, self.timeout.storage),
-                NextValue(count, 0),
+                NextValue(crc_error, 0),
                 NextValue(datar_reset, 1),
                 NextState("WAIT")
             )
@@ -571,7 +633,7 @@ class SDPHYDATAR(LiteXModule):
         fsm.act("DATA",
             pads_out.clk.eq(1),
             source.valid.eq(datar_source.valid),
-            source.status.eq(SDCARD_STREAM_STATUS_OK),
+            source.status.eq(Mux(crc_error, SDCARD_STREAM_STATUS_CRCERROR, SDCARD_STREAM_STATUS_OK)),
             source.first.eq(count == 0),
             source.last.eq(count == (sink.block_length + crc_len - 1)), # 1 block + CRC
             source.drop.eq(count > (sink.block_length - 1)), # Drop CRC
@@ -591,6 +653,12 @@ class SDPHYDATAR(LiteXModule):
                     )
                 ).Else(
                      self.stop.eq(1)
+                )
+            ),
+            If(pads_in.valid & data_done & (crc_count < 16),
+                NextValue(crc_count, crc_count + 1),
+                If(~crc_correct,
+                    NextValue(crc_error, 1),
                 )
             ),
             NextValue(timeout, timeout - 1),
