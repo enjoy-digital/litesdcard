@@ -210,7 +210,6 @@ class SDPHYCMDR(LiteXModule):
 
         timeout = Signal(32)
         count   = Signal(8)
-        busy    = Signal()
         last_data = Signal(len(source.data))
 
         self.cmdr = cmdr = SDPHYR(sdpads_layout, cmd=True, data_width=1, skip_start_bit=False)
@@ -220,9 +219,8 @@ class SDPHYCMDR(LiteXModule):
         fsm.act("IDLE",
             # Preload Timeout with Cmd Timeout.
             NextValue(timeout, self.timeout.storage),
-            # Reset Count/Busy flags.
+            # Reset Count flag.
             NextValue(count, 0),
-            NextValue(busy, 1),
             # When the Cmd has been sent to the SDCard, get the response.
             If(sink.valid & pads_out.ready & cmdw.done,
                 NextValue(cmdr.reset, 1),
@@ -254,16 +252,15 @@ class SDPHYCMDR(LiteXModule):
                 cmdr.source.ready.eq(1),
                 NextValue(count, count + 1),
                 If(source.last,
-                    sink.ready.eq(1),
-                    If(sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY,
-                        # Generate the last valid cycle in BUSY state.
+                    If((sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY) |
+                       (sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE),
+                       # Generate the last valid cycle in BUSY or CLK8 state.
                         source.valid.eq(0),
                         NextValue(last_data, source.data),
-                        NextState("BUSY")
-                    ).Elif(sink.data_type == SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(count, 0),
                         NextState("CLK8")
                     ).Else(
+                        sink.ready.eq(1),
                         NextState("IDLE")
                     )
                 )
@@ -278,18 +275,11 @@ class SDPHYCMDR(LiteXModule):
             pads_out.clk.eq(1),
             # D0 is kept low by the SDCard while busy.
             If(pads_in.valid & pads_in.data.i[0],
-                NextValue(busy, 0),
-            ),
-            # Generate the last cycle of the Cmd Response when no longer busy.
-            If(~busy,
                 source.valid.eq(1),
                 source.last.eq(1),
                 source.status.eq(SDCARD_STREAM_STATUS_OK),
                 source.data.eq(last_data),
-                If(source.ready,
-                    NextValue(count, 0),
-                    NextState("CLK8")
-                )
+                NextState("IDLE")
             ),
             # Timeout.
             NextValue(timeout, timeout - 1),
@@ -297,6 +287,8 @@ class SDPHYCMDR(LiteXModule):
                 NextState("TIMEOUT")
             )
         )
+        # 8 clk cycles before shutting the clk down,
+        # also 8 clk cycles before the next cmd can be sent.
         fsm.act("CLK8",
             pads_out.clk.eq(1),
             pads_out.cmd.oe.eq(1),
@@ -304,7 +296,16 @@ class SDPHYCMDR(LiteXModule):
             If(pads_out.ready,
                 NextValue(count, count + 1),
                 If(count == (8-1),
-                    NextState("IDLE")
+                    sink.ready.eq(1),
+                    If(sink.cmd_type == SDCARD_CTRL_RESPONSE_SHORT_BUSY,
+                        NextState("BUSY")
+                    ).Else(
+                        source.valid.eq(1),
+                        source.last.eq(1),
+                        source.status.eq(SDCARD_STREAM_STATUS_OK),
+                        source.data.eq(last_data),
+                        NextState("IDLE"),
+                    )                    
                 )
             )
         )
