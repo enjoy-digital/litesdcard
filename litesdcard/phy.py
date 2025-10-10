@@ -167,17 +167,23 @@ class SDPHYCMDW(LiteXModule):
             )
         )
         fsm.act("WRITE",
-            pads_out.clk.eq(1),
-            pads_out.cmd.oe.eq(1),
-            Case(count, {i: pads_out.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
-            If(pads_out.ready,
-                NextValue(count, count + 1),
-                If(count == (8-1),
-                    If(sink.last & (sink.cmd_type == SDCARD_CTRL_RESPONSE_NONE),
-                        NextState("CLK8")
-                    ).Else(
+            If(sink.valid,
+                pads_out.clk.eq(1),
+                pads_out.cmd.oe.eq(1),
+                Case(count, {i: pads_out.cmd.o.eq(sink.data[8-1-i]) for i in range(8)}),
+                If(pads_out.ready,
+                    NextValue(count, count + 1),
+                    If(count == (8-1),
+                        NextValue(count, 0),
                         sink.ready.eq(1),
-                        NextState("IDLE")
+                        If(sink.last,
+                            If(sink.cmd_type == SDCARD_CTRL_RESPONSE_NONE,
+                                sink.ready.eq(0),
+                                NextState("CLK8")
+                            ).Else(
+                                NextState("IDLE")
+                            )
+                        )
                     )
                 )
             )
