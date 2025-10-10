@@ -646,7 +646,7 @@ class SDPHYDATAR(LiteXModule):
                         sink.ready.eq(1),
                         If(sink.last,
                             NextValue(count, 0),
-                            NextState("CLK40")
+                            NextState("CLK8")
                         ).Else(
                             NextState("IDLE")
                         )
@@ -667,11 +667,11 @@ class SDPHYDATAR(LiteXModule):
                 NextState("TIMEOUT")
             )
         )
-        fsm.act("CLK40",
+        fsm.act("CLK8",
             pads_out.clk.eq(1),
             If(pads_out.ready,
                 NextValue(count, count + 1),
-                If(count == (40-1),
+                If(count == (8-1),
                     NextState("IDLE")
                 )
             )
