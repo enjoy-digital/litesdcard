@@ -165,14 +165,15 @@ class TestPHY(unittest.TestCase):
             yield dut.sink.valid.eq(1)
             for i in range(len(data)):
                 yield dut.sink.data.eq(data[i])
+                yield dut.sink.last.eq(i == len(data) - 1)
                 yield
                 while (yield dut.sink.ready) == 0:
                     yield
         def check_gen(dut):
             yield dut.pads_out.ready.eq(1)
-            #        ---0x55----0x00------0xff----
-            cmd_o  = "___-_-_-_-__________--------"
-            cmd_oe = "__--------_--------_--------"
+            #        ---0x55----0x00----0xff----
+            cmd_o  = "___-_-_-_-________--------"
+            cmd_oe = "__------------------------"
             for i in range(len(cmd_o)):
                 self.assertEqual(c2bool(cmd_o[i]),  (yield dut.pads_out.cmd.o))
                 self.assertEqual(c2bool(cmd_oe[i]), (yield dut.pads_out.cmd.oe))
@@ -215,3 +216,6 @@ class TestPHY(unittest.TestCase):
 
     def test_phydatar(self):
         pass
+
+if __name__ == '__main__':
+        unittest.main()
