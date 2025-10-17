@@ -13,8 +13,18 @@ jobs:
       # Install Tools
       - name: Install Tools
         run: |
-          sudo apt-get install wget build-essential python3
-          pip3 install setuptools
+          sudo apt-get install wget build-essential
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+          cache: "pip"
+          cache-dependency-path: "setup.py"
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install setuptools pytest
 
       # Install (n)Migen / LiteX / Cores
       - name: Install LiteX
@@ -28,4 +38,4 @@ jobs:
 
       # Test
       - name: Run Tests
-        run: python3 setup.py test
+        run: python3 -m pytest -v
