@@ -205,9 +205,9 @@ class SDCore(LiteXModule):
                 ).Elif(phy.cmdr.source.last,
                     # Send/Receive Data for Data Cmds.
                     If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
-                        NextState("DATA-WRITE")
+                        NextState("DATA-WRITE"), NextValue(cmd_done, 1)
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
-                        NextState("DATA-READ")
+                        NextState("DATA-READ"), NextValue(cmd_done, 1)
                     # Else return to Idle.
                     ).Else(
                         NextState("IDLE")
