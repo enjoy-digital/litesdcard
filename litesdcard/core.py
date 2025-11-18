@@ -205,13 +205,14 @@ class SDCore(LiteXModule):
                 ).Elif(phy.cmdr.source.last,
                     # Send/Receive Data for Data Cmds.
                     If(data_type == SDCARD_CTRL_DATA_TRANSFER_WRITE,
-                        NextState("DATA-WRITE"), NextValue(cmd_done, 1)
+                        NextState("DATA-WRITE")
                     ).Elif(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
-                        NextState("DATA-READ"), NextValue(cmd_done, 1)
+                        NextState("DATA-READ")
                     # Else return to Idle.
                     ).Else(
                         NextState("IDLE")
                     ),
+                    NextValue(cmd_done, 1),
                     If(cmd_type == SDCARD_CTRL_RESPONSE_LONG,
                         # 8-bit shift to expose expected 128-bit window to software.
                         NextValue(cmd_response, Cat(phy.cmdr.source.data, cmd_response)),
