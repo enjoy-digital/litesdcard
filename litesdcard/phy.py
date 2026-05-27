@@ -355,7 +355,10 @@ class SDPHYDATAW(LiteXModule):
         self.crc = SDPHYR(sdpads_layout, data=True, data_width=1, skip_start_bit=True)
         self.comb += self.crc.pads_in.eq(pads_in)
 
-        self.crc16 = crc16 = CRC16(pads_out.data.o, count)
+        # Feed the CRC from the data selected for this cycle, not from pads_out,
+        # which is later reused to emit the CRC bits.
+        crc16_data = Signal(len(pads_out.data.o))
+        self.crc16 = crc16 = CRC16(crc16_data, count)
 
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
@@ -394,15 +397,16 @@ class SDPHYDATAW(LiteXModule):
         # SD_PHY_SPEED_1X.
         data_cases["default"] = [
             Case(count, {
-                0 : pads_out.data.o[0].eq(sink.data[7]),
-                1 : pads_out.data.o[0].eq(sink.data[6]),
-                2 : pads_out.data.o[0].eq(sink.data[5]),
-                3 : pads_out.data.o[0].eq(sink.data[4]),
-                4 : pads_out.data.o[0].eq(sink.data[3]),
-                5 : pads_out.data.o[0].eq(sink.data[2]),
-                6 : pads_out.data.o[0].eq(sink.data[1]),
-                7 : pads_out.data.o[0].eq(sink.data[0]),
+                0 : crc16_data[0].eq(sink.data[7]),
+                1 : crc16_data[0].eq(sink.data[6]),
+                2 : crc16_data[0].eq(sink.data[5]),
+                3 : crc16_data[0].eq(sink.data[4]),
+                4 : crc16_data[0].eq(sink.data[3]),
+                5 : crc16_data[0].eq(sink.data[2]),
+                6 : crc16_data[0].eq(sink.data[1]),
+                7 : crc16_data[0].eq(sink.data[0]),
             }),
+            pads_out.data.o[0].eq(crc16_data[0]),
             If(pads_out.ready,
                 If(count == (8-1),
                     NextValue(count, 0),
@@ -421,9 +425,10 @@ class SDPHYDATAW(LiteXModule):
         if len(pads_out.data.o) >= 4:
             data_cases[SD_PHY_SPEED_4X] = [
                 Case(count, {
-                    0: pads_out.data.o[:4].eq(sink.data[4:8]),
-                    1: pads_out.data.o[:4].eq(sink.data[0:4]),
+                    0: crc16_data[:4].eq(sink.data[4:8]),
+                    1: crc16_data[:4].eq(sink.data[0:4]),
                 }),
+                pads_out.data.o[:4].eq(crc16_data[:4]),
                 If(pads_out.ready,
                     If(count == (2-1),
                         NextValue(count, 0),
@@ -441,7 +446,8 @@ class SDPHYDATAW(LiteXModule):
         # SD_PHY_SPEED_8X.
         if len(pads_out.data.o) >= 8:
             data_cases[SD_PHY_SPEED_8X] = [
-                pads_out.data.o[:8].eq(sink.data[:8]),
+                crc16_data[:8].eq(sink.data[:8]),
+                pads_out.data.o[:8].eq(crc16_data[:8]),
                 If(pads_out.ready,
                     If(sink.last,
                         NextState("CRC16")
