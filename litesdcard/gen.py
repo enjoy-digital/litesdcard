@@ -58,12 +58,12 @@ _io = [
 # LiteSDCard Core ----------------------------------------------------------------------------------
 
 class LiteSDCardCore(SoCMini):
-    def __init__(self, platform, clk_freq=int(100e6)):
+    def __init__(self, platform, clk_freq=int(100e6), dma_data_width=32):
         # CRG --------------------------------------------------------------------------------------
         self.crg = CRG(platform.request("clk"), platform.request("rst"))
 
         # SoCMini ----------------------------------------------------------------------------------
-        SoCMini.__init__(self, platform, clk_freq=clk_freq)
+        SoCMini.__init__(self, platform, clk_freq=clk_freq, bus_data_width=dma_data_width)
 
         # Wishbone Control -------------------------------------------------------------------------
         # Create Wishbone Control Slave interface, expose it and connect it to the SoC.
@@ -74,15 +74,15 @@ class LiteSDCardCore(SoCMini):
 
         # Wishbone DMA -----------------------------------------------------------------------------
         # Create Wishbone DMA Master interface and expose it.
-        wb_dma = wishbone.Interface(data_width=32)
-        platform.add_extension(wb_ctrl.get_ios("wb_dma"))
+        wb_dma = wishbone.Interface(data_width=dma_data_width)
+        platform.add_extension(wb_dma.get_ios("wb_dma"))
         self.comb += wb_dma.connect_to_pads(self.platform.request("wb_dma"), mode="master")
 
         # Create DMA Bus Handler (DMAs will be added by add_sdcard to it) and connect it to Wishbone DMA.
         self.dma_bus = SoCBusHandler(
             name             = "SoCDMABusHandler",
             standard         = "wishbone",
-            data_width       = 32,
+            data_width       = dma_data_width,
             address_width    = 32,
         )
         self.dma_bus.add_slave("dma", slave=wb_dma, region=SoCRegion(origin=0x00000000, size=0x100000000))
@@ -93,19 +93,24 @@ class LiteSDCardCore(SoCMini):
 
         # IRQ
         irq_pad = platform.request("irq")
-        self.comb += irq_pad.eq(self.sdcard_irq.irq)
+        self.comb += irq_pad.eq(self.sdcard.ev.irq)
 
 # Build --------------------------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="LiteSDCard standalone core generator.")
-    parser.add_argument("--clk-freq", default="100e6",  help="Input Clk Frequency.")
-    parser.add_argument("--vendor",   default="xilinx", help="FPGA Vendor.")
+    parser.add_argument("--clk-freq",       default="100e6",  help="Input Clk Frequency.")
+    parser.add_argument("--vendor",         default="xilinx", help="FPGA Vendor.")
+    parser.add_argument("--dma-data-width", default=32,        help="Wishbone DMA data width.")
     args = parser.parse_args()
 
     # Convert/Check Arguments ----------------------------------------------------------------------------
-    clk_freq     = int(float(args.clk_freq))
-    platform_cls = {
+    clk_freq       = int(float(args.clk_freq))
+    dma_data_width = int(args.dma_data_width)
+    if dma_data_width not in SoCBusHandler.supported_data_width:
+        raise ValueError("Wishbone DMA data width must be one of: {}.".format(
+            ", ".join(str(data_width) for data_width in SoCBusHandler.supported_data_width)))
+    platform_cls   = {
         "xilinx"  : XilinxPlatform,
         "altera"  : AlteraPlatform,
         "intel"   : AlteraPlatform,
@@ -114,7 +119,7 @@ def main():
 
     # Generate core --------------------------------------------------------------------------------
     platform = platform_cls(device="", io=_io)
-    core     = LiteSDCardCore(platform, clk_freq=clk_freq)
+    core     = LiteSDCardCore(platform, clk_freq=clk_freq, dma_data_width=dma_data_width)
     builder  = Builder(core, output_dir="build")
     builder.build(build_name="litesdcard_core", run=False)
 
