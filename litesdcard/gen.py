@@ -30,7 +30,7 @@ from litex.build.lattice.platform import LatticePlatform
 
 from litex.soc.interconnect import wishbone
 from litex.soc.integration.soc import SoCBusHandler, SoCRegion
-from litex.soc.integration.soc_core import *
+from litex.soc.integration.soc import *
 from litex.soc.integration.builder import *
 
 # IOs ----------------------------------------------------------------------------------------------
