@@ -59,7 +59,7 @@ class SDCore(LiteXModule):
         # Register Mapping -------------------------------------------------------------------------
         cmd_argument = self.cmd_argument.storage
         cmd_command  = self.cmd_command.storage
-        cmd_send     = self.cmd_send.re
+        cmd_send     = self.cmd_send.wr_stb
         cmd_response = self.cmd_response.status
         cmd_event    = self.cmd_event.status
         data_event   = self.data_event.status

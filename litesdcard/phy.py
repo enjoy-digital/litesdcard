@@ -125,7 +125,7 @@ class SDPHYInit(LiteXModule):
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(count, 0),
-            If(self.initialize.re,
+            If(self.initialize.wr_stb,
                 NextState("INITIALIZE")
             )
         )

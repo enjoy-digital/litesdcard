@@ -108,8 +108,8 @@ class BISTBlockGenerator(LiteXModule):
         self.core = core = _BISTBlockGenerator(random)
         self.comb += [
             core.source.connect(source),
-            core.reset.eq(self.reset.re),
-            core.start.eq(self.start.re),
+            core.reset.eq(self.reset.wr_stb),
+            core.start.eq(self.start.wr_stb),
             self.done.status.eq(core.done),
             core.count.eq(self.count.storage)
         ]
@@ -184,8 +184,8 @@ class BISTBlockChecker(LiteXModule):
         self.core = core = _BISTBlockChecker(random)
         self.comb += [
             sink.connect(core.sink),
-            core.reset.eq(self.reset.re),
-            core.start.eq(self.start.re),
+            core.reset.eq(self.reset.wr_stb),
+            core.start.eq(self.start.wr_stb),
             self.done.status.eq(core.done),
             core.count.eq(self.count.storage),
             self.errors.status.eq(core.errors)

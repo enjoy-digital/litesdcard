@@ -148,9 +148,9 @@ class TestPHY(unittest.TestCase):
     def test_phyinit(self):
         def gen(dut):
             for n in range(4):
-                yield dut.initialize.re.eq(1)
+                yield dut.initialize.wr_stb.eq(1)
                 yield
-                yield dut.initialize.re.eq(0)
+                yield dut.initialize.wr_stb.eq(0)
                 yield dut.pads_out.ready.eq(1)
                 clk   = "_" + "-"*80 + "__"
                 for i in range(len(clk)):
