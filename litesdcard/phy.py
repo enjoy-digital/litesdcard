@@ -113,20 +113,35 @@ class SDPHYR(LiteXModule):
 # SDCard PHY Init ----------------------------------------------------------------------------------
 
 class SDPHYInit(LiteXModule):
-    def __init__(self, sdpads_layout):
+    def __init__(self, sdpads_layout, with_reset=False):
         self.initialize = CSR()
+        self.card_reset = Signal()
         self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
 
         # # #
 
-        count = Signal(8)
+        count = Signal(16)
 
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             NextValue(count, 0),
             If(self.initialize.wr_stb,
-                NextState("INITIALIZE")
+                NextState("RESET" if with_reset else "INITIALIZE")
+            )
+        )
+        fsm.act("RESET",
+            self.card_reset.eq(1),
+            pads_out.cmd.oe.eq(1),
+            pads_out.cmd.o.eq(1),
+            pads_out.data.oe.eq(1),
+            pads_out.data.o.eq(Replicate(C(1), len(pads_out.data.o))),
+            If(pads_out.ready,
+                NextValue(count, count + 1),
+                If(count == (4096-1),
+                    NextValue(count, 0),
+                    NextState("INITIALIZE")
+                )
             )
         )
         fsm.act("INITIALIZE",
@@ -713,7 +728,8 @@ class SDPHYIOGen(SDPHYIO):
     def __init__(self, clocker, sdpads, pads):
         # Rst
         if hasattr(pads, "rst"):
-            self.comb += pads.rst.eq(0)
+            self.card_reset = Signal()
+            self.comb += pads.rst.eq(self.card_reset)
 
         # Clk
         self.specials += SDROutput(
@@ -800,7 +816,7 @@ class SDPHY(LiteXModule):
         data_width = Signal(2)
 
         self.clocker = clocker = SDPHYClocker()
-        self.init    = init    = SDPHYInit(sdpads_layout)
+        self.init    = init    = SDPHYInit(sdpads_layout, with_reset=hasattr(pads, "rst"))
         self.cmdw    = cmdw    = SDPHYCMDW(sdpads_layout)
         self.cmdr    = cmdr    = SDPHYCMDR(sdpads_layout, sys_clk_freq, cmd_timeout, cmdw)
         self.dataw   = dataw   = SDPHYDATAW(sdpads_layout, data_width)
@@ -846,6 +862,10 @@ class SDPHY(LiteXModule):
 
         # Speed Throttling -------------------------------------------------------------------------
         self.comb += clocker.stop.eq(dataw.stop | datar.stop)
+
+        # Card Reset -------------------------------------------------------------------------------
+        if hasattr(self.io, "card_reset"):
+            self.comb += self.io.card_reset.eq(init.card_reset)
 
         # IRQs -------------------------------------------------------------------------------------
         self.card_detect_irq = Signal() # Generate Card Detect IRQ on level change.
