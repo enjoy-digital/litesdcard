@@ -284,7 +284,7 @@ class SDCore(LiteXModule):
                             NextState("IDLE")
                         )
                     ),
-                    If(phy.dataw.source.status == SDCARD_STREAM_STATUS_CRCERROR,
+                    If(phy.datar.source.status == SDCARD_STREAM_STATUS_CRCERROR,
                         NextValue(data_crc, 1),
                     ),
                 # On Timeout: set Data Timeout and return to Idle.
