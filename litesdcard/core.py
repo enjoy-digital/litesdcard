@@ -80,12 +80,20 @@ class SDCore(LiteXModule):
 
         data_type    = Signal(2)
         data_count   = Signal(32)
+        data_read_count = Signal(32)
         data_done    = Signal()
         data_error   = Signal()
         data_timeout = Signal()
         data_crc     = Signal()
 
         cmd          = Signal(6)
+
+        data_read_fifo = ResetInserter()(stream.SyncFIFO(
+            [("data", 8), ("status", 3), ("drop", 1)],
+            depth=64,
+        ))
+        self.submodules.data_read_fifo = data_read_fifo
+        self.comb += phy.datar.source.connect(data_read_fifo.sink)
 
         self.comb += [
             # Decode type of Cmd/Data from Register.
@@ -130,6 +138,8 @@ class SDCore(LiteXModule):
             NextValue(data_done,  1),
             NextValue(cmd_count,  0),
             NextValue(data_count, 0),
+            NextValue(data_read_count, 0),
+            data_read_fifo.reset.eq(1),
             crc7_inserter.reset.eq(1),
             # Wait for a valid Cmd.
             If(cmd_send,
@@ -191,6 +201,17 @@ class SDCore(LiteXModule):
             ).Else(
                 # 48-bit 6 bytes.
                 phy.cmdr.sink.length.eq(48//8)
+            ),
+
+            # Start looking for read data in parallel with the command response. Some cards
+            # can drive DAT before the CMD response has fully completed.
+            If(data_type == SDCARD_CTRL_DATA_TRANSFER_READ,
+                phy.datar.sink.valid.eq(data_read_count != block_count),
+                phy.datar.sink.block_length.eq(block_length),
+                phy.datar.sink.last.eq(data_read_count == (block_count - 1)),
+                If(phy.datar.sink.ready,
+                    NextValue(data_read_count, data_read_count + 1),
+                ),
             ),
 
             # Receive the Cmd Response from the PHY.
@@ -260,23 +281,26 @@ class SDCore(LiteXModule):
         )
         fsm.act("DATA-READ",
             # Send Data Response information to the PHY.
-            phy.datar.sink.valid.eq(1),
+            phy.datar.sink.valid.eq(data_read_count != block_count),
             phy.datar.sink.block_length.eq(block_length),
-            phy.datar.sink.last.eq(data_count == (block_count - 1)),
+            phy.datar.sink.last.eq(data_read_count == (block_count - 1)),
+            If(phy.datar.sink.ready,
+                NextValue(data_read_count, data_read_count + 1),
+            ),
 
             # Receive Data Response and Status from the PHY.
-            If(phy.datar.source.valid,
+            If(data_read_fifo.source.valid,
                 # On valid Data:
-                If((phy.datar.source.status == SDCARD_STREAM_STATUS_OK) |
-                   (phy.datar.source.status == SDCARD_STREAM_STATUS_CRCERROR),
+                If((data_read_fifo.source.status == SDCARD_STREAM_STATUS_OK) |
+                   (data_read_fifo.source.status == SDCARD_STREAM_STATUS_CRCERROR),
                     # Receive Data and drop CRC part.
-                    If(phy.datar.source.drop,
-                        phy.datar.source.ready.eq(1)
+                    If(data_read_fifo.source.drop,
+                        data_read_fifo.source.ready.eq(1)
                     ).Else(
-                        phy.datar.source.connect(self.source, omit={"status", "drop"}),
+                        data_read_fifo.source.connect(self.source, omit={"status", "drop"}),
                     ),
                     # On last Data:
-                    If(phy.datar.source.last & phy.datar.source.ready,
+                    If(data_read_fifo.source.last & data_read_fifo.source.ready,
                         # Increment Data Count.
                         NextValue(data_count, data_count + 1),
                         # Transfer is Done when Data Count reaches Block Count.
@@ -284,13 +308,13 @@ class SDCore(LiteXModule):
                             NextState("IDLE")
                         )
                     ),
-                    If(phy.datar.source.status == SDCARD_STREAM_STATUS_CRCERROR,
+                    If(data_read_fifo.source.status == SDCARD_STREAM_STATUS_CRCERROR,
                         NextValue(data_crc, 1),
                     ),
                 # On Timeout: set Data Timeout and return to Idle.
-                ).Elif(phy.datar.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
+                ).Elif(data_read_fifo.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
                     NextValue(data_timeout, 1),
-                    phy.datar.source.ready.eq(1),
+                    data_read_fifo.source.ready.eq(1),
                     NextState("IDLE")
                 )
             )
