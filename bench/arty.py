@@ -12,6 +12,7 @@ import argparse
 from migen import *
 
 from litex.build.generic_platform import *
+from litex.build.pmod import PmodSDCard
 
 from litex_boards.platforms import digilent_arty
 from litex_boards.targets.digilent_arty import BaseSoC
@@ -38,7 +39,7 @@ class BenchSoC(BaseSoC):
             **bench_kwargs)
 
         # SDCard on PMODD with Digilent's Pmod MicroSD ---------------------------------------------
-        self.platform.add_extension(digilent_arty._sdcard_pmod_io)
+        self.platform.add_extension(PmodSDCard("pmodd"))
         self.add_sdcard("sdcard")
 
         if with_sampler or with_analyzer:
@@ -122,7 +123,7 @@ class BenchPHY(BaseSoC):
         BaseSoC.__init__(self, sys_clk_freq=int(100e6), cpu_type=None, integrated_main_ram_size=0x100)
 
         # SDCard on PMODD with Digilent's Pmod MicroSD ---------------------------------------------
-        self.platform.add_extension(digilent_arty._sdcard_pmod_io)
+        self.platform.add_extension(PmodSDCard("pmodd"))
         from litesdcard.phy import SDPHY
         self.submodules.sd_phy = SDPHY(self.platform.request("sdcard"), platform.device, self.clk_freq)
 
