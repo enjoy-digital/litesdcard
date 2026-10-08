@@ -12,9 +12,9 @@ import argparse
 from migen import *
 
 from litex.build.generic_platform import *
-from litex.build.pmod import PmodSDCard
 
 from litex_boards.platforms import digilent_arty
+from litex_boards.extensions.pmod import PmodSDCard
 from litex_boards.targets.digilent_arty import BaseSoC
 
 from litex.soc.interconnect import stream
