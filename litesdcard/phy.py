@@ -355,7 +355,7 @@ class SDPHYDATAW(LiteXModule):
             CSRField("crc_error",   size=1, offset=1),
             CSRField("write_error", size=1, offset=2),
         ])
-        self.timeout  = CSRStorage(32, reset=int(write_timeout*sys_clk_freq))
+        self.timeout  = Signal(32, reset=int(write_timeout*sys_clk_freq)) # Driven by SDPHY.dataw_timeout.
 
         # # #
 
@@ -500,7 +500,7 @@ class SDPHYDATAW(LiteXModule):
             If(pads_out.ready,
                 self.crc.reset.eq(1),
                 # Preload Timeout with Write Timeout (CRC status token and busy).
-                NextValue(timeout, self.timeout.storage),
+                NextValue(timeout, self.timeout),
                 NextState("CRC")
             )
         )
@@ -856,6 +856,11 @@ class SDPHY(LiteXModule):
         ])
 
         self.comb += data_width.eq(self.settings.fields.data_width)
+
+        # Write Timeout (declared after settings to keep the CSR layout of the existing drivers:
+        # card_detect, clocker, init, cmdr, dataw status, datar, settings).
+        self.dataw_timeout = CSRStorage(32, reset=int(write_timeout*sys_clk_freq))
+        self.comb += dataw.timeout.eq(self.dataw_timeout.storage)
 
         self.sdpads = sdpads = Record(sdpads_layout)
 

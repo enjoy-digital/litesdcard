@@ -331,5 +331,24 @@ class TestPHY(unittest.TestCase):
     def test_phydatar(self):
         pass
 
+
+class TestSDPHYCSRLayout(unittest.TestCase):
+    def test_csr_layout(self):
+        # The register offsets are used by existing drivers (ex: Linux litex_mmc writes the settings
+        # register at offset 0x18): new registers must be added after the existing ones.
+        pads = Record([("clk", 1), ("cmd_i", 1), ("cmd_o", 1), ("cmd_t", 1),
+                       ("dat_i", 4), ("dat_o", 4), ("dat_t", 4)])
+        phy  = SDPHY(pads, "sim", 100e6)
+        self.assertEqual([csr.name for csr in phy.get_csrs()], [
+            "card_detect",     # 0x00.
+            "clocker_divider", # 0x04.
+            "init_initialize", # 0x08.
+            "cmdr_timeout",    # 0x0c.
+            "dataw_status",    # 0x10.
+            "datar_timeout",   # 0x14.
+            "settings",        # 0x18.
+            "dataw_timeout",   # 0x1c.
+        ])
+
 if __name__ == '__main__':
-        unittest.main()
+    unittest.main()
