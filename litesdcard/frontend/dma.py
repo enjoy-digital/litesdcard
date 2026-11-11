@@ -28,10 +28,16 @@ class SDBlock2MemDMA(LiteXModule):
         # # #
 
         # Submodules
-        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True)
-        converter = stream.Converter(8, bus.data_width, reverse=True)
+        fifo      = ResetInserter()(stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True))
+        converter = ResetInserter()(stream.Converter(8, bus.data_width, reverse=True))
         self.submodules += fifo, converter
         self.dma = WishboneDMAWriter(bus, with_csr=True, endianness=endianness)
+
+        # Flush FIFO/Converter when disabled (no stale bytes at the start of the next transfer).
+        self.comb += [
+            fifo.reset.eq(~self.dma._enable.storage),
+            converter.reset.eq(~self.dma._enable.storage),
+        ]
 
         # Flow
         start   = Signal()
@@ -75,9 +81,18 @@ class SDMem2BlockDMA(LiteXModule):
 
         # Submodules
         self.dma = WishboneDMAReader(bus, with_csr=True, endianness=endianness)
-        converter = stream.Converter(bus.data_width, 8, reverse=True)
-        fifo      = stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True)
+        converter = ResetInserter()(stream.Converter(bus.data_width, 8, reverse=True))
+        fifo      = ResetInserter()(stream.SyncFIFO([("data", 8)], fifo_depth, buffered=True))
         self.submodules += converter, fifo
+
+        # Flush DMA FIFO/Converter/FIFO when disabled (no prefetched bytes of an aborted transfer
+        # at the start of the next one).
+        ResetInserter()(self.dma.fifo)
+        self.comb += [
+            self.dma.fifo.reset.eq(~self.dma._enable.storage),
+            converter.reset.eq(~self.dma._enable.storage),
+            fifo.reset.eq(~self.dma._enable.storage),
+        ]
 
         # Flow
         self.comb += [

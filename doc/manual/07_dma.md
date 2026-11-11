@@ -45,8 +45,8 @@ in bus words and sets `done` after `length` bytes.
 `length` must equal `block_length` times `block_count`. A longer length never completes: `done`
 stays low, and the BIOS gives up after its DMA timeout. With a shorter length, the DMA writer
 stops accepting words once done; the FIFO fills, the core stops, and the PHY stops the card clock
-until the DMA is disabled. Disabling the DMA drains the FIFO: the bytes left in it are dropped. A
-partial bus word left in the converter is not, and leads the next transfer.
+until the DMA is disabled. Disabling the DMA resets the FIFO and the converter: the bytes left in
+them, a partial bus word included, are dropped.
 
 ## Mem2block {#dma-mem2block}
 
@@ -57,8 +57,8 @@ the bytes only in its DATA-WRITE state and marks the block boundaries itself
 
 Here too `length` must equal `block_length` times `block_count`. A shorter length leaves the core
 waiting for data in DATA-WRITE, with the card clock stopped. With a longer length, the extra bytes
-stay in the FIFO when the write ends; disabling the DMA does not empty it, so they are sent first
-by the next write.
+stay in the FIFO when the write ends. Disabling the DMA resets the FIFOs (of the DMA reader and of
+mem2block) and the converter, so they do not lead the next write.
 
 ## Registers {#dma-registers}
 
