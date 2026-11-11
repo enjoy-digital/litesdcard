@@ -18,7 +18,7 @@ of each configuration is in the [status table](#intro-status).
 | Command frame | 48 bits built by the core: start, direction, index, argument, CRC7, end |
 | Responses | 48 bits (6 bytes) or 136 bits (17 bytes), CRC7 checked on request |
 | Read buffer | `SyncFIFO` of 64 bytes between the PHY and `source` |
-| Block size | `block_length` up to 1023 bytes on write; on read up to 1022 bytes (1016 on a 4-bit bus, 1008 on an 8-bit bus) |
+| Block size | `block_length` up to 1023 bytes, on read and write |
 | Events | `cmd_event` and `data_event`: done, error, timeout, crc |
 | Interrupt | `irq`, a pulse when a command completes (not used by `add_sdcard`) |
 
