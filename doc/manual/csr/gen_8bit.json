@@ -1,0 +1,588 @@
+{
+ "argv": [
+  "--vendor lattice",
+  "--clk-freq 100e6",
+  "--dma-data-width 32",
+  "8 data lines (data subsignal widened)"
+ ],
+ "banks": {
+  "sdcard_block2mem": [
+   {
+    "access": "rw",
+    "description": "DMA Writer base address.",
+    "fields": [],
+    "name": "dma_base",
+    "offset": 76,
+    "reset": 0,
+    "size": 64
+   },
+   {
+    "access": "rw",
+    "description": "DMA Writer transfer length in bytes.",
+    "fields": [],
+    "name": "dma_length",
+    "offset": 84,
+    "reset": 0,
+    "size": 32
+   },
+   {
+    "access": "rw",
+    "description": "DMA Writer enable.",
+    "fields": [],
+    "name": "dma_enable",
+    "offset": 88,
+    "reset": 0,
+    "size": 1
+   },
+   {
+    "access": "ro",
+    "description": "DMA Writer transfer done.",
+    "fields": [],
+    "name": "dma_done",
+    "offset": 92,
+    "reset": null,
+    "size": 1
+   },
+   {
+    "access": "rw",
+    "description": "DMA Writer loop enable.",
+    "fields": [],
+    "name": "dma_loop",
+    "offset": 96,
+    "reset": 0,
+    "size": 1
+   },
+   {
+    "access": "ro",
+    "description": "DMA Writer current transfer offset.",
+    "fields": [],
+    "name": "dma_offset",
+    "offset": 100,
+    "reset": null,
+    "size": 32
+   },
+   {
+    "access": "ro",
+    "description": "DMA Writer rejected a non-word-aligned base or length. Cleared when disabled.",
+    "fields": [],
+    "name": "dma_error",
+    "offset": 104,
+    "reset": null,
+    "size": 1
+   }
+  ],
+  "sdcard_core": [
+   {
+    "access": "rw",
+    "description": "SDCard Cmd Argument.",
+    "fields": [],
+    "name": "cmd_argument",
+    "offset": 32,
+    "reset": 0,
+    "size": 32
+   },
+   {
+    "access": "rw",
+    "description": "",
+    "fields": [
+     {
+      "description": "Core/PHY Cmd transfer type.",
+      "name": "cmd_type",
+      "offset": 0,
+      "reset": 0,
+      "size": 2,
+      "values": []
+     },
+     {
+      "description": "Enable CRC7 check for response.",
+      "name": "crc",
+      "offset": 2,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Core/PHY Data transfer type.",
+      "name": "data_type",
+      "offset": 5,
+      "reset": 0,
+      "size": 2,
+      "values": []
+     },
+     {
+      "description": "SDCard Cmd.",
+      "name": "cmd",
+      "offset": 8,
+      "reset": 0,
+      "size": 6,
+      "values": []
+     }
+    ],
+    "name": "cmd_command",
+    "offset": 36,
+    "reset": 0,
+    "size": 14
+   },
+   {
+    "access": "rw",
+    "description": "Run Cmd/Data transfer.",
+    "fields": [],
+    "name": "cmd_send",
+    "offset": 40,
+    "reset": 0,
+    "size": 1
+   },
+   {
+    "access": "ro",
+    "description": "SDCard Cmd Response.",
+    "fields": [],
+    "name": "cmd_response",
+    "offset": 44,
+    "reset": null,
+    "size": 128
+   },
+   {
+    "access": "ro",
+    "description": "",
+    "fields": [
+     {
+      "description": "Cmd transfer has been executed.",
+      "name": "done",
+      "offset": 0,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Cmd transfer has failed due to error(s).",
+      "name": "error",
+      "offset": 1,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Timeout error.",
+      "name": "timeout",
+      "offset": 2,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "CRC Error.",
+      "name": "crc",
+      "offset": 3,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     }
+    ],
+    "name": "cmd_event",
+    "offset": 60,
+    "reset": null,
+    "size": 4
+   },
+   {
+    "access": "ro",
+    "description": "",
+    "fields": [
+     {
+      "description": "Data transfer has been executed.",
+      "name": "done",
+      "offset": 0,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Data transfer has failed due to error(s).",
+      "name": "error",
+      "offset": 1,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Timeout Error.",
+      "name": "timeout",
+      "offset": 2,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "CRC Error.",
+      "name": "crc",
+      "offset": 3,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     }
+    ],
+    "name": "data_event",
+    "offset": 64,
+    "reset": null,
+    "size": 4
+   },
+   {
+    "access": "rw",
+    "description": "Data transfer Block Length (in bytes).",
+    "fields": [],
+    "name": "block_length",
+    "offset": 68,
+    "reset": 0,
+    "size": 10
+   },
+   {
+    "access": "rw",
+    "description": "Data transfer Block Count.",
+    "fields": [],
+    "name": "block_count",
+    "offset": 72,
+    "reset": 0,
+    "size": 32
+   }
+  ],
+  "sdcard_ev": [
+   {
+    "access": "ro",
+    "description": "This register contains the current raw level of the event trigger. Writes to this register have no effect.",
+    "fields": [
+     {
+      "description": "Level of the ``card_detect`` event.",
+      "name": "card_detect",
+      "offset": 0,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Level of the ``block2mem_dma`` event.",
+      "name": "block2mem_dma",
+      "offset": 1,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Level of the ``mem2block_dma`` event.",
+      "name": "mem2block_dma",
+      "offset": 2,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Level of the ``data_done`` event.",
+      "name": "data_done",
+      "offset": 3,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Level of the ``cmd_done`` event.",
+      "name": "cmd_done",
+      "offset": 4,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     }
+    ],
+    "name": "status",
+    "offset": 140,
+    "reset": null,
+    "size": 5
+   },
+   {
+    "access": "rw",
+    "description": "When an event occurs, the corresponding bit will be set in this register. To clear the Event, set the corresponding bit in this register.",
+    "fields": [
+     {
+      "description": "SDCard has been ejected/inserted.",
+      "name": "card_detect",
+      "offset": 0,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Block2Mem DMA terminated.",
+      "name": "block2mem_dma",
+      "offset": 1,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Mem2Block DMA terminated.",
+      "name": "mem2block_dma",
+      "offset": 2,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Transfer completed  (cmd and data).",
+      "name": "data_done",
+      "offset": 3,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Command completed.",
+      "name": "cmd_done",
+      "offset": 4,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     }
+    ],
+    "name": "pending",
+    "offset": 144,
+    "reset": null,
+    "size": 5
+   },
+   {
+    "access": "rw",
+    "description": "This register enables the corresponding events. Write a ``0`` to this register to disable individual events.",
+    "fields": [
+     {
+      "description": "Write a ``1`` to enable the ``card_detect`` Event.",
+      "name": "card_detect",
+      "offset": 0,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Write a ``1`` to enable the ``block2mem_dma`` Event.",
+      "name": "block2mem_dma",
+      "offset": 1,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Write a ``1`` to enable the ``mem2block_dma`` Event.",
+      "name": "mem2block_dma",
+      "offset": 2,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Write a ``1`` to enable the ``data_done`` Event.",
+      "name": "data_done",
+      "offset": 3,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "Write a ``1`` to enable the ``cmd_done`` Event.",
+      "name": "cmd_done",
+      "offset": 4,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     }
+    ],
+    "name": "enable",
+    "offset": 148,
+    "reset": 0,
+    "size": 5
+   }
+  ],
+  "sdcard_mem2block": [
+   {
+    "access": "rw",
+    "description": "DMA Reader base address.",
+    "fields": [],
+    "name": "dma_base",
+    "offset": 108,
+    "reset": 0,
+    "size": 64
+   },
+   {
+    "access": "rw",
+    "description": "DMA Reader transfer length in bytes.",
+    "fields": [],
+    "name": "dma_length",
+    "offset": 116,
+    "reset": 0,
+    "size": 32
+   },
+   {
+    "access": "rw",
+    "description": "DMA Reader enable.",
+    "fields": [],
+    "name": "dma_enable",
+    "offset": 120,
+    "reset": 0,
+    "size": 1
+   },
+   {
+    "access": "ro",
+    "description": "DMA Reader transfer done.",
+    "fields": [],
+    "name": "dma_done",
+    "offset": 124,
+    "reset": null,
+    "size": 1
+   },
+   {
+    "access": "rw",
+    "description": "DMA Reader loop enable.",
+    "fields": [],
+    "name": "dma_loop",
+    "offset": 128,
+    "reset": 0,
+    "size": 1
+   },
+   {
+    "access": "ro",
+    "description": "DMA Reader current transfer offset.",
+    "fields": [],
+    "name": "dma_offset",
+    "offset": 132,
+    "reset": null,
+    "size": 32
+   },
+   {
+    "access": "ro",
+    "description": "DMA Reader rejected a non-word-aligned base or length. Cleared when disabled.",
+    "fields": [],
+    "name": "dma_error",
+    "offset": 136,
+    "reset": null,
+    "size": 1
+   }
+  ],
+  "sdcard_phy": [
+   {
+    "access": "ro",
+    "description": "Level of the card detect pad `cd` (0 when the pads have none). The BIOS reads 1 as no card.",
+    "fields": [],
+    "name": "card_detect",
+    "offset": 0,
+    "reset": null,
+    "size": 1
+   },
+   {
+    "access": "rw",
+    "description": "Card clock divider: the card clock is the system clock divided by `divider` rounded up to even, and by 2 at least.",
+    "fields": [],
+    "name": "clocker_divider",
+    "offset": 4,
+    "reset": 256,
+    "size": 9
+   },
+   {
+    "access": "wo",
+    "description": "Write: send the power-up clocks, 80 card clocks with CMD and DAT high; when the pads have `rst`, they follow a card reset as long as 4096 card clock periods, with the clock stopped.",
+    "fields": [],
+    "name": "init_initialize",
+    "offset": 8,
+    "reset": null,
+    "size": 1
+   },
+   {
+    "access": "rw",
+    "description": "Response timeout in system clock cycles: wait for the start bit, the response bytes and the busy of an R1b.",
+    "fields": [],
+    "name": "cmdr_timeout",
+    "offset": 12,
+    "reset": 100000000,
+    "size": 32
+   },
+   {
+    "access": "ro",
+    "description": "CRC status tokens of the last write. See the fields below.",
+    "fields": [
+     {
+      "description": "1: the card accepted a block (token `010`).",
+      "name": "accepted",
+      "offset": 0,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "1: the card reported a CRC error on a block (token `101`).",
+      "name": "crc_error",
+      "offset": 1,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     },
+     {
+      "description": "1: the card reported a write error on a block (token `110`).",
+      "name": "write_error",
+      "offset": 2,
+      "reset": 0,
+      "size": 1,
+      "values": []
+     }
+    ],
+    "name": "dataw_status",
+    "offset": 16,
+    "reset": null,
+    "size": 3
+   },
+   {
+    "access": "rw",
+    "description": "Write timeout in system clock cycles, for each block of a write: wait for the CRC status token and the end of the busy.",
+    "fields": [],
+    "name": "dataw_timeout",
+    "offset": 20,
+    "reset": 50000000,
+    "size": 32
+   },
+   {
+    "access": "rw",
+    "description": "Read timeout in system clock cycles, for each block of a read; it does not count while the PHY stops the card clock for back-pressure.",
+    "fields": [],
+    "name": "datar_timeout",
+    "offset": 24,
+    "reset": 100000000,
+    "size": 32
+   },
+   {
+    "access": "rw",
+    "description": "",
+    "fields": [
+     {
+      "description": "Bus width of the data transfers: `0b00` 1-bit, `0b01` 4-bit, `0b10` 8-bit.",
+      "name": "data_width",
+      "offset": 0,
+      "reset": 1,
+      "size": 2,
+      "values": [
+       [
+        "0b00",
+        "1-bit"
+       ],
+       [
+        "0b01",
+        "4-bit"
+       ],
+       [
+        "0b10",
+        "8-bit"
+       ]
+      ]
+     }
+    ],
+    "name": "settings",
+    "offset": 28,
+    "reset": 1,
+    "size": 2
+   }
+  ]
+ },
+ "config": "gen_8bit",
+ "target": "litesdcard_gen"
+}
