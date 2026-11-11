@@ -6,6 +6,34 @@ import os
 
 from migen import *
 
+# Helpers ------------------------------------------------------------------------------------------
+
+_BLOCK_SIZE  = 512
+_C_SIZE_UNIT = 512*1024 # SDHC/SDXC (CSD 2.0) capacity unit: (C_SIZE + 1) * 512KB.
+
+def _sdemulator_store(size, image):
+    """Return (nblocks, init, csd_c_size) of the emulator block store."""
+    # Default: Single 512-byte block buffer shared by all block addresses.
+    if size is None and image is None:
+        return 1, [i for i in range(_BLOCK_SIZE//4)], None
+
+    # Block-addressed store, optionally initialized from a raw disk image.
+    data = b""
+    if image is not None:
+        with open(image, "rb") as f:
+            data = f.read()
+    if size is None:
+        size = max(_C_SIZE_UNIT, (len(data) + _C_SIZE_UNIT - 1)//_C_SIZE_UNIT*_C_SIZE_UNIT)
+    if (size <= 0) or (size % _C_SIZE_UNIT):
+        raise ValueError(f"SDEmulator size must be a multiple of {_C_SIZE_UNIT} bytes ({size}).")
+    if len(data) > size:
+        raise ValueError(f"SDEmulator image ({len(data)} bytes) larger than size ({size} bytes).")
+    data = data + bytes(size - len(data))
+    init = [int.from_bytes(data[i:i+4], "big") for i in range(0, size, 4)] # Card sends MSB first.
+    return size//_BLOCK_SIZE, init, size//_C_SIZE_UNIT - 1
+
+# SDEmulator ---------------------------------------------------------------------------------------
+
 
 def _sdemulator_pads():
     pads = Record([
@@ -23,18 +51,30 @@ def _sdemulator_pads():
 class SDEmulator(Module):
     """This is a Migen wrapper around the lower-level parts of the SD card emulator
        from Google Project Vault's Open Reference Platform. This core still does all
-       SD card command processing in hardware, integrating a 512-bytes block buffer.
+       SD card command processing in hardware.
+
+       Block store:
+       - Default (size=None, image=None): a single 512-bytes block buffer shared by all block
+         addresses (small footprint, card capacity reported as 125MB).
+       - size (bytes, multiple of 512KB) and/or image (raw disk image file): a block-addressed
+         store, initialized from image (zeros when not provided/after its end), with the card
+         capacity reported from size (default: image size rounded up to 512KB).
        """
-    def  __init__(self, platform):
+    def  __init__(self, platform, size=None, image=None):
         self.pads = pads = _sdemulator_pads()
 
         # The external SD clock drives a separate clock domain
         self.clock_domains.cd_sd_ll = ClockDomain(reset_less=True)
         self.comb += self.cd_sd_ll.clk.eq(pads.clk)
 
-        self.specials.buffer = Memory(32, 512//4, init=[i for i in range(512//4)])
+        # Block Store.
+        nblocks, init, csd_c_size = _sdemulator_store(size, image)
+        self.nblocks = nblocks
+        self.specials.buffer = Memory(32, nblocks*_BLOCK_SIZE//4, init=init)
         self.specials.internal_rd_port = self.buffer.get_port(clock_domain="sd_ll")
         self.specials.internal_wr_port = self.buffer.get_port(write_capable=True, clock_domain="sd_ll")
+        bram_rd_sd_addr = Signal(7) # Word address in the 512-bytes block.
+        bram_wr_sd_addr = Signal(7) # Word address in the 512-bytes block.
 
         # Communication between PHY and Link layers
         self.card_state       = Signal(4)
@@ -102,6 +142,20 @@ class SDEmulator(Module):
         self.block_read_go    = Signal()
         self.block_write_done = Signal()
 
+        # Block Store addressing: Word address in block from the PHY, block from the Link (stable
+        # during the block transfer).
+        if nblocks > 1:
+            block_bits = bits_for(nblocks - 1)
+            self.comb += [
+                self.internal_rd_port.adr.eq(Cat(bram_rd_sd_addr, self.block_read_addr[:block_bits])),
+                self.internal_wr_port.adr.eq(Cat(bram_wr_sd_addr, self.block_write_addr[:block_bits])),
+            ]
+        else:
+            self.comb += [
+                self.internal_rd_port.adr.eq(bram_rd_sd_addr),
+                self.internal_wr_port.adr.eq(bram_wr_sd_addr),
+            ]
+
         self.specials += Instance("sd_phy",
             i_clk_50           = ClockSignal(),
             i_reset_n          = ~ResetSignal(),
@@ -138,9 +192,9 @@ class SDEmulator(Module):
             i_data_out_act     = self.data_out_act,
             i_data_out_stop    = self.data_out_stop,
             o_data_out_done    = self.data_out_done,
-            o_bram_rd_sd_addr  = self.internal_rd_port.adr,
+            o_bram_rd_sd_addr  = bram_rd_sd_addr,
             i_bram_rd_sd_q     = self.internal_rd_port.dat_r,
-            o_bram_wr_sd_addr  = self.internal_wr_port.adr,
+            o_bram_wr_sd_addr  = bram_wr_sd_addr,
             o_bram_wr_sd_wren  = self.internal_wr_port.we,
             o_bram_wr_sd_data  = self.internal_wr_port.dat_w,
             i_bram_wr_sd_q     = self.internal_wr_port.dat_r,
@@ -151,7 +205,10 @@ class SDEmulator(Module):
             o_spi_cnt          = self.phy_spi_cnt
         )
 
-        self.specials += Instance("sd_link",
+        sd_link_params = {}
+        if csd_c_size is not None:
+            sd_link_params["p_CSD_C_SIZE"] = csd_c_size # Card capacity: (C_SIZE + 1) * 512KB.
+        self.specials += Instance("sd_link", **sd_link_params,
             i_clk_50               = ClockSignal(),
             i_reset_n              = ~ResetSignal(),
             o_link_card_state      = self.card_state,
