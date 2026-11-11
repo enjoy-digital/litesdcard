@@ -43,7 +43,7 @@ class TestCRC(unittest.TestCase):
                 yield
 
         dut = CRC16(data_pads, count)
-        run_simulation(dut, gen(dut), vcd_name="sim.vcd")
+        run_simulation(dut, gen(dut))
 
     def test_crc_inserter_ones(self):
         self.crc_inserter_test(data=[0xff]*512, crc=0x7fa1, data_pads_width=1)
