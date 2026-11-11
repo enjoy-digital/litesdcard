@@ -159,6 +159,34 @@ class TestPHY(unittest.TestCase):
         dut = SDPHYInit(_sdpads_layout(4))
         run_simulation(dut, [gen(dut)])
 
+    def test_phydatar_abort(self):
+        # Data reader armed for a read whose Cmd failed: abort must return it to IDLE (SD clock
+        # released, next request starts with a fresh timeout).
+        data_width = Signal(2)
+        dut        = SDPHYDATAR(_sdpads_layout(4), data_width, 1e6, 1e-3) # 1000 cycles timeout.
+        idle       = dut.fsm.ongoing("IDLE")
+        result     = []
+
+        def gen():
+            yield dut.pads_out.ready.eq(1)
+            yield dut.pads_in.data.i.eq(0b1111)
+            yield dut.sink.block_length.eq(512)
+            yield dut.sink.last.eq(1)
+            yield dut.sink.valid.eq(1)
+            yield
+            yield dut.sink.valid.eq(0)
+            for _ in range(16):
+                yield
+            result.append(((yield idle), (yield dut.pads_out.clk)))
+            yield dut.abort.eq(1)
+            yield
+            yield dut.abort.eq(0)
+            yield
+            result.append(((yield idle), (yield dut.pads_out.clk)))
+
+        run_simulation(dut, gen())
+        self.assertEqual(result, [(0, 1), (1, 0)])
+
     def test_phycmdw(self):
         def stim_gen(dut):
             data = [0x55, 0x00, 0xff]

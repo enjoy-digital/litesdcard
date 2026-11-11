@@ -164,8 +164,9 @@ not answer ([Software: BIOS, boot and Linux](#software)).
 ## Data reader {#eng-datar}
 
 The data reader receives one block per request from the core. The core requests the first block
-during the command response, so the data reader listens on the DAT lines from the start. The
-figure below shows its state machine.
+during the command response, so the data reader listens on the DAT lines from the start; if the
+command fails, the core aborts it (`abort` input) and it returns to IDLE. The figure below shows
+its state machine.
 
 ![Data reader state machine. Each block goes from IDLE through WAIT to DATA and back; CLK8 follows
 the last block. WAIT and DATA lead to TIMEOUT when the counter expires.](eng_datar_fsm.svg)

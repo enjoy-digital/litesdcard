@@ -179,7 +179,9 @@ bytes and counts blocks on `last`.
 The core requests the blocks from the PHY in CMD-RESPONSE already, not in DATA-READ. Some cards
 start the data on DAT before the response on CMD has ended, and the PHY must be listening then
 (`test/test_core.py` covers this case). The FIFO holds the early bytes until the state machine
-reaches DATA-READ.
+reaches DATA-READ. When the command fails instead (response timeout or CRC7 mismatch), the core
+pulses the `abort` input of the data reader, which returns to IDLE and releases the card clock, so
+the next command starts with a data reader that is not armed.
 
 Reads have back-pressure all the way to the card. When `source` is not ready, the FIFO fills, the
 PHY stops the card clock, and the card waits ([PHY: clocking and IO](#phy)). A slow consumer
