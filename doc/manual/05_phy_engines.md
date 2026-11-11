@@ -208,14 +208,16 @@ The command engines always use CMD alone.
 | `0b01` | 4 bits | 4 or 8 data pins; reset value |
 | `0b10` | 8 bits | 8 data pins |
 
-The register resets to 4 bits for compatibility with drivers written before the field existed.
+The register resets to 4 bits for compatibility with drivers written before the field existed,
+or to 1 bit when the pads have fewer than 4 data lines.
 The BIOS driver writes 1 bit before it initializes the card, then 4 or 8 bits once the card has
 accepted the wider bus ([Software: BIOS, boot and Linux](#software)).
 
 A value that the pins cannot support selects 1 bit, without any error. The engines contain only
 the widths that the pads allow, and the 1-bit path is their default case. A PHY with 4 data pins
-therefore runs on DAT0 alone if software writes `0b10` or `0b11`, and a PHY with 1 data pin runs on
-DAT0 at the reset value `0b01`.
+therefore runs on DAT0 alone if software writes `0b10` or `0b11`. Software knows the supported
+widths from the constants `SDCARD_PHY_SUPPORT_4X` (4 data pins or more) and `SDCARD_PHY_SUPPORT_8X`
+(8 data pins).
 
 The figure below shows how one byte maps onto the lines. The most significant bit goes first in
 time and, on a wide bus, on the highest line.

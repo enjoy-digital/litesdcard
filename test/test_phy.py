@@ -350,5 +350,21 @@ class TestSDPHYCSRLayout(unittest.TestCase):
             "dataw_timeout",   # 0x1c.
         ])
 
+
+class TestSDPHYDataWidth(unittest.TestCase):
+    def _phy(self, n):
+        pads = Record([("clk", 1), ("cmd", 1), ("data", n)])
+        return SDPHY(pads, "xc7", 100e6)
+
+    def test_data_width_capabilities(self):
+        for n, constants, reset in [
+            (1, [],                           SD_PHY_SPEED_1X),
+            (4, ["support_4x"],               SD_PHY_SPEED_4X),
+            (8, ["support_4x", "support_8x"], SD_PHY_SPEED_4X),
+        ]:
+            phy = self._phy(n)
+            self.assertEqual(sorted(c.name for c in phy.get_constants()), constants)
+            self.assertEqual(phy.settings.fields.data_width.reset.value, reset)
+
 if __name__ == '__main__':
     unittest.main()
