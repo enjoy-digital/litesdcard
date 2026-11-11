@@ -343,7 +343,7 @@ class SDPHYCMDR(LiteXModule):
 # SDCard PHY Data Write ----------------------------------------------------------------------------
 
 class SDPHYDATAW(LiteXModule):
-    def __init__(self, sdpads_layout, data_width):
+    def __init__(self, sdpads_layout, data_width, sys_clk_freq, write_timeout):
         self.pads_in  = pads_in  = stream.Endpoint(sdpads_layout)
         self.pads_out = pads_out = stream.Endpoint(sdpads_layout)
         self.sink     = sink     = stream.Endpoint([("data", 8), ("last_block", 1)])
@@ -355,10 +355,12 @@ class SDPHYDATAW(LiteXModule):
             CSRField("crc_error",   size=1, offset=1),
             CSRField("write_error", size=1, offset=2),
         ])
+        self.timeout  = CSRStorage(32, reset=int(write_timeout*sys_clk_freq))
 
         # # #
 
-        count = Signal(8)
+        count   = Signal(8)
+        timeout = Signal(32)
 
         accepted    = Signal()
         crc_error   = Signal()
@@ -497,11 +499,17 @@ class SDPHYDATAW(LiteXModule):
             pads_out.data.o.eq(Replicate(C(1), len(pads_out.data.o))),
             If(pads_out.ready,
                 self.crc.reset.eq(1),
+                # Preload Timeout with Write Timeout (CRC status token and busy).
+                NextValue(timeout, self.timeout.storage),
                 NextState("CRC")
             )
         )
         fsm.act("CRC",
             pads_out.clk.eq(1),
+            NextValue(timeout, timeout - 1),
+            If(timeout == 0,
+                NextState("TIMEOUT")
+            ),
             If(self.crc.source.valid,
                 source.valid.eq(1),
                 Case(self.crc.source.data[5:], {
@@ -532,6 +540,10 @@ class SDPHYDATAW(LiteXModule):
         fsm.act("BUSY",
             pads_out.clk.eq(1),
             NextValue(count, 0),
+            NextValue(timeout, timeout - 1),
+            If(timeout == 0,
+                NextState("TIMEOUT")
+            ),
             If(pads_in.valid & pads_in.data.i[0],
                 sink.ready.eq(1),
                 If(sink.last_block,
@@ -539,6 +551,16 @@ class SDPHYDATAW(LiteXModule):
                 ).Else(
                     NextState("CLK2"),
                 )
+            )
+        )
+        # No CRC status token or card still busy after Write Timeout: report it and release the block.
+        fsm.act("TIMEOUT",
+            NextValue(count, 0),
+            source.valid.eq(1),
+            source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT),
+            If(source.ready,
+                sink.ready.eq(1),
+                NextState("IDLE")
             )
         )
 
@@ -808,7 +830,7 @@ class SDPHYIOEmulator(SDPHYIO):
 # SDCard PHY ---------------------------------------------------------------------------------------
 
 class SDPHY(LiteXModule):
-    def __init__(self, pads, device, sys_clk_freq, cmd_timeout=10e-3, data_timeout=10e-3):
+    def __init__(self, pads, device, sys_clk_freq, cmd_timeout=10e-3, data_timeout=10e-3, write_timeout=500e-3):
         use_emulator = hasattr(pads, "cmd_t") and hasattr(pads, "dat_t")
         self.card_detect = CSRStatus() # Assume SDCard is present if no cd pin.
         self.comb += self.card_detect.status.eq(getattr(pads, "cd", 0))
@@ -822,7 +844,7 @@ class SDPHY(LiteXModule):
         self.init    = init    = SDPHYInit(sdpads_layout, with_reset=hasattr(pads, "rst"))
         self.cmdw    = cmdw    = SDPHYCMDW(sdpads_layout)
         self.cmdr    = cmdr    = SDPHYCMDR(sdpads_layout, sys_clk_freq, cmd_timeout, cmdw)
-        self.dataw   = dataw   = SDPHYDATAW(sdpads_layout, data_width)
+        self.dataw   = dataw   = SDPHYDATAW(sdpads_layout, data_width, sys_clk_freq, write_timeout)
         self.datar   = datar   = SDPHYDATAR(sdpads_layout, data_width, sys_clk_freq, data_timeout)
 
         self.settings = CSRStorage(fields=[

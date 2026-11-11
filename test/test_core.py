@@ -258,6 +258,73 @@ class TestSDCore(unittest.TestCase):
         event = self._run_cmd_response(response, cmd_type=SDCARD_CTRL_RESPONSE_LONG)
         self.assertEqual(event, {"done": 1, "error": 1, "timeout": 0, "crc": 1, "data_error": 0})
 
+    def test_write_timeout_sets_data_timeout(self):
+        phy = _FakePHY()
+        dut = SDCore(phy)
+        idle = dut.fsm.ongoing("IDLE")
+        write = dut.fsm.ongoing("DATA-WRITE")
+
+        data_event = []
+
+        def host_gen():
+            yield dut.block_length.storage.eq(512)
+            yield dut.block_count.storage.eq(4)
+            yield dut.cmd_command.fields.cmd_type.eq(SDCARD_CTRL_RESPONSE_SHORT)
+            yield dut.cmd_command.fields.data_type.eq(SDCARD_CTRL_DATA_TRANSFER_WRITE)
+            yield dut.cmd_command.fields.cmd.eq(25)
+            yield dut.sink.valid.eq(1)
+            yield dut.cmd_send.wr_stb.eq(1)
+            yield
+            yield dut.cmd_send.wr_stb.eq(0)
+            for _ in range(64):
+                if (yield write):
+                    break
+                yield
+            for _ in range(64):
+                if (yield idle):
+                    break
+                yield
+            yield
+            data_event.append({
+                "done"    : (yield dut.data_event.fields.done),
+                "error"   : (yield dut.data_event.fields.error),
+                "timeout" : (yield dut.data_event.fields.timeout),
+                "crc"     : (yield dut.data_event.fields.crc),
+            })
+
+        def cmdw_gen():
+            yield phy.cmdw.sink.ready.eq(1)
+            for _ in range(32):
+                yield
+
+        def cmdr_gen():
+            for _ in range(64):
+                if (yield phy.cmdr.sink.valid):
+                    break
+                yield
+            for i in range(6):
+                yield phy.cmdr.source.status.eq(SDCARD_STREAM_STATUS_OK)
+                yield phy.cmdr.source.last.eq(i == 5)
+                yield phy.cmdr.source.valid.eq(1)
+                yield
+            yield phy.cmdr.source.valid.eq(0)
+
+        def dataw_gen():
+            # PHY reports a Write Timeout (card busy) on the first block.
+            for _ in range(64):
+                if (yield phy.dataw.sink.valid):
+                    break
+                yield
+            for _ in range(4):
+                yield
+            yield phy.dataw.source.status.eq(SDCARD_STREAM_STATUS_TIMEOUT)
+            yield phy.dataw.source.valid.eq(1)
+            yield
+            yield phy.dataw.source.valid.eq(0)
+
+        run_simulation(dut, [host_gen(), cmdw_gen(), cmdr_gen(), dataw_gen()])
+        self.assertEqual(data_event, [{"done": 1, "error": 0, "timeout": 1, "crc": 0}])
+
     def test_cmd_event_crc_check_disabled(self):
         response = [0x3f, 0xff, 0xff, 0xff, 0xff, 0xff] # R3 (OCR): no CRC.
         event = self._run_cmd_response(response, crc=0)
