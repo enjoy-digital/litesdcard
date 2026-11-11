@@ -248,12 +248,12 @@ placement; check the timing report or the IO register settings of the tool.
 ### Emulator IO {#phy-emulator-io}
 
 With the pads of the emulator, the PHY uses `SDPHYIOEmulator` instead. It connects the internal
-pads to the emulator ports with plain logic: no IO register, no tristate, four DAT lines, and the
-clocker output wired straight to the emulator clock input. That clock is the inverse of the
-hardware card clock, which leaves through a register fed with the inverted clocker output, and it
-idles low when gated where the hardware clock idles high. The timing at the emulator pads therefore
-differs from [Timing at the pins](#phy-timing). `data_i_ce` comes from the same logic as on
-hardware. [The SD card emulator](#emulator) describes the other side.
+pads to the emulator ports without tristate, on four DAT lines, but with the timing of the hardware
+IO: the card clock is the inverted clocker output through a register, so it idles high when gated,
+and CMD and DAT go through one register in each direction, as the `SDROutput` and `SDRTristate` of
+`SDPHYIOGen`. The edges the emulator sees relative to CMD and DAT are therefore those of
+[Timing at the pins](#phy-timing), and `data_i_ce` comes from the same logic and the same delay as
+on hardware. [The SD card emulator](#emulator) describes the other side.
 
 ## Limits {#phy-limits}
 
