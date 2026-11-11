@@ -65,6 +65,27 @@ Achieved rates are lower and depend on the card (access time, write busy time), 
 
 If you want to support these features, please contact us.
 
+[> Documentation
+----------------
+The **SD Card & eMMC Host Core manual** is the reference of LiteSDCard: a nightly
+[PDF](https://github.com/enjoy-digital/litesdcard/releases/download/manual-nightly/litesdcard_manual.pdf)
+and [HTML page](https://github.com/enjoy-digital/litesdcard/releases/download/manual-nightly/litesdcard_manual.html)
+are published on the [manual-nightly](https://github.com/enjoy-digital/litesdcard/releases/tag/manual-nightly)
+release. Sources in [doc/manual](doc/manual/README.md) (build: `python3 doc/manual/build.py`, outputs in
+`build/doc/`; pandoc, XeLaTeX and the fonts listed in the README of `doc/manual`):
+
+- **Understand**: [introduction](doc/manual/01_introduction.md), [SD cards in a nutshell](doc/manual/02_sd_primer.md)
+  (bus, commands and responses, initialization, data blocks, eMMC).
+- **The core**: [architecture](doc/manual/03_architecture.md), [PHY: clocking and IO](doc/manual/04_phy.md),
+  [PHY: command and data engines](doc/manual/05_phy_engines.md), [core](doc/manual/06_core.md),
+  [DMAs](doc/manual/07_dma.md), [emulator](doc/manual/08_emulator.md).
+- **Use it**: [getting started](doc/manual/09_getting_started.md), [integration](doc/manual/10_integration.md),
+  [software: BIOS, boot and Linux](doc/manual/11_software.md), [boards](doc/manual/12_boards.md),
+  [simulation](doc/manual/13_simulation.md), [debugging](doc/manual/14_debugging.md).
+- **Appendices**: [registers](doc/manual/A_registers.md), [build options](doc/manual/B_build_options.md),
+  [glossary](doc/manual/C_glossary.md), [performance](doc/manual/D_performance.md),
+  [maintaining this manual](doc/manual/E_maintenance.md) (for contributors).
+
 [> Getting started
 ------------------
 1. Install Python 3.6+ and FPGA vendor's development tools.
