@@ -214,6 +214,62 @@ class TestPHY(unittest.TestCase):
     def test_phydataw(self):
         pass
 
+    def test_phydatar_backpressure_no_timeout(self):
+        # 1-bit read of a 4-byte block with the consumer stalled for longer than the timeout: the SD
+        # clock is stopped (stop) during the stall and the timeout must not expire.
+        data_width = Signal(2)
+        dut        = SDPHYDATAR(_sdpads_layout(4), data_width, 1e6, 100e-6) # 100 cycles timeout.
+
+        data   = [0xa5, 0x5a, 0x12, 0x34]
+        bits   = [1]*4 + [0] # Idle/Start.
+        for byte in data + [0x00, 0x00]: # Data + CRC16 (CRC value not checked here).
+            bits += [(byte >> (7 - i)) & 1 for i in range(8)]
+        bits  += [1]*32 # End/Idle.
+        status = []
+
+        def sink_gen():
+            yield dut.pads_out.ready.eq(1)
+            yield dut.sink.block_length.eq(len(data))
+            yield dut.sink.last.eq(1)
+            yield dut.sink.valid.eq(1)
+            for _ in range(2048):
+                if (yield dut.sink.ready):
+                    break
+                yield
+            yield dut.sink.valid.eq(0)
+
+        def card_gen():
+            yield dut.pads_in.data.i.eq(0b1111)
+            for _ in range(8):
+                yield
+            i = 0
+            for _ in range(2048):
+                stop = (yield dut.stop)
+                yield dut.pads_in.valid.eq(~stop & 1)
+                yield dut.pads_in.data.i.eq(0b1110 | bits[min(i, len(bits) - 1)])
+                if not stop:
+                    i += 1
+                yield
+
+        def source_gen():
+            for _ in range(32):
+                if (yield dut.source.valid):
+                    break
+                yield
+            # Consumer stall (3x timeout).
+            for _ in range(300):
+                yield
+            yield dut.source.ready.eq(1)
+            yield
+            for _ in range(1024):
+                if (yield dut.source.valid):
+                    status.append((yield dut.source.status))
+                yield
+
+        run_simulation(dut, [sink_gen(), card_gen(), source_gen()])
+        self.assertNotIn(SDCARD_STREAM_STATUS_TIMEOUT, status)
+        self.assertEqual(len(status), len(data) + 2) # Data + CRC16 (dropped by the core).
+
     def test_phydatar(self):
         pass
 

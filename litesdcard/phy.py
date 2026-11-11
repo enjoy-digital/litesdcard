@@ -689,7 +689,10 @@ class SDPHYDATAR(LiteXModule):
                     NextValue(crc_error, 1),
                 )
             ),
-            NextValue(timeout, timeout - 1),
+            # Timeout (frozen while the SD clock is stopped by back-pressure).
+            If(~self.stop,
+                NextValue(timeout, timeout - 1),
+            ),
             If(timeout == 0,
                 sink.ready.eq(1),
                 NextState("TIMEOUT")
