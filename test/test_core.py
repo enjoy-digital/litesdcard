@@ -347,5 +347,53 @@ class TestSDCore(unittest.TestCase):
         self.assertEqual(event, {"done": 1, "error": 1, "timeout": 1, "crc": 0, "data_error": 0})
 
 
+    def test_zero_block_count_data_cmd(self):
+        for data_type in [SDCARD_CTRL_DATA_TRANSFER_READ, SDCARD_CTRL_DATA_TRANSFER_WRITE]:
+            phy  = _FakePHY()
+            dut  = SDCore(phy)
+            idle = dut.fsm.ongoing("IDLE")
+
+            data_done = []
+
+            def host_gen():
+                yield dut.block_length.storage.eq(512)
+                yield dut.block_count.storage.eq(0)
+                yield dut.cmd_command.fields.cmd_type.eq(SDCARD_CTRL_RESPONSE_SHORT)
+                yield dut.cmd_command.fields.data_type.eq(data_type)
+                yield dut.cmd_command.fields.cmd.eq(18)
+                yield dut.cmd_send.wr_stb.eq(1)
+                yield
+                yield dut.cmd_send.wr_stb.eq(0)
+                for _ in range(64):
+                    if (yield idle) == 0:
+                        break
+                    yield
+                for _ in range(256):
+                    if (yield idle) == 1:
+                        break
+                    yield
+                yield
+                data_done.append((yield dut.data_event.fields.done))
+
+            def cmdw_gen():
+                yield phy.cmdw.sink.ready.eq(1)
+                for _ in range(32):
+                    yield
+
+            def cmdr_gen():
+                for _ in range(64):
+                    if (yield phy.cmdr.sink.valid):
+                        break
+                    yield
+                for i in range(6):
+                    yield phy.cmdr.source.status.eq(SDCARD_STREAM_STATUS_OK)
+                    yield phy.cmdr.source.last.eq(i == 5)
+                    yield phy.cmdr.source.valid.eq(1)
+                    yield
+                yield phy.cmdr.source.valid.eq(0)
+
+            run_simulation(dut, [host_gen(), cmdw_gen(), cmdr_gen()])
+            self.assertEqual(data_done, [1])
+
 if __name__ == "__main__":
     unittest.main()
