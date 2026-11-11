@@ -116,7 +116,7 @@ class SDCore(LiteXModule):
         ]
 
         # Block delimiter for DATA-WRITE
-        count = Signal(9)
+        count = Signal(len(block_length))
         self.sync += [
             If(self.sink.valid & self.sink.ready,
                 count.eq(count + 1),

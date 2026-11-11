@@ -121,6 +121,64 @@ class TestSDCore(unittest.TestCase):
         self.assertEqual(early_datar_start, [True])
         self.assertEqual(read_data, [0xa5])
 
+    def _run_write_block_delimiter(self, block_length, block_count):
+        phy = _FakePHY()
+        dut = SDCore(phy)
+
+        last_positions = []
+
+        def host_gen():
+            yield dut.block_length.storage.eq(block_length)
+            yield dut.block_count.storage.eq(block_count)
+            yield dut.cmd_command.fields.cmd_type.eq(SDCARD_CTRL_RESPONSE_SHORT)
+            yield dut.cmd_command.fields.data_type.eq(SDCARD_CTRL_DATA_TRANSFER_WRITE)
+            yield dut.cmd_command.fields.cmd.eq(25)
+            yield dut.cmd_send.wr_stb.eq(1)
+            yield
+            yield dut.cmd_send.wr_stb.eq(0)
+
+        def cmdw_gen():
+            yield phy.cmdw.sink.ready.eq(1)
+            for _ in range(32):
+                yield
+
+        def cmdr_gen():
+            for _ in range(64):
+                if (yield phy.cmdr.sink.valid):
+                    break
+                yield
+            for i in range(6):
+                yield phy.cmdr.source.status.eq(SDCARD_STREAM_STATUS_OK)
+                yield phy.cmdr.source.last.eq(i == 5)
+                yield phy.cmdr.source.valid.eq(1)
+                yield
+            yield phy.cmdr.source.valid.eq(0)
+
+        def sink_gen():
+            yield dut.sink.valid.eq(1)
+            yield phy.dataw.sink.ready.eq(1)
+            n = 0
+            for _ in range(block_length*block_count + 256):
+                if (yield phy.dataw.sink.valid) & (yield phy.dataw.sink.ready):
+                    if (yield phy.dataw.sink.last):
+                        last_positions.append(n)
+                    n += 1
+                    if n == block_length*block_count:
+                        break
+                yield
+            yield dut.sink.valid.eq(0)
+
+        run_simulation(dut, [host_gen(), cmdw_gen(), cmdr_gen(), sink_gen()])
+        return last_positions
+
+    def test_write_block_delimiter_512(self):
+        last_positions = self._run_write_block_delimiter(block_length=512, block_count=2)
+        self.assertEqual(last_positions, [511, 1023])
+
+    def test_write_block_delimiter_above_512(self):
+        last_positions = self._run_write_block_delimiter(block_length=1023, block_count=2)
+        self.assertEqual(last_positions, [1022, 2045])
+
     def _run_cmd_response(self, response, status=SDCARD_STREAM_STATUS_OK, crc=1, cmd_type=SDCARD_CTRL_RESPONSE_SHORT, data_type=SDCARD_CTRL_DATA_TRANSFER_NONE):
         phy = _FakePHY()
         dut = SDCore(phy)
