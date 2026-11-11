@@ -1,0 +1,25 @@
+# Manual of this project: output name and chapters, in order (read by build.py; the pandoc defaults
+# files and the theme are generic, from the manual kit).
+name: litesdcard_manual
+chapters:
+  - 00_front.md
+  - 01_introduction.md
+  - 02_sd_primer.md
+  - 03_architecture.md
+  - 04_phy.md
+  - 05_phy_engines.md
+  - 06_core.md
+  - 07_dma.md
+  - 08_emulator.md
+  - 09_getting_started.md
+  - 10_integration.md
+  - 11_software.md
+  - 12_boards.md
+  - 13_simulation.md
+  - 14_debugging.md
+  - Z_appendix.md
+  - A_registers.md
+  - B_build_options.md
+  - C_glossary.md
+  - D_performance.md
+  - E_maintenance.md
