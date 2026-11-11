@@ -133,9 +133,8 @@ python3 sim.py
 python3 sim.py --trace --trace-start 0 --trace-end 1000000
 ```
 
-The Ethernet module of the simulator opens `tap0`, which needs the rights to create it. The
-script passes `--trace` to both `trace` and `trace_fst`, so a trace is always written in FST and
-`--trace-fst` has no effect.
+The Ethernet module of the simulator opens `tap0`, which needs the rights to create it. `--trace`
+writes a VCD trace, or an FST trace with `--trace-fst`.
 
 ## Adding a test {#sim-adding}
 
