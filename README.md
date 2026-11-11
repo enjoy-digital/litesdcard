@@ -44,17 +44,17 @@ Frontend:
 
 [> Performances
 ---------------
-SD0: Good RAM 8GB (cheap SD Card)
-SD1: SanDisk Ultra 32GB
-SD2: SanDisk Extreme 128GB
+Throughput is bounded by the SD bus: each 512-byte block takes a start bit, the data, a 16-bit CRC
+and an end bit, so 4114/1042/530 SD clocks in 1/4/8-bit mode. Bus-only upper bounds (MB/s):
 
-W/R(MB/s) performance vs SD frequency:
+| Data width   | 25MHz | 50MHz |
+|--------------|-------|-------|
+| 1-bit        |  3.11 |  6.22 |
+| 4-bit        | 12.28 | 24.57 |
+| 8-bit (eMMC) | 24.15 | 48.30 |
 
-| SDCard | 20MHz | 40MHz | 75MHz | 100MHz | 125MHz |
-|--------|-------|-------|-------|--------|--------|
-|   SD0  |  4/9  | 6/18  |  7/33 |   7/44 |  7/56  |
-|   SD1  |  6/9  | 9/18  | 12/33 |  14/44 | 15/56  |
-|   SD2  |  9/9  | 18/18 | 33/33 |  43/44 | 54/55  |
+Achieved rates are lower and depend on the card (access time, write busy time), on the SD clock
+(sys_clk_freq divided by the clocker divider, BIOS default: 25MHz) and on the DMA/memory path.
 
 [> Possible improvements
 ------------------------
