@@ -249,10 +249,9 @@ The BIOS driver never writes them; a driver may change them at any time between 
 
 The command reader reloads its counter once per command, the data engines once per block.
 
-`phy_dataw_timeout` sits between `phy_dataw_status` and `phy_datar_timeout` in the register bank,
-so it moved `phy_datar_timeout` and `phy_settings` by one register. A Linux driver that writes the
-bus width at a fixed offset of the PHY registers no longer reaches `phy_settings`
-([Known issues](#debug-known)).
+`phy_dataw_timeout` is the last register of the PHY bank, after `phy_settings`, so the offsets of
+the older registers did not move: the Linux driver, which writes the bus width at a fixed offset
+of the PHY registers, still reaches `phy_settings` ([Register reference](#registers)).
 
 The command timeout covers the whole response in one budget: the wait for the start bit, the
 response bytes and the busy time of an R1b response. A long busy, such as an erase, needs a larger

@@ -288,7 +288,6 @@ The issues of the code that show up while debugging are listed here with the pla
 | `flash_from_sdcard` disk functions | Uses the FatFs disk of the last `sdcardboot` or `sataboot`, none at reset | LiteX `bios/cmds/cmd_spiflash.c` |
 | DTS generator needs both DMAs and the IRQ | `KeyError` with one DMA, or without an interrupt even with `--polling` | LiteX `litex_json2dts_linux.py` |
 | DTS `bus-width` always 4 | An 8-bit eMMC is described as 4-bit | LiteX `litex_json2dts_linux.py` |
-| Linux driver PHY offsets | The mainline `litex_mmc` writes the bus width at offset `0x18` of the PHY, where the master branch has `datar_timeout` (`settings` is at `0x1c`) | `litesdcard/phy.py` (`dataw_timeout`), Linux `litex_mmc.c` (`drivers/mmc/host`) |
 | Emulator with one buffer by default | No boot in simulation with `add_sdcard` | LiteX `add_sdcard`, `litesdcard/emulator/` |
 | TrellisBoard `--bench phy` | `TypeError` at elaboration | `bench/trellisboard.py` (`BenchPHY`) |
 | `--trace-fst` of `bench/sim.py` | Ignored: `--trace` always writes FST | `bench/sim.py` |

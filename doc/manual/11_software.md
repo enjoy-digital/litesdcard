@@ -308,13 +308,8 @@ needs `mode="read+write"` (the default of `add_sdcard`) to run Linux on the card
 the host unable to run MMC and SDIO devices, so Linux does not use an eMMC on LiteSDCard. It
 drops the 8-bit bus and takes the bus width of the device tree, so the 4 of the node gives a
 4-bit bus. The kernel sends ACMD6 itself; the driver only writes the width code into the PHY
-`settings` register, at offset `0x18` of the `phy` range.
-
-On the master branch of LiteSDCard, offset `0x18` of the PHY is `datar_timeout`: the write timeout
-register `dataw_timeout` at `0x14` moved `settings` to `0x1c`, as the `phy` range of `0x20` bytes
-above shows. The width code written by the driver therefore lands in the read timeout, and
-`settings` keeps its reset value, so data transfers under Linux are expected to fail with this
-gateware (not tested on hardware, [Known issues](#debug-known)).
+`settings` register, at offset `0x18` of the `phy` range. The write timeout register
+`dataw_timeout` comes after it, at `0x1c`, so the driver and the gateware agree on that offset.
 
 With a driver and a gateware that agree on the register map, the card appears as `mmcblk0` with one
 device per partition. The Linux-on-LiteX-VexRiscv project documents its use in its HOWTO:
