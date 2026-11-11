@@ -236,12 +236,6 @@ response, and `data_event` reads `0x1`.
 
 A driver must know the following limits:
 
-- After a failed read command (response timeout or CRC7 mismatch), no data reaches the DMA, but
-  the data reader of the PHY, already started during the response, receives and drops the
-  block that the card may send. It returns to IDLE after that block or after its read timeout
-  (1 s with `add_sdcard`); a command sent in the meantime runs while the data reader is active.
-- On read, the PHY counts a block and its CRC bytes on 10 bits, which limits a block to 1022,
-  1016 or 1008 bytes on a 1, 4 or 8-bit bus ([Data reader](#eng-datar)).
 - The write timeout covers the card. If the data source runs dry, the data writer stops the card
   clock and waits for the next byte without a timeout, and the core stays in DATA-WRITE.
 - `phy_dataw_status` sums up the tokens of every block of a write; the per-block result is only in
