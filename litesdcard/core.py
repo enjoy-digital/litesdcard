@@ -106,7 +106,7 @@ class SDCore(LiteXModule):
             self.cmd_event.fields.done.eq(cmd_done),
             self.cmd_event.fields.error.eq(cmd_error),
             self.cmd_event.fields.timeout.eq(cmd_timeout),
-            self.cmd_event.fields.crc.eq(0),
+            self.cmd_event.fields.crc.eq(cmd_crc),
 
             # Encode Data Event to Register.
             self.data_event.fields.done.eq(data_done),
@@ -218,9 +218,14 @@ class SDCore(LiteXModule):
             phy.cmdr.source.ready.eq(1),
             crc7_inserter.din.eq(phy.cmdr.source.data),
             If(phy.cmdr.source.valid,
-                # On Timeout: set Cmd Timeout and return to Idle.
+                # On Timeout: set Cmd Error/Timeout and return to Idle.
                 If(phy.cmdr.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
+                    NextValue(cmd_error,   1),
                     NextValue(cmd_timeout, 1),
+                    # Data phase skipped for Data Cmds: set Data Error.
+                    If(data_type != SDCARD_CTRL_DATA_TRANSFER_NONE,
+                        NextValue(data_error, 1),
+                    ),
                     NextState("IDLE")
                 # On last Cmd byte:
                 ).Elif(phy.cmdr.source.last,
@@ -240,7 +245,12 @@ class SDCore(LiteXModule):
                     ),
                     If(cmd_crc_en & (crc7_inserter.crc != phy.cmdr.source.data[1:]),
                         # If CRC check enabled and CRC bad, set Cmd Error/CRC and return to Idle
-                        NextValue(cmd_crc, 1),
+                        NextValue(cmd_error, 1),
+                        NextValue(cmd_crc,   1),
+                        # Data phase skipped for Data Cmds: set Data Error.
+                        If(data_type != SDCARD_CTRL_DATA_TRANSFER_NONE,
+                            NextValue(data_error, 1),
+                        ),
                         NextState("IDLE"),
                     ),
                 # Else Shift Cmd Response.
