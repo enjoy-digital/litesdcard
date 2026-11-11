@@ -500,10 +500,10 @@
    },
    {
     "access": "ro",
-    "description": "CRC status tokens of the last write. See the fields below.",
+    "description": "CRC status tokens of the last write, summed over its blocks (cleared when a write starts); data_event of the core tells whether the write failed.",
     "fields": [
      {
-      "description": "1: the card accepted a block (token `010`).",
+      "description": "A block of the last write was accepted (token 010).",
       "name": "accepted",
       "offset": 0,
       "reset": 0,
@@ -511,7 +511,7 @@
       "values": []
      },
      {
-      "description": "1: the card reported a CRC error on a block (token `101`).",
+      "description": "A block of the last write had a CRC error (token 101).",
       "name": "crc_error",
       "offset": 1,
       "reset": 0,
@@ -519,7 +519,7 @@
       "values": []
      },
      {
-      "description": "1: the card reported a write error on a block (token `110`).",
+      "description": "A block of the last write had a write error (token 110).",
       "name": "write_error",
       "offset": 2,
       "reset": 0,

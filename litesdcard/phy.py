@@ -350,11 +350,14 @@ class SDPHYDATAW(LiteXModule):
         self.source   = source   = stream.Endpoint([("status", 3)])
         self.stop     = Signal()
 
+        # Status of the CRC status tokens, cleared at the start of a write and set by the token of
+        # each block: over a multi-block write, the fields sum up the blocks (sticky over the write).
         self.status   = CSRStatus(fields=[
-            CSRField("accepted",    size=1, offset=0),
-            CSRField("crc_error",   size=1, offset=1),
-            CSRField("write_error", size=1, offset=2),
-        ])
+            CSRField("accepted",    size=1, offset=0, description="A block of the last write was accepted (token 010)."),
+            CSRField("crc_error",   size=1, offset=1, description="A block of the last write had a CRC error (token 101)."),
+            CSRField("write_error", size=1, offset=2, description="A block of the last write had a write error (token 110)."),
+        ], description="CRC status tokens of the last write, summed over its blocks (cleared when a " +
+            "write starts); data_event of the core tells whether the write failed.")
         self.timeout  = Signal(32, reset=int(write_timeout*sys_clk_freq)) # Driven by SDPHY.dataw_timeout.
 
         # # #

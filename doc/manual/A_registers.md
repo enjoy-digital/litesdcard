@@ -55,7 +55,7 @@ Bank `sdcard_phy`.
 | `clocker_divider` | `0x0004` | 9 | rw | Card clock divider: the card clock is the system clock divided by `divider` rounded up to even, and by 2 at least. Reset `0x100`. |
 | `init_initialize` | `0x0008` | 1 | wo | Write: send the power-up clocks, 80 card clocks with CMD and DAT high; when the pads have `rst`, they follow a card reset as long as 4096 card clock periods, with the clock stopped. |
 | `cmdr_timeout` | `0x000c` | 32 | rw | Response timeout in system clock cycles: wait for the start bit, the response bytes and the busy of an R1b. Reset `0x5f5e100`. |
-| `dataw_status` | `0x0010` | 3 | ro | CRC status tokens of the last write. See the fields below. |
+| `dataw_status` | `0x0010` | 3 | ro | CRC status tokens of the last write, summed over its blocks (cleared when a write starts); data_event of the core tells whether the write failed. |
 | `datar_timeout` | `0x0014` | 32 | rw | Read timeout in system clock cycles, for each block of a read; it does not count while the PHY stops the card clock for back-pressure. Reset `0x5f5e100`. |
 | `settings` | `0x0018` | 2 | rw | Bus width of the data transfers: `0b00` 1-bit, `0b01` 4-bit, `0b10` 8-bit. A width the data pads do not support (support_4x/support_8x constants) falls back to 1-bit. Reset `0x1`. |
 | `dataw_timeout` | `0x001c` | 32 | rw | Write timeout in system clock cycles, for each block of a write: wait for the CRC status token and the end of the busy. Reset `0x2faf080`. |
@@ -64,9 +64,9 @@ Fields of `dataw_status`:
 
 | Field | Bits | Description |
 |------------------------|---------|------------------------------------------------------|
-| `accepted` | 0 | 1: the card accepted a block (token `010`). |
-| `crc_error` | 1 | 1: the card reported a CRC error on a block (token `101`). |
-| `write_error` | 2 | 1: the card reported a write error on a block (token `110`). |
+| `accepted` | 0 | A block of the last write was accepted (token 010). |
+| `crc_error` | 1 | A block of the last write had a CRC error (token 101). |
+| `write_error` | 2 | A block of the last write had a write error (token 110). |
 
 ## Core {#reg-sdcard-core}
 
