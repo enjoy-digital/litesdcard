@@ -211,8 +211,66 @@ class TestPHY(unittest.TestCase):
     def test_phycrc(self):
         pass
 
+    def _run_phydataw(self, busy_cycles):
+        # Write one 1-byte block; the card answers with an accepted CRC status token then holds
+        # DAT0 low (busy) for busy_cycles (None: forever).
+        data_width = Signal(2)
+        dut        = SDPHYDATAW(_sdpads_layout(4), data_width, 1e6, 200e-6) # 200 cycles timeout.
+        crc_state  = dut.fsm.ongoing("CRC")
+
+        status     = []
+        sink_ready = []
+
+        def sink_gen():
+            yield dut.pads_out.ready.eq(1)
+            yield dut.sink.data.eq(0x5a)
+            yield dut.sink.last.eq(1)
+            yield dut.sink.last_block.eq(1)
+            yield dut.sink.valid.eq(1)
+            yield
+            for _ in range(1024):
+                if (yield dut.sink.ready):
+                    sink_ready.append(True)
+                    break
+                yield
+            yield dut.sink.valid.eq(0)
+
+        def card_gen():
+            yield dut.pads_in.valid.eq(1)
+            yield dut.pads_in.data.i.eq(0b1111)
+            for _ in range(1024):
+                if (yield crc_state):
+                    break
+                yield
+            # Start bit, CRC status token (010: accepted), end bit.
+            for bit in [0, 0, 1, 0, 1]:
+                yield dut.pads_in.data.i.eq(0b1110 | bit)
+                yield
+            # Busy.
+            yield dut.pads_in.data.i.eq(0b1110)
+            for _ in range(1024 if busy_cycles is None else busy_cycles):
+                yield
+            yield dut.pads_in.data.i.eq(0b1111)
+
+        def source_gen():
+            yield dut.source.ready.eq(1)
+            for _ in range(1024):
+                if (yield dut.source.valid):
+                    status.append((yield dut.source.status))
+                yield
+
+        run_simulation(dut, [sink_gen(), card_gen(), source_gen()])
+        return status, sink_ready
+
     def test_phydataw(self):
-        pass
+        status, sink_ready = self._run_phydataw(busy_cycles=32)
+        self.assertEqual(status, [SDCARD_STREAM_STATUS_DATAACCEPTED])
+        self.assertEqual(sink_ready, [True])
+
+    def test_phydataw_busy_timeout(self):
+        status, sink_ready = self._run_phydataw(busy_cycles=None)
+        self.assertEqual(status, [SDCARD_STREAM_STATUS_DATAACCEPTED, SDCARD_STREAM_STATUS_TIMEOUT])
+        self.assertEqual(sink_ready, [True])
 
     def test_phydatar_backpressure_no_timeout(self):
         # 1-bit read of a 4-byte block with the consumer stalled for longer than the timeout: the SD

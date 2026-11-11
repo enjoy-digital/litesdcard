@@ -281,8 +281,12 @@ class SDCore(LiteXModule):
             # Receive Status from the PHY.
             phy.dataw.source.ready.eq(1),
             If(phy.dataw.source.valid,
+                # On Timeout: set Data Timeout and return to Idle.
+                If(phy.dataw.source.status == SDCARD_STREAM_STATUS_TIMEOUT,
+                    NextValue(data_timeout, 1),
+                    NextState("IDLE")
                 # Set Data Error when Data has not been accepted.
-                If(phy.dataw.source.status == SDCARD_STREAM_STATUS_CRCERROR,
+                ).Elif(phy.dataw.source.status == SDCARD_STREAM_STATUS_CRCERROR,
                     NextValue(data_crc, 1)
                 ).Elif(phy.dataw.source.status != SDCARD_STREAM_STATUS_DATAACCEPTED,
                     NextValue(data_error, 1)
