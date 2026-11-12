@@ -108,6 +108,35 @@ class TestPHY(unittest.TestCase):
         dut.divider.storage.reset = 8
         run_simulation(dut, gen(dut))
 
+    def test_ioemulator_timing(self):
+        # Emulator IO as SDPHYIOGen: card clock inverted, idle high, Clk/Cmd registered (1 cycle).
+        class DUT(Module):
+            def __init__(self):
+                self.pads   = Record([("clk", 1), ("cmd_i", 1), ("cmd_o", 1), ("cmd_t", 1),
+                                      ("dat_i", 4), ("dat_o", 4), ("dat_t", 4)])
+                self.sdpads = Record(_sdpads_layout(4))
+                self.submodules.clocker = SDPHYClocker()
+                self.submodules.io      = SDPHYIOEmulator(self.clocker, self.sdpads, self.pads)
+        def gen(dut):
+            yield dut.clocker.divider.storage.eq(4)
+            yield dut.clocker.clk_en.eq(0)
+            for _ in range(16):
+                yield
+            self.assertEqual((yield dut.pads.clk), 1) # Idle high.
+            yield dut.clocker.clk_en.eq(1)
+            prev_clk, prev_cmd = None, None
+            for i in range(64):
+                yield dut.sdpads.cmd.oe.eq(1)
+                yield dut.sdpads.cmd.o.eq((i >> 2) & 1)
+                yield
+                if prev_clk is not None:
+                    self.assertEqual((yield dut.pads.clk),   1 - prev_clk)
+                    self.assertEqual((yield dut.pads.cmd_i), prev_cmd)
+                prev_clk = (yield dut.clocker.clk)
+                prev_cmd = (yield dut.sdpads.cmd.o)
+        dut = DUT()
+        run_simulation(dut, gen(dut))
+
     def test_phyr_cmd(self):
         def stim_gen(dut):
             yield dut.pads_in.valid.eq(1)

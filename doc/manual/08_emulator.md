@@ -98,7 +98,7 @@ table below gives the limits of that default emulator.
 | Persistent data | No: initial content at each start |
 | 8 DAT lines, eMMC | No: 4 DAT lines, SD card only |
 | Card access and busy times | Set by the model, not those of a real card |
-| Clock polarity, IO delays | Inverted card clock, no IO registers ([Emulator IO](#phy-emulator-io)) |
+| Clock polarity, IO delays | As the hardware IO registers, without pad and board delays ([Emulator IO](#phy-emulator-io)) |
 | Signal integrity, pull-ups | Not applicable: the lines connect without IO buffers |
 
 A simulation with the emulator therefore checks the protocol: the initialization flow, the

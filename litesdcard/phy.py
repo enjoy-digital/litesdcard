@@ -810,12 +810,14 @@ class SDPHYIOGen(SDPHYIO):
 # SDCard PHY Emulator ------------------------------------------------------------------------------
 
 class SDPHYIOEmulator(SDPHYIO):
+    # Same timing as SDPHYIOGen: inverted card clock (idle high) and registered Clk/Cmd/Data, as
+    # the SDROutput/SDRTristate of the hardware IOs (the one-cycle delay add_data_i_ce expects).
     def __init__(self, clocker, sdpads, pads):
         # Clk
-        self.comb += pads.clk.eq(clocker.clk)
+        self.sync += pads.clk.eq(~clocker.clk)
 
         # Cmd
-        self.comb += [
+        self.sync += [
             pads.cmd_i.eq(1),
             If(sdpads.cmd.oe, pads.cmd_i.eq(sdpads.cmd.o)),
             sdpads.cmd.i.eq(1),
@@ -823,14 +825,14 @@ class SDPHYIOEmulator(SDPHYIO):
         ]
 
         # Data
-        self.comb += [
+        self.sync += [
             pads.dat_i.eq(0b1111),
             If(sdpads.data.oe, pads.dat_i.eq(sdpads.data.o)),
             sdpads.data.i.eq(0b1111),
         ]
         self.add_data_i_ce(clocker, sdpads)
         for i in range(4):
-            self.comb += If(~pads.dat_t[i], sdpads.data.i[i].eq(pads.dat_o[i]))
+            self.sync += If(~pads.dat_t[i], sdpads.data.i[i].eq(pads.dat_o[i]))
 
 # SDCard PHY ---------------------------------------------------------------------------------------
 
