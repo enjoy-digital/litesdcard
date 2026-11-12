@@ -14,14 +14,15 @@ the rest needs a board.
 | Level | What runs | Card | Where |
 |-------------|-------------------------------|---------------|------------------------------------|
 | CRC | `CRC16` on 1, 4 and 8 lines | None | `test/test_crc.py` |
-| PHY | Clocker, bit receiver, power-up clocks, command engines, data writer, read timeout | Bit patterns | `test/test_phy.py` |
+| PHY | Clocker, emulator IO, bit receiver, power-up clocks, command engines, data writer and reader, register layout, bus widths | Bit patterns | `test/test_phy.py` |
 | Core | Read and write commands, events, with a fake PHY | Fake PHY | `test/test_core.py` |
+| DMA | Block2mem and mem2block flush on disable, with a Wishbone memory | Stream | `test/test_dma.py` |
 | Emulator | Block store of the wrapper | None | `test/test_emulator.py` |
 | SoC | CPU, BIOS driver, core and DMAs, in Verilator | Emulator | `litex_sim` |
 | Bench SoC | The SoC plus SDRAM, Etherbone and a sampler | Emulator | `bench/sim.py` |
 | Hardware | A board with a slot or an eMMC | Real card | Not in CI |
 
-The suite collects 36 tests and runs in about 4 s. The Verilator simulations are not part of it:
+The suite collects 45 tests and runs in about 15 s. The Verilator simulations are not part of it:
 they are run by hand, and the CI does not run them.
 
 ## Running the tests {#sim-run}
@@ -61,32 +62,37 @@ system clock cycle, and compare the outputs the same way. The table lists what e
 | Test | Checks |
 |---------------------------------------|--------------------------------------------------------|
 | `test_crc_inserter_ones` | 512 bytes of `0xff` give the CRC16 `0x7fa1` on 1, 4 and 8 lines; the 16 CRC bits are then serialized on every line |
-| `test_crc_inserter_` `tuning_block` | The 512 bits of the tuning block, fed least significant bit first and copied on each of 4 lines, give `0x6b02` on every line |
+| `test_crc_inserter_` `tuning_block` | The tuning block split on 4 lines as the data writer does (high nibble first) gives `0xc59f`, `0xa2e5`, `0x8d06` and `0xe946` on DAT3 to DAT0, then serializes them |
 | `test_clocker_div0` to `div8` | Dividers 0, 1 and 2 divide by 2, 3 and 4 by 4, 5 by 6, 8 by 8: card clock and `ce` pulse |
+| `test_ioemulator_` `timing` | The emulator IO card clock is the inverted clocker output through a register (idle high), CMD registered |
 | `test_phyr_cmd`, `test_phyr_data` | The bit receiver finds the start bit and assembles bytes from CMD and from 4 DAT lines |
 | `test_phyinit` | Each `initialize` strobe gives 80 card clocks |
+| `test_phydatar_abort` | `abort` returns an armed data reader to IDLE and releases the card clock |
 | `test_phycmdw` | Three command bytes go out MSB first on CMD, with the output enable |
 | `test_phycmdr` | A 3-byte response is received after its start bit, `last` on the third byte |
 | `test_phydataw` | One block written, an accepted token (`010`), a short busy: one status, the block released |
 | `test_phydataw_` `busy_timeout` | The same with DAT0 held low: the accepted status, then a timeout status, and the block released |
+| `test_phydataw_` `status_multiblock` | `dataw_status` sums the tokens of a 2-block write (CRC error, accepted) and is cleared by the next write |
 | `test_phydatar_` `backpressure_no_timeout` | A 1-bit read with the consumer stalled for three times the read timeout: no timeout, every byte delivered |
+| `test_phydatar_` `max_block_length` | A 1023-byte block on 4 lines: 1023 data and 8 CRC bytes, `last` on the final byte |
+| `test_csr_layout`, `test_data_width_` `capabilities` | The order of the PHY registers; the `support_4x`/`support_8x` constants and the `settings` reset for 1, 4 and 8 data lines |
 | `test_read_data_` `reception_starts_` `during_cmd_response` | The core asks the PHY for read data before the last response byte, then delivers the data byte |
 | `test_write_block_` `delimiter_512`, `_above_512` | Two write blocks of 512 and of 1023 bytes: `last` on the final byte of each |
 | `test_cmd_event_crc_ok`, `_crc_error`, `_crc_long_response`, `_crc_check_disabled` | `cmd_event` after a short response with a good or bad CRC7, after an R2 (CRC7 over the CID only), and with the check off for an R3 |
 | `test_cmd_event_` `timeout`, `_timeout_data_cmd`, `_crc_error_data_cmd` | A response timeout sets `timeout` and `error`; on a data command, a timeout or a CRC7 error also sets `data_event.error` |
 | `test_write_timeout_` `sets_data_timeout` | A timeout status of the data writer ends a write with `data_event` done and timeout |
 | `test_zero_block_count_` `data_cmd` | A read or write command with `block_count` 0 returns to idle with `data_event.done` |
+| `test_read_cmd_` `timeout_aborts_datar`, `_crc_error_aborts_datar` | A read command that fails after arming the data reader aborts it |
+| `test_mem2block_` `disable_flushes`, `test_block2mem_` `disable_flushes` | Bytes of a transfer stopped by a disable do not lead the next transfer |
 | `test_default_single_` `block_buffer`, `test_block_store_*` | The emulator store: one 512-byte buffer by default; with `size` or `image`, one block per address, the image words and the capacity given to the card model, and an invalid size rejected |
 
-Two tests of `test_phy.py`, `test_phycrc` and `test_phydatar`, contain only `pass`: they
-always pass and check nothing. The gaps are therefore:
+`test_phycrc` of `test_phy.py` contains only `pass`: it always passes and checks nothing. The
+gaps are therefore:
 
-- the data reader of the PHY: no test of a block read with its CRC16 check, or of its timeout;
-- the CRC16 split of a 4-bit or 8-bit block over its lines: the tuning-block test copies one
-  serial stream on every line, so it checks the CRC engine on a second pattern, not the per-line
-  CRCs of the tuning block on a 4-bit bus;
-- the CRC status tokens other than "accepted", and the bus widths of the data writer;
-- the DMAs, the Verilog card model of the emulator and the BIST frontend.
+- the data reader of the PHY: no test of its CRC16 check or of its timeout;
+- the write token "write error", and the 4-bit and 8-bit widths of the data writer;
+- the DMA transfers beyond the flush on disable, the Verilog card model of the emulator and the
+  BIST frontend.
 
 The data path between the card and the DMAs and the BIOS driver are exercised only by the SoC
 simulation below and by hardware.

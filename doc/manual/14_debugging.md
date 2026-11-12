@@ -170,8 +170,8 @@ The write timeout covers the CRC status token and the busy of each written block
 never sends its token, or holds DAT0 low longer than `dataw_timeout`, ends the write with
 `data_event` at `0x5`. The BIOS driver waits for `data_event.done` after each write command
 without a bound of its own (`sdcard_wait_data_done`), so this timeout is what bounds the wait:
-`sdcard_write` then fails and disables mem2block. The bytes of the failed write that mem2block
-had already fetched stay in its FIFOs and lead the next write ([Known issues](#debug-known)).
+`sdcard_write` then fails and disables mem2block, which drops the bytes of the failed write
+that it had already fetched ([Mem2block](#dma-mem2block)).
 
 A write that fails with `data_event.timeout` set points to a card stuck in busy, or a CRC status
 token that never came: check DAT0 with LiteScope. A card that needs longer to program a block
@@ -276,12 +276,7 @@ The issues of the code that show up while debugging are listed here with the pla
 
 | Issue | Effect | Where |
 |------------------------------------|----------------------------|-----------------------------------------------------|
-| Data reader left running after a failed read command | After a CRC7 error on a read command, the PHY still receives and drops the block the card sends, or waits for its timeout | `litesdcard/core.py`, `litesdcard/phy.py` (`SDPHYDATAR`) |
-| Read block counter of 10 bits | Read blocks limited to 1022, 1016 or 1008 bytes on a 1, 4 or 8-bit bus | `litesdcard/phy.py` (`SDPHYDATAR`) |
-| Unsupported `settings` width | A width the pads do not have moves the data on DAT0 only, without an error | `litesdcard/phy.py` |
-| `dataw_status` sums the blocks | After a multi-block write, a rejected block and the accepted ones all show, without telling which | `litesdcard/phy.py` (`SDPHYDATAW`) |
-| Mem2block FIFOs not flushed | Bytes of a failed write lead the next write | `litesdcard/frontend/dma.py`, LiteX `soc/cores/dma.py` |
-| Emulator clock inverted | The emulator card clock idles low and has no IO register; pad timing differs from hardware | `litesdcard/phy.py` (`SDPHYIOEmulator`) |
+| Unsupported `settings` width | A width the pads do not have moves the data on DAT0 only, without an error (see the `support_4x` and `support_8x` constants) | `litesdcard/phy.py` |
 | BIOS 4-bit switch without a PHY width check | A 1-bit slot fails after the bus switch | LiteX `sdcard.c` |
 | BIOS ACMD41 argument | Sets bit 29, which the SD specification reserves | LiteX `sdcard.c` |
 | BIOS CID and CSD decode | Debug trace prints shifted CID fields and the CSD structure as the transfer rate | LiteX `sdcard.c` (`SDCARD_DEBUG`) |
@@ -289,9 +284,6 @@ The issues of the code that show up while debugging are listed here with the pla
 | DTS generator needs both DMAs and the IRQ | `KeyError` with one DMA, or without an interrupt even with `--polling` | LiteX `litex_json2dts_linux.py` |
 | DTS `bus-width` always 4 | An 8-bit eMMC is described as 4-bit | LiteX `litex_json2dts_linux.py` |
 | Emulator with one buffer by default | No boot in simulation with `add_sdcard` | LiteX `add_sdcard`, `litesdcard/emulator/` |
-| TrellisBoard `--bench phy` | `TypeError` at elaboration | `bench/trellisboard.py` (`BenchPHY`) |
-| `--trace-fst` of `bench/sim.py` | Ignored: `--trace` always writes FST | `bench/sim.py` |
-| Tuning-block CRC test | Checks one serial stream copied on 4 lines, not the per-line CRCs of a 4-bit block | `test/test_crc.py` |
 
 ## Where to go next {#debug-next}
 
