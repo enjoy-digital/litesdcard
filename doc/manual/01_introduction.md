@@ -65,7 +65,7 @@ to a SoC](#integration) the integration.
 | Bus | 1-bit, 4-bit and 8-bit data, selected at run time; card clock from the system clock divided by an even number, up to half the system clock |
 | PHY | Vendor-neutral IO through LiteX; optional card detect, card reset and level-shifter direction pins |
 | Core | Command frames with CRC7, short and long responses with CRC7 check, busy wait, data blocks with one CRC16 per data line, CRC status token on writes, timeouts on responses, reads and writes |
-| Transfers | Single and multiple blocks; block length up to 1023 bytes on writes and 1022, 1016 or 1008 bytes on reads (1, 4 or 8-bit bus); block count up to 2^32 - 1, a count of 0 skips the data phase |
+| Transfers | Single and multiple blocks; block length up to 1023 bytes; block count up to 2^32 - 1, a count of 0 skips the data phase |
 | Frontends | block2mem and mem2block DMAs (Wishbone masters); a BIST frontend, not integrated |
 | Software | BIOS driver for SD cards and eMMC, boot from a FAT file system, Linux and Zephyr device tree nodes |
 | Verification | Unit tests of the PHY, the core and the CRC; card emulator for full-system simulation |

@@ -409,8 +409,58 @@ class TestPHY(unittest.TestCase):
         self.assertNotIn(SDCARD_STREAM_STATUS_TIMEOUT, status)
         self.assertEqual(len(status), len(data) + 2) # Data + CRC16 (dropped by the core).
 
-    def test_phydatar(self):
-        pass
+    def _run_phydatar(self, block_length, width):
+        # Read of one block (CRC value not checked here), returns the source beats (last, drop).
+        data_width = Signal(2, reset={1: SD_PHY_SPEED_1X, 4: SD_PHY_SPEED_4X}[width])
+        dut        = SDPHYDATAR(_sdpads_layout(4), data_width, 1e6, 100e-3)
+        crc_len    = {1: 2, 4: 8}[width]
+        data       = [i & 0xff for i in range(block_length)] + [0x00]*crc_len
+        nibbles    = [0xf]*4 + [0x0] # Idle/Start.
+        for byte in data:
+            if width == 1:
+                nibbles += [0b1110 | ((byte >> (7 - i)) & 1) for i in range(8)]
+            else:
+                nibbles += [byte >> 4, byte & 0xf]
+        nibbles   += [0xf]*32 # End/Idle.
+        beats      = []
+
+        def sink_gen():
+            yield dut.pads_out.ready.eq(1)
+            yield dut.sink.block_length.eq(block_length)
+            yield dut.sink.last.eq(1)
+            yield dut.sink.valid.eq(1)
+            for _ in range(len(nibbles) + 64):
+                if (yield dut.sink.ready):
+                    break
+                yield
+            yield dut.sink.valid.eq(0)
+
+        def card_gen():
+            yield dut.pads_in.data.i.eq(0b1111)
+            for _ in range(8):
+                yield
+            yield dut.pads_in.valid.eq(1)
+            for n in nibbles:
+                yield dut.pads_in.data.i.eq(n)
+                yield
+
+        def source_gen():
+            yield dut.source.ready.eq(1)
+            for _ in range(len(nibbles) + 64):
+                if (yield dut.source.valid):
+                    beats.append(((yield dut.source.last), (yield dut.source.drop)))
+                yield
+
+        run_simulation(dut, [sink_gen(), card_gen(), source_gen()])
+        return beats, crc_len
+
+    def test_phydatar_max_block_length(self):
+        # Largest block_length (1023 bytes) in 4-bit mode: 1023 data + 8 CRC bytes, last on the
+        # final CRC byte (the byte counter must not wrap).
+        beats, crc_len = self._run_phydatar(block_length=1023, width=4)
+        self.assertEqual(len(beats), 1023 + crc_len)
+        self.assertEqual([i for i, (last, drop) in enumerate(beats) if last], [len(beats) - 1])
+        self.assertEqual(sum(drop for last, drop in beats), crc_len)
 
 
 class TestSDPHYCSRLayout(unittest.TestCase):

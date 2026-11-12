@@ -583,7 +583,7 @@ class SDPHYDATAR(LiteXModule):
         # # #
 
         timeout     = Signal(32)
-        count       = Signal(10)
+        count       = Signal(max=2**len(sink.block_length) + 16) # 1 block + CRC (up to 16 bytes).
         crc_count   = Signal(max=17)
         crc_len     = Signal(max=17)
         crc_correct = Signal()

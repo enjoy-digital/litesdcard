@@ -193,10 +193,9 @@ When the consumer is not ready, the data reader asserts `stop` and the card cloc
 ([Back-pressure](#arch-backpressure)). No bit is lost, because the card only moves on a clock
 edge, and the read timeout does not count while the clock is stopped.
 
-The data reader counts the bytes of a block, data and CRC, on 10 bits. A block whose length plus
-its CRC bytes exceeds 1024 never reaches its last byte and ends on the read timeout: the longest
-block that can be read is 1022 bytes on a 1-bit bus, 1016 bytes on a 4-bit bus and 1008 bytes on
-an 8-bit bus. Cards use 512-byte blocks, so this only matters for other block lengths.
+The data reader counts the bytes of a block, data and CRC, on a counter sized for the longest
+block (1023 bytes) plus the 16 CRC bytes of an 8-bit bus, so every `block_length` can be read on
+every bus width (`test_phydatar_max_block_length` reads a 1023-byte block on 4 lines).
 
 ## Bus width {#eng-widths}
 
