@@ -16,6 +16,8 @@ are listed below with their defaults.
 | `sdcard_name` | `"sdcard"` | Name of the platform resource holding the card pins |
 | `mode` | `"read+write"` | `"read"`: block2mem only; `"write"`: mem2block only |
 | `use_emulator` | `False` | Use the emulator instead of platform pins |
+| `emulator_size` | `None` | Emulator store size in bytes, a multiple of 512 KiB ([The SD card emulator](#emu-limits)) |
+| `emulator_image` | `None` | Raw disk image file loaded into the emulator store |
 | `software_debug` | `False` | Add the `SDCARD_DEBUG` constant: trace of the BIOS driver |
 
 The BIOS driver and the device tree generator look for registers named `sdcard_*`, so keep

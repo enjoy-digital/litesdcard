@@ -86,15 +86,16 @@ fit in it; the wrapper raises a `ValueError` otherwise. The store is a memory of
 initialized from the image when it is built: a simulation or a bitstream holds a whole disk only
 when the memory can be that large.
 
-`add_sdcard(use_emulator=True)` builds `SDEmulator(soc.platform)` without arguments, so
-`litex_sim --with-sdcard` and the LiteX-Boards targets get the default single buffer: every read
-returns the content of the buffer and every write overwrites it, whatever the block address. The
-table below gives the limits of that default emulator.
+`add_sdcard(use_emulator=True)` passes its `emulator_size` and `emulator_image` arguments to
+`SDEmulator` as `size` and `image`. Without them, as in `litex_sim --with-sdcard` and the
+LiteX-Boards targets, the emulator has the default single buffer: every read returns the content
+of the buffer and every write overwrites it, whatever the block address. The table below gives
+the limits of that default emulator.
 
 | Feature | Emulator |
 |----------------------------|---------------------------------------------------------------|
 | Distinct blocks | No: one buffer for all addresses (yes with `size` or `image`) |
-| A FAT file system | No: the buffer holds no boot sector, `sdcardboot` finds none (yes with an `image` that holds one) |
+| A FAT file system | No: the buffer holds no boot sector, `sdcardboot` finds none (yes with an `image` that holds one, as `litex_sim --sdcard-image`) |
 | Persistent data | No: initial content at each start |
 | 8 DAT lines, eMMC | No: 4 DAT lines, SD card only |
 | Card access and busy times | Set by the model, not those of a real card |
@@ -122,10 +123,19 @@ The same option of `add_sdcard` builds the emulator into an FPGA design, where t
 through internal signals instead of pads. One LiteX-Boards target offers it,
 `efinix_tz170_j484_dev_kit.py --with-sdcard-emulator` ([Boards and examples](#boards)).
 
-`add_sdcard` has no argument for `size` or `image` on the LiteX master branch; a design that needs
-a block-addressed store instantiates `SDEmulator` with them and connects its `pads` to an
-`SDPHY`, as `add_sdcard` does. A change proposed to LiteX adds both options to `add_sdcard` and an
-image option to `litex_sim`.
+A block-addressed store comes from the arguments of `add_sdcard`, or from `--sdcard-image` in
+`litex_sim`, which builds the emulator from a raw disk image (and implies `--with-sdcard`):
+
+```python
+# Emulator store loaded from a raw disk image, its size rounded up to 512 KiB.
+soc.add_sdcard(use_emulator=True, emulator_image="sdcard.img")
+```
+
+```sh
+litex_sim --sdcard-image sdcard.img
+```
+
+[Boot from a FAT image in simulation](#gs-sim-boot) builds such an image and boots from it.
 
 ## In the code {#emu-code}
 

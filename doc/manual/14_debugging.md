@@ -102,6 +102,13 @@ capped the divider at 256: with a system clock above 102.4 MHz, it got more than
 asked for. The driver of the master branch accepts dividers up to 511, the range of the
 register, and stays at 400 kHz or below up to a 204.8 MHz system clock (computed).
 
+The driver also bounds its waits in software. When the done bit does not come within
+`SDCARD_CMD_TIMEOUT_US` for a command, or `SDCARD_DATA_TIMEOUT_US` per block for the data, 2 s
+each by default, the trace prints `cmdevt: software timeout` or `dataevt: software timeout` and
+the function returns `SD_TIMEOUT`. The timeouts of the PHY end a wait first (1 s or 500 ms with
+`add_sdcard`), so a software timeout points to a core that does not run or does not answer at
+the registers the BIOS was built for.
+
 ## Card not detected {#debug-detect}
 
 `sdcard_detect` prints `SDCard inserted.` when `card_detect` reads 0, and `SDCard not inserted.`
@@ -169,7 +176,7 @@ because the DMA is not ready.
 The write timeout covers the CRC status token and the busy of each written block. A card that
 never sends its token, or holds DAT0 low longer than `dataw_timeout`, ends the write with
 `data_event` at `0x5`. The BIOS driver waits for `data_event.done` after each write command
-without a bound of its own (`sdcard_wait_data_done`), so this timeout is what bounds the wait:
+(`sdcard_wait_data_done`), and this timeout ends that wait first:
 `sdcard_write` then fails and disables mem2block, which drops the bytes of the failed write
 that it had already fetched ([Mem2block](#dma-mem2block)).
 
@@ -219,13 +226,14 @@ to `boot.bin`. The messages tell which step failed:
 - `SDCard boot failed.`: neither `boot.json` nor `boot.bin` could be loaded.
 
 Run `sdcard_init` alone first: a mount failure with a failed initialization is a card or board
-problem, not a file system problem. In simulation the boot does not work with the default
-emulator ([What the emulator does not model](#emu-limits)).
+problem, not a file system problem. In simulation, the default emulator holds no file system and
+the mount fails with FatFs error 13; `litex_sim --sdcard-image` loads a FAT image into the
+emulator, and the boot then runs ([Getting started](#gs-sim-boot)).
 
-On Linux, `litex_json2dts_linux` reads the registers of both DMAs and the interrupt number of
-the module to build the `mmc` node: a SoC built with `mode="read"` or `mode="write"`, or without
-an interrupt for the module, makes it stop with a `KeyError`, even with `--polling` ([Software:
-BIOS, boot and Linux](#software)).
+On Linux, `litex_json2dts_linux` needs the registers of both DMAs to build the `mmc` node: on a
+SoC built with `mode="read"` or `mode="write"`, it prints a warning and writes the device tree
+without the node. Without an interrupt for the module, it writes the node in polling mode
+([Software: BIOS, boot and Linux](#software)).
 
 ## LiteScope captures {#debug-litescope}
 
@@ -278,12 +286,7 @@ The issues of the code that show up while debugging are listed here with the pla
 |------------------------------------|----------------------------|-----------------------------------------------------|
 | Unsupported `settings` width | A width the pads do not have moves the data on DAT0 only, without an error (see the `support_4x` and `support_8x` constants) | `litesdcard/phy.py` |
 | BIOS 4-bit switch without a PHY width check | A 1-bit slot fails after the bus switch | LiteX `sdcard.c` |
-| BIOS ACMD41 argument | Sets bit 29, which the SD specification reserves | LiteX `sdcard.c` |
-| BIOS CID and CSD decode | Debug trace prints shifted CID fields and the CSD structure as the transfer rate | LiteX `sdcard.c` (`SDCARD_DEBUG`) |
-| `flash_from_sdcard` disk functions | Uses the FatFs disk of the last `sdcardboot` or `sataboot`, none at reset | LiteX `bios/cmds/cmd_spiflash.c` |
-| DTS generator needs both DMAs and the IRQ | `KeyError` with one DMA, or without an interrupt even with `--polling` | LiteX `litex_json2dts_linux.py` |
-| DTS `bus-width` always 4 | An 8-bit eMMC is described as 4-bit | LiteX `litex_json2dts_linux.py` |
-| Emulator with one buffer by default | No boot in simulation with `add_sdcard` | LiteX `add_sdcard`, `litesdcard/emulator/` |
+| DTS node needs both DMAs | No `mmc` node, with a warning, on a SoC built with `mode="read"` or `mode="write"` | LiteX `litex_json2dts_linux.py` |
 
 ## Where to go next {#debug-next}
 

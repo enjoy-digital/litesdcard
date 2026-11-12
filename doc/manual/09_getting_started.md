@@ -46,8 +46,8 @@ them from the root of the repository:
 python3 -m pytest -v
 ```
 
-**What you should see.** On the master branch, the suite ends with `36 passed` after about ten
-seconds. [Simulation and verification](#simulation) says what each test covers.
+**What you should see.** On the master branch, the suite ends with `45 passed` in less than a
+minute. [Simulation and verification](#simulation) says what each test covers.
 
 **If not.** An import error names the missing package: `litex` or `migen` when LiteX is not
 installed, `litesdcard` when the clone is not installed with `pip3 install -e .`.
@@ -92,10 +92,10 @@ litex>
 ```
 
 The BIOS tries its boot methods in order. After the serial boot, the SD card boot initializes
-the card and reads its first block to mount a FAT file system. The emulator of `litex_sim` holds
-one buffer and no file system, so FatFs stops with error 13 (no file system found) and the BIOS
-gives its prompt. This failure is expected in simulation: the boot from the card cannot be tried
-in `litex_sim` ([What it does not model](#emu-limits)).
+the card and reads its first block to mount a FAT file system. By default, the emulator of
+`litex_sim` holds one buffer and no file system, so FatFs stops with error 13 (no file system
+found) and the BIOS gives its prompt. This failure is expected here; [Boot from a FAT image in
+simulation](#gs-sim-boot) gives the emulator a file system to boot from.
 
 **If not.** A Verilator or compiler error stops the build: check that Verilator and the RISC-V
 toolchain are in the `PATH`. A missing `sd_phy.v` or `sd_link.v` means LiteSDCard is not
@@ -170,6 +170,58 @@ even number ([The BIOS driver](#sw-bios) gives the rule). At the nominal 1 MHz o
 **If not.** `Initialize SDCard: failed` means a command failed. In simulation, this points to the
 software or the gateware, not to signal integrity: rebuild with the debug trace of the BIOS
 driver, as [Initialization](#sw-init) shows, and see which command stops.
+
+## Boot from a FAT image in simulation {#gs-sim-boot}
+
+`litex_sim --sdcard-image` loads a raw disk image into the emulator, which then stores distinct
+blocks ([The SD card emulator](#emu-limits)), so the BIOS boots from the card as on a board. The
+image below is a 512 KiB FAT file system without partition table, with the bare metal demo of
+LiteX and a `boot.json` that loads it at the start of the main RAM. The default simulation SoC
+has no main RAM: `--integrated-main-ram-size` adds 64 KiB at `0x40000000`.
+
+```sh
+# Build the BIOS and the libraries of the SoC, without the gateware.
+litex_sim --integrated-main-ram-size=0x10000 --with-sdcard --no-compile-gateware
+# Build the demo for that SoC: demo.bin, linked for the main RAM.
+litex_bare_metal_demo --build-path=build/sim
+# A 512 KiB FAT image with the demo and its boot.json.
+printf '{\n    "demo.bin": "0x40000000"\n}\n' > boot.json
+mkfs.fat -C -n LITEX sdcard.img 512
+mcopy -i sdcard.img boot.json demo.bin ::/
+# Run the SoC with the image in the emulator.
+litex_sim --integrated-main-ram-size=0x10000 --sdcard-image sdcard.img
+```
+
+**What you should see.** After the memory test of the main RAM and the serial boot timeout, the
+BIOS mounts the file system, reads `boot.json`, copies `demo.bin` and jumps to it. The session
+below was recorded with these commands on the master branches of LiteX and LiteSDCard, with
+`helloc` typed at the prompt of the demo; the banners are cut.
+
+```console
+--================ Boot ================--
+Booting from serial...
+Press Q or ESC to abort boot completely.
+sL5DdSMmkekro
+Timeout
+Booting from SDCard in SD-Mode...
+Booting from boot.json...
+Copying demo.bin to 0x40000000 (6264 bytes)...
+[...]
+Executing booted program at 0x40000000
+
+--============== Liftoff! ==============--
+
+LiteX minimal demo app built Nov 12 2026 11:30:35
+[...]
+litex-demo-app> helloc
+Hello C demo...
+C: Hello, world!
+litex-demo-app>
+```
+
+**If not.** `Error: filesystem mount failed (FatFs error 13)` means the image holds no FAT file
+system, and `Error: cannot open boot.json` that the file is not at its root; [Boot
+fails](#debug-boot) lists the other messages.
 
 ## Step 4: a board {#gs-board}
 

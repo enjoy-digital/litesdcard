@@ -14,8 +14,8 @@ maintainer knows what to update when the code changes.
 | 05 PHY engines | `litesdcard/{phy,crc,common,core}.py`, `test/test_phy.py`; LiteX `soc/integration/soc.py`, `liblitesdcard/sdcard.c` |
 | 06 Core | `litesdcard/{core,crc,common,phy}.py`, `test/test_core.py`, `test/test_crc.py`; LiteX `liblitesdcard/sdcard.{c,h}` |
 | 07 DMAs | `litesdcard/frontend/{dma,bist}.py`; LiteX `soc/cores/dma.py`, `soc/integration/soc.py`, `liblitesdcard/sdcard.c` |
-| 08 Emulator | `litesdcard/emulator/`, `litesdcard/phy.py` (`SDPHYIOEmulator`); LiteX `tools/litex_sim.py` |
-| 09 Getting started | LiteX `tools/litex_sim.py`, `bios/cmds/cmd_litesdcard.c`, `bios/boot.c`, `bios/helpers.c`; LiteX-Boards `targets/digilent_arty.py`, `extensions/pmod.py`; captures with `litex_sim --with-sdcard` |
+| 08 Emulator | `litesdcard/emulator/`, `litesdcard/phy.py` (`SDPHYIOEmulator`); LiteX `tools/litex_sim.py` (`--sdcard-image`), `soc/integration/soc.py` (`add_sdcard` `emulator_size`/`emulator_image`) |
+| 09 Getting started | LiteX `tools/litex_sim.py`, `bios/cmds/cmd_litesdcard.c`, `bios/boot.c`, `bios/helpers.c`; LiteX-Boards `targets/digilent_arty.py`, `extensions/pmod.py`; `soc/software/demo/` (`litex_bare_metal_demo`); captures with `litex_sim --with-sdcard` and `litex_sim --sdcard-image` |
 | 10 Integration | LiteX `soc/integration/soc.py` (`add_sdcard`, `add_spi_sdcard`), `soc/cores/spi/spi_master.py`, `build/extension.py`; `litesdcard/{phy,core,gen}.py`; LiteX-Boards `extensions/pmod.py` and platforms |
 | 11 Software | LiteX `liblitesdcard/sdcard.{c,h}`, `bios/cmds/cmd_litesdcard.c`, `bios/cmds/cmd_spiflash.c`, `bios/boot.c`, `bios/main.c`, `tools/litex_json2dts_{linux,zephyr}.py`; Linux-on-LiteX-VexRiscv `HOWTO.md`; Enjoy-Digital blog (TEL0025) |
 | 12 Boards | LiteX-Boards `targets/*` (`add_sdcard` calls), `platforms/*`, `extensions/pmod.py`; LiteX `build/*/common.py`; `bench/*.py` |

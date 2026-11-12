@@ -59,7 +59,9 @@ LiteX uses them ([DMAs](#dma)).
 | `name` | `"sdcard"` | Attribute of the SoC and name of the register bank |
 | `sdcard_name` | `"sdcard"` | Platform resource requested for the pads |
 | `mode` | `"read+write"` | `"read"`: block2mem only; `"write"`: mem2block only |
-| `use_emulator` | `False` | Uses `SDEmulator`, with its default store of one buffer, in place of the pads |
+| `use_emulator` | `False` | Uses `SDEmulator` in place of the pads |
+| `emulator_size` | `None` | `size` of `SDEmulator`: store size in bytes, a multiple of 512 KiB |
+| `emulator_image` | `None` | `image` of `SDEmulator`: raw disk image file; without both, the store is one 512-byte buffer |
 | `software_debug` | `False` | Adds the constant `<NAME>_DEBUG` to `soc.h`, which turns on the BIOS trace |
 
 The method builds the PHY with `cmd_timeout=10e-1` and `data_timeout=10e-1` (1 s) and the default
@@ -79,7 +81,8 @@ needs both DMAs ([Software: BIOS, boot and Linux](#software)).
 
 Many LiteX-Boards targets expose the two methods as the mutually exclusive options
 `--with-sdcard` and `--with-spi-sdcard`; some targets with an eMMC add `--with-emmc`
-([Boards and examples](#boards)). `litex_sim --with-sdcard` adds LiteSDCard with the emulator
+([Boards and examples](#boards)). `litex_sim --with-sdcard` adds LiteSDCard with the emulator,
+and `litex_sim --sdcard-image <file>` adds it with its store loaded from a raw disk image
 ([Simulation and verification](#sim-litex-sim)).
 
 ## Standalone generator {#opt-gen}
@@ -127,7 +130,7 @@ directory and `csr.csv` are written in the working directory.
 
 | Option | Scripts | Values | Meaning |
 |------------------------------|----------------------|------------------------|--------------------------------|
-| `--bench` | Arty, TrellisBoard | `soc` (default), `phy` | SoC with CPU and BIOS, or the PHY alone; `phy` fails on the TrellisBoard, see [Known issues](#debug-known) |
+| `--bench` | Arty, TrellisBoard | `soc` (default), `phy` | SoC with CPU and BIOS, or the PHY alone |
 | `--variant` | Arty, TrellisBoard | `standard` (default), `minimal` | CPU and memory of the SoC |
 | `--with-sampler` | Arty, TrellisBoard | flag | 8-bit sampler streamed over UDP |
 | `--with-analyzer` | All three | flag | LiteScope on the PHY |

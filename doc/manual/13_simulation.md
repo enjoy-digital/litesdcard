@@ -119,10 +119,11 @@ The simulation SoC runs at 1 MHz, so the card clocks are much lower than on a bo
 ([The BIOS driver](#sw-bios) gives the values). The timeouts scale with the system clock: the
 1 s of `add_sdcard` is `1000000` cycles.
 
-`add_sdcard` builds the emulator with its default store, one 512-byte buffer for every block
-address, so `sdcardboot` does not work in simulation ([What the emulator does not
-model](#emu-limits)). The simulation suits the initialization, the command and data engines and
-the DMAs, not the boot path.
+`litex_sim --with-sdcard` builds the emulator with its default store, one 512-byte buffer for
+every block address, so `sdcardboot` finds no file system ([What the emulator does not
+model](#emu-limits)). `--sdcard-image` gives the emulator a store loaded from a raw disk image,
+and `sdcardboot` then boots from a FAT image ([Boot from a FAT image in
+simulation](#gs-sim-boot)).
 
 ## Bench simulation {#sim-bench}
 

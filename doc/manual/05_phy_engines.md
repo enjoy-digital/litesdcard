@@ -157,9 +157,9 @@ and returns to IDLE. The core then ends the write with `data_event.timeout`
 ([Write data path](#core-write)). A card that never sends a token, or never releases DAT0, no
 longer keeps the core in its write state.
 
-The BIOS driver waits for `data_event.done` after each write command without a bound of its own
-(`sdcard_wait_data_done`); the write timeout of the PHY is what ends that wait when the card does
-not answer ([Software: BIOS, boot and Linux](#software)).
+The BIOS driver waits for `data_event.done` after each write command (`sdcard_wait_data_done`);
+the write timeout of the PHY ends that wait when the card does not answer, before the software
+bound of the driver ([Software: BIOS, boot and Linux](#software)).
 
 ## Data reader {#eng-datar}
 
@@ -251,9 +251,8 @@ The BIOS driver never writes them; a driver may change them at any time between 
 
 The command reader reloads its counter once per command, the data engines once per block.
 
-`phy_dataw_timeout` is the last register of the PHY bank, after `phy_settings`, so the offsets of
-the older registers did not move: the Linux driver, which writes the bus width at a fixed offset
-of the PHY registers, still reaches `phy_settings` ([Register reference](#registers)).
+`phy_dataw_timeout` is the last register of the PHY bank, after `phy_settings`: the Linux driver
+writes the bus width at a fixed offset of the PHY registers ([Register reference](#registers)).
 
 The command timeout covers the whole response in one budget: the wait for the start bit, the
 response bytes and the busy time of an R1b response. A long busy, such as an erase, needs a larger
