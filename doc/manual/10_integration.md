@@ -72,11 +72,12 @@ exist.
 | `rst` | 1 | Card reset or power control, output, driven during the PHY init |
 | `cmd_dir`, `dat0_dir`, `dat13_dir` | 1 each | Direction of an external level shifter, outputs |
 
-The number of `data` pins fixes what the PHY can do. With 8 pins, the PHY adds a constant that
-the BIOS reads (`SDCARD_PHY_SUPPORT_8X`) to choose the 8-bit bus of an eMMC.
+The number of `data` pins fixes what the PHY can do. With 4 pins or more, the PHY adds the
+constant `SDCARD_PHY_SUPPORT_4X`; with 8 pins, it also adds the constant that the BIOS reads
+(`SDCARD_PHY_SUPPORT_8X`) to choose the 8-bit bus of an eMMC.
 
-With 1 pin, the PHY has no 4-bit data path, while the BIOS driver selects the 4-bit bus whenever
-the card offers it, without checking the width of the PHY. A 1-bit resource therefore needs a
+With 1 pin, the PHY has no 4-bit data path and `settings` resets to 1 bit, while the BIOS driver
+selects the 4-bit bus whenever the card offers it, without checking `SDCARD_PHY_SUPPORT_4X`. A 1-bit resource therefore needs a
 driver that keeps the 1-bit setting ([Initialization](#sw-init), [Known issues](#debug-known)).
 
 The CMD and DAT lines need pull-ups, on the board or in the FPGA pads. The resource below, from

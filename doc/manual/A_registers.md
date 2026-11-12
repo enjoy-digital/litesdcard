@@ -40,10 +40,12 @@ value is the system clock frequency, `0x5f5e100` at 100 MHz; their class default
 The bits of `dataw_status` are cleared when a write
 starts and set by the token of each block, so they sum up the whole last write.
 
-`settings` resets to 4-bit; the BIOS writes 1-bit before the initialization and widens the
-bus once the card supports it. The 8-bit design has the same registers: with 8 data lines
-the PHY only adds the constant `sdcard_phy_support_8x` (1) to `csr.csv`, which `soc.h`
-exports as `SDCARD_PHY_SUPPORT_8X` ([PHY: clocking and IO](#phy)).
+`settings` resets to 4-bit (1-bit with fewer than 4 data lines); the BIOS writes 1-bit before
+the initialization and widens the bus once the card supports it. The PHY adds the constant
+`sdcard_phy_support_4x` (1) to `csr.csv` with 4 data lines or more, and
+`sdcard_phy_support_8x` (1) with 8 data lines, which `soc.h` exports as
+`SDCARD_PHY_SUPPORT_4X` and `SDCARD_PHY_SUPPORT_8X`; the 8-bit design has the same
+registers ([PHY: clocking and IO](#phy)).
 
 Bank `sdcard_phy`.
 
@@ -55,7 +57,7 @@ Bank `sdcard_phy`.
 | `cmdr_timeout` | `0x000c` | 32 | rw | Response timeout in system clock cycles: wait for the start bit, the response bytes and the busy of an R1b. Reset `0x5f5e100`. |
 | `dataw_status` | `0x0010` | 3 | ro | CRC status tokens of the last write. See the fields below. |
 | `datar_timeout` | `0x0014` | 32 | rw | Read timeout in system clock cycles, for each block of a read; it does not count while the PHY stops the card clock for back-pressure. Reset `0x5f5e100`. |
-| `settings` | `0x0018` | 2 | rw | Bus width of the data transfers: `0b00` 1-bit, `0b01` 4-bit, `0b10` 8-bit. Reset `0x1`. |
+| `settings` | `0x0018` | 2 | rw | Bus width of the data transfers: `0b00` 1-bit, `0b01` 4-bit, `0b10` 8-bit. A width the data pads do not support (support_4x/support_8x constants) falls back to 1-bit. Reset `0x1`. |
 | `dataw_timeout` | `0x001c` | 32 | rw | Write timeout in system clock cycles, for each block of a write: wait for the CRC status token and the end of the busy. Reset `0x2faf080`. |
 
 Fields of `dataw_status`:

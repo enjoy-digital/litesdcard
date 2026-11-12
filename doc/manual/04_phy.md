@@ -44,8 +44,9 @@ with `hasattr` and adds the matching logic when they exist.
 | `dat0_dir` | 1 | Output | Direction of an external buffer on DAT0 |
 | `dat13_dir` | 1 | Output | Direction of an external buffer on DAT1 to DAT3 |
 
-The PHY sizes everything from `len(pads.data)`. With 8 data pins it also adds the constant
-`support_8x`, which LiteX exports as `SDCARD_PHY_SUPPORT_8X` for the BIOS driver. Pads that have
+The PHY sizes everything from `len(pads.data)`. With 4 data pins or more it adds the constant
+`support_4x`, and with 8 data pins the constant `support_8x`, which LiteX exports as
+`SDCARD_PHY_SUPPORT_4X` and `SDCARD_PHY_SUPPORT_8X` for the drivers. Pads that have
 `cmd_t` and `dat_t` fields are those of the emulator: the PHY then uses its emulator IO
 ([Emulator IO](#phy-emulator-io)).
 

@@ -546,7 +546,7 @@
     "description": "",
     "fields": [
      {
-      "description": "Bus width of the data transfers: `0b00` 1-bit, `0b01` 4-bit, `0b10` 8-bit.",
+      "description": "Bus width of the data transfers: `0b00` 1-bit, `0b01` 4-bit, `0b10` 8-bit. A width the data pads do not support (support_4x/support_8x constants) falls back to 1-bit.",
       "name": "data_width",
       "offset": 0,
       "reset": 1,

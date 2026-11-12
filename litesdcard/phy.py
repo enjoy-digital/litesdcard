@@ -847,12 +847,16 @@ class SDPHY(LiteXModule):
         self.dataw   = dataw   = SDPHYDATAW(sdpads_layout, data_width, sys_clk_freq, write_timeout)
         self.datar   = datar   = SDPHYDATAR(sdpads_layout, data_width, sys_clk_freq, data_timeout)
 
+        # Defaults to 4x speed for retro-compatibility (1x when the pads have less than 4 data lines).
         self.settings = CSRStorage(fields=[
             CSRField("data_width", size=2, offset=0, values=[
                 ("0b00", "1-bit"),
                 ("0b01", "4-bit"),
                 ("0b10", "8-bit"),
-            ], reset=SD_PHY_SPEED_4X), # Defaults to 4x speed for retro-compatibility.
+            ], reset=SD_PHY_SPEED_4X if pads_data_width >= 4 else SD_PHY_SPEED_1X,
+            description="Bus width of the data transfers: `0b00` 1-bit, `0b01` 4-bit, `0b10` 8-bit. " +
+                "A width the data pads do not support (support_4x/support_8x constants) " +
+                "falls back to 1-bit."),
         ])
 
         self.comb += data_width.eq(self.settings.fields.data_width)
@@ -864,6 +868,9 @@ class SDPHY(LiteXModule):
 
         self.sdpads = sdpads = Record(sdpads_layout)
 
+        # Supported data widths (1-bit is always supported).
+        if len(sdpads.data.i) >= 4:
+            self.support_4x = CSRConstant(1)
         if len(sdpads.data.i) >= 8:
             self.support_8x = CSRConstant(1)
 
