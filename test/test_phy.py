@@ -272,6 +272,59 @@ class TestPHY(unittest.TestCase):
         self.assertEqual(status, [SDCARD_STREAM_STATUS_DATAACCEPTED, SDCARD_STREAM_STATUS_TIMEOUT])
         self.assertEqual(sink_ready, [True])
 
+    def test_phydataw_status_multiblock(self):
+        # 2-block write answered with a CRC error (101) then accepted (010): the status fields sum
+        # up the blocks of the write, cleared at the start of the next write.
+        data_width = Signal(2)
+        dut        = SDPHYDATAW(_sdpads_layout(4), data_width, 1e6, 200e-6)
+        crc_state  = dut.fsm.ongoing("CRC")
+        idle       = dut.fsm.ongoing("IDLE")
+        fields     = dut.status.fields
+        status     = []
+
+        def sink_gen():
+            yield dut.pads_out.ready.eq(1)
+            yield dut.sink.data.eq(0x5a)
+            yield dut.sink.last.eq(1)
+            for last_block in [0, 1, 1]: # 2-block write, then a 1-block write.
+                yield dut.sink.last_block.eq(last_block)
+                yield dut.sink.valid.eq(1)
+                yield
+                for _ in range(1024):
+                    if (yield dut.sink.ready):
+                        break
+                    yield
+                yield dut.sink.valid.eq(0)
+                yield
+                if last_block:
+                    for _ in range(4):
+                        yield
+                    status.append(((yield fields.accepted), (yield fields.crc_error), (yield fields.write_error)))
+
+        def card_gen():
+            yield dut.pads_in.valid.eq(1)
+            yield dut.pads_in.data.i.eq(0b1111)
+            for token in [[1, 0, 1], [0, 1, 0], [0, 1, 0]]:
+                for _ in range(1024):
+                    if (yield crc_state):
+                        break
+                    yield
+                # Start bit, CRC status token, end bit, then a short busy.
+                for bit in [0] + token + [1] + [0]*8:
+                    yield dut.pads_in.data.i.eq(0b1110 | bit)
+                    yield
+                yield dut.pads_in.data.i.eq(0b1111)
+                for _ in range(4):
+                    yield
+
+        def source_gen():
+            yield dut.source.ready.eq(1)
+            for _ in range(2048):
+                yield
+
+        run_simulation(dut, [sink_gen(), card_gen(), source_gen()])
+        self.assertEqual(status, [(1, 1, 0), (1, 0, 0)])
+
     def test_phydatar_backpressure_no_timeout(self):
         # 1-bit read of a 4-byte block with the consumer stalled for longer than the timeout: the SD
         # clock is stopped (stop) during the stall and the timeout must not expire.
