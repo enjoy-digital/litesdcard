@@ -149,10 +149,8 @@ pad timing with an oscilloscope. The sampler records 8 external signals and send
 host over UDP, through a DRAM FIFO on the Arty, for a logic view of the card lines from a second
 Pmod.
 
-On the TrellisBoard, `--bench phy` does not elaborate on the master branch: the script passes
-the `--variant`, `--with-sampler` and `--with-analyzer` values to `BenchPHY`, which takes no
-argument, and Python stops with a `TypeError` ([Known issues](#debug-known)). The Arty `phy`
-bench accepts them.
+On the TrellisBoard and on the Arty, the `phy` bench accepts the `--variant`, `--with-sampler`
+and `--with-analyzer` options of the script and ignores them.
 
 ## In the code {#boards-code}
 

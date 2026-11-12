@@ -141,7 +141,8 @@ On a read, the engine freezes the CRC16 after the data and compares it bit by bi
 that arrives on each line. A mismatch on any line marks the block as a CRC error.
 
 The unit tests check the CRC16 against known values (`test/test_crc.py`): 512 bytes of `0xff`
-give `0x7fa1` on 1, 4 and 8 lines, and the tuning block of `common.py` gives `0x6b02`.
+give `0x7fa1` on 1, 4 and 8 lines, and the tuning block of `common.py`, split on 4 lines (high
+nibble first), gives `0xc59f`, `0xa2e5`, `0x8d06` and `0xe946` on DAT3 to DAT0.
 
 ## Main state machine {#core-fsm}
 

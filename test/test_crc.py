@@ -51,11 +51,41 @@ class TestCRC(unittest.TestCase):
         self.crc_inserter_test(data=[0xff]*512, crc=0x7fa1, data_pads_width=8)
 
     def test_crc_inserter_tuning_block(self):
+        # 4-bit tuning block, split on the lines as SDPHYDATAW does (high nibble first, MSB on
+        # DAT3): each line has its own CRC16.
         from litesdcard.common import SDCARD_TUNING_BLOCK
         data = []
         for word in SDCARD_TUNING_BLOCK:
             data += word.to_bytes(4, "big")
-        self.crc_inserter_test(data=data, crc=0x6b02)
+        nibbles = []
+        for byte in data:
+            nibbles += [byte >> 4, byte & 0xf]
+        crcs = {3: 0xc59f, 2: 0xa2e5, 1: 0x8d06, 0: 0xe946}
+
+        data_pads = Signal(4)
+        count     = Signal(8)
+        def gen(dut):
+            yield dut.reset.eq(1)
+            yield
+            yield dut.reset.eq(0)
+            yield
+            for nibble in nibbles:
+                yield dut.enable.eq(1)
+                yield data_pads.eq(nibble)
+                yield
+            yield dut.enable.eq(0)
+            yield
+            for i in range(4):
+                self.assertEqual((yield dut.crc[i]), crcs[i])
+            # CRC bits on the lines, MSB first.
+            for i in range(16):
+                yield count.eq(i)
+                yield
+                expected = sum(((crcs[l] >> (15 - i)) & 1) << l for l in range(4))
+                self.assertEqual((yield dut.data_pads_out), expected)
+
+        dut = CRC16(data_pads, count)
+        run_simulation(dut, gen(dut))
 
 if __name__ == '__main__':
         unittest.main()

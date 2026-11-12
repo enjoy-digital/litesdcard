@@ -113,7 +113,7 @@ class BenchSoC(BaseSoC):
 # BenchPHY -----------------------------------------------------------------------------------------
 
 class BenchPHY(BaseSoC):
-    def __init__(self):
+    def __init__(self, **kwargs):
         platform = trellisboard.Platform()
 
         # BenchPHY ---------------------------------------------------------------------------------

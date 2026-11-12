@@ -87,7 +87,7 @@ def main():
     builder = Builder(soc, csr_csv="csr.csv")
     builder.build(sim_config=sim_config,
         trace       = args.trace,
-        trace_fst   = args.trace,
+        trace_fst   = args.trace_fst,
         trace_start = int(args.trace_start),
         trace_end   = int(args.trace_end)
     )
