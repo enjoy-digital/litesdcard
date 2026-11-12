@@ -534,19 +534,10 @@
    },
    {
     "access": "rw",
-    "description": "Write timeout in system clock cycles, for each block of a write: wait for the CRC status token and the end of the busy.",
-    "fields": [],
-    "name": "dataw_timeout",
-    "offset": 20,
-    "reset": 50000000,
-    "size": 32
-   },
-   {
-    "access": "rw",
     "description": "Read timeout in system clock cycles, for each block of a read; it does not count while the PHY stops the card clock for back-pressure.",
     "fields": [],
     "name": "datar_timeout",
-    "offset": 24,
+    "offset": 20,
     "reset": 100000000,
     "size": 32
    },
@@ -577,9 +568,18 @@
      }
     ],
     "name": "settings",
-    "offset": 28,
+    "offset": 24,
     "reset": 1,
     "size": 2
+   },
+   {
+    "access": "rw",
+    "description": "Write timeout in system clock cycles, for each block of a write: wait for the CRC status token and the end of the busy.",
+    "fields": [],
+    "name": "dataw_timeout",
+    "offset": 28,
+    "reset": 50000000,
+    "size": 32
    }
   ]
  },
