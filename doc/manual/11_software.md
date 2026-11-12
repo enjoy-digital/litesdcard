@@ -49,6 +49,8 @@ constant, which LiteX writes in `soc.h` before the driver includes it.
 | `SDCARD_CLK_FREQ` | `25000000` | SD card clock after identification, Hz |
 | `SDCARD_MMC_CLK_FREQ` | `50000000` | eMMC clock in high speed timing, Hz |
 | `SDCARD_CMD_RETRIES` | `16` | Attempts of the SD CMD6, ACMD51 and data commands |
+| `SDCARD_CMD_TIMEOUT_US` | `2000000` | Wait for `cmd_event.done`, µs |
+| `SDCARD_DATA_TIMEOUT_US` | `2000000` | Wait for `data_event.done`, µs per block of the request |
 | `SDCARD_DMA_TIMEOUT_US` | `1000000` | Wait for the end of a DMA, µs |
 | `SDCARD_DEBUG` | undefined | Print every command, event and response |
 | `SDCARD_BOOT_PRIORITY` | `30` | Rank of the SD card in the boot sequence |
@@ -98,10 +100,10 @@ Two CMD6 SWITCH commands then write the EXT_CSD: the bus width (8 bits when the 
 lines, else 4) and the high speed timing, after which the clock rises to `SDCARD_MMC_CLK_FREQ`.
 
 **A recorded trace.** The session below ran `sdcard_init` in `litex_sim --with-sdcard`, with a
-BIOS built with `SDCARD_DEBUG`; the decoded CID, CSD and SCR fields are cut. After each command,
-the driver prints the value of `cmd_event` and the four words of `cmd_response`. It prints CMD8
-as `SEND_EXT_CSD`: it is SEND_IF_COND ([BIOS debug trace](#debug-trace)). The decoded CID and CSD
-fields that it prints are shifted by one byte ([Known issues](#debug-known)): read the raw words.
+BIOS built with `SDCARD_DEBUG`; the decoded CSD and SCR fields are cut. After each command,
+the driver prints the value of `cmd_event` and the four words of `cmd_response`, and after CMD2
+the fields of the CID. It prints CMD8 as `SEND_EXT_CSD`: it is SEND_IF_COND ([BIOS debug
+trace](#debug-trace)).
 
 ```console
 litex> sdcard_init
@@ -116,12 +118,20 @@ cmdevt: 00000001
 000001aa 00090008 09001100 20100000
 CMD55: APP_CMD
 [...]
-ACMD41: APP_SEND_OP_COND, arg: 70ff8000
+ACMD41: APP_SEND_OP_COND, arg: 50ff8000
 cmdevt: wait for event & 0x1
 cmdevt: 00000001
 c0ff8000 0001203f 01aa3700 00080000
 CMD2: ALL_SEND_CID
+cmdevt: wait for event & 0x1
+cmdevt: 00000001
+01014fa7 10000000 454c4c4f 7f504348
+CID Register: 0x01014fa710000000454c4c4f7f504348
+Manufacturer ID: 0x7f
+Application ID 0x5043
+Product name: HELLO
 [...]
+OID: PC
 CMD3: SET_RELATIVE_ADDRESS
 cmdevt: wait for event & 0x1
 cmdevt: 00000001
@@ -151,7 +161,8 @@ Initialize SDCard: OK
 ```
 
 Read the first response word of each command. CMD8 echoes the check pattern `0x1aa`. The OCR
-of ACMD41, `0xc0ff8000`, has bit 31 set (ready) and bit 30 set (CCS, block addressing). CMD3
+of ACMD41, `0xc0ff8000`, has bit 31 set (ready) and bit 30 set (CCS, block addressing). The CID
+of CMD2 is the one of the emulator: manufacturer `0x7f`, OEM `PC`, product `HELLO`. CMD3
 returns the relative address `0x1337` of the emulator in its upper half, after which the driver
 leaves the 250 kHz identification clock for 500 kHz, the closest to 25 MHz at the 1 MHz system
 clock of `litex_sim`. The other words keep bytes of earlier responses and carry no meaning for a
@@ -181,9 +192,12 @@ multiplied by 512 on a standard capacity card. After the command, the driver wai
 `done` bit of `data_event`, then for the `done` register of the DMA, for at most
 `SDCARD_DMA_TIMEOUT_US`. A failed command stops the DMA at once, since no data will come.
 
-The wait for `data_event` has no bound of its own in the driver; the PHY bounds it, with the read
-timeout for a read and the write timeout (CRC status token and busy, 500 ms with `add_sdcard`)
-for a write, so a card that stops answering ends the request with `SD_TIMEOUT`.
+The PHY bounds the wait for `data_event`, with the read timeout for a read and the write timeout
+(CRC status token and busy, 500 ms with `add_sdcard`) for a write, so a card that stops answering
+ends the request with `SD_TIMEOUT`. The driver also bounds its waits for `cmd_event` and
+`data_event` in software, with `SDCARD_CMD_TIMEOUT_US` and `SDCARD_DATA_TIMEOUT_US` per block,
+above the timeouts of the PHY: a core that does not answer at all also ends with `SD_TIMEOUT`
+instead of a hung BIOS.
 
 The functions return `SD_OK`, `SD_TIMEOUT`, `SD_CRCERROR` or `SD_WRITEERROR`. The driver checks
 the timeout, CRC and error bits of `data_event`, in this order: `SD_WRITEERROR` reports the error
@@ -209,11 +223,9 @@ boot sequence do it. Without `addr`, `sdcard_read` reads into a buffer of the BI
 blocks go to any memory, the main RAM for a large `count`. [Step 3: talk to the
 card](#gs-commands) shows a recorded session.
 
-`flash_from_sdcard` exists when the SoC has a LiteSPI flash. It mounts the file system through
-the FatFs disk functions of the last `sdcardboot` or `sataboot`, and selects none itself: run
-`sdcardboot` first (it fails harmlessly when no boot file is found). On a SoC that also has
-SATA, the boot sequence ends on the SATA disk, so run `sdcardboot` by hand ([Known
-issues](#debug-known)).
+`flash_from_sdcard` exists when the SoC has a LiteSPI flash. It selects the FatFs disk functions
+of the SD card itself, as `sdcardboot` does, then mounts the file system, so it works at any time,
+also after a `sataboot`.
 
 ## Boot from the card {#sw-boot}
 
@@ -245,8 +257,9 @@ on a VexRiscv-SMP SoC:
 
 The four files are copied to the FAT partition with the manifest; the BIOS jumps to OpenSBI with
 the address of the device tree in `r1`. With the root file system on the card ([Linux](#sw-linux)),
-the manifest drops `rootfs.cpio`. The boot cannot be tried in `litex_sim` ([What it does not
-model](#emu-limits)).
+the manifest drops `rootfs.cpio`. In `litex_sim`, `--sdcard-image` loads a FAT image into the
+emulator, so the boot runs in simulation too ([Boot from a FAT image in
+simulation](#gs-sim-boot)).
 
 ## Linux {#sw-linux}
 
@@ -295,24 +308,22 @@ number differs.
 The node gives the driver five register ranges, found from the register names: the PHY, the
 core, block2mem (`reader`), mem2block (`writer`) and the event manager.
 
-It adds the system clock, a fixed 3.3 V supply and the interrupt; with `--polling`, the
-interrupt is left out. The generator still reads the interrupt number of the module, so on a SoC
-without interrupts it stops with a `KeyError` (`sdcard_interrupt`) even with `--polling`. The bus
-width is written as 4 in every case.
+It adds the system clock, a fixed 3.3 V supply and the interrupt; with `--polling`, or when the
+SoC has no interrupt for the module (the generator then prints a warning), the interrupt is left
+out and the driver polls. The bus width is 8 when the PHY has 8 data pins (constant
+`sdcard_phy_support_8x` in `csr.json`), else 4.
 
-The generator reads the registers of both DMAs to build the node: on a SoC built with
-`mode="read"` or `mode="write"` it stops with a `KeyError` and writes no device tree, so a SoC
-needs `mode="read+write"` (the default of `add_sdcard`) to run Linux on the card.
+The driver maps both DMAs, so the generator needs the registers of both: on a SoC built with
+`mode="read"` or `mode="write"`, it prints a warning and writes the device tree without the `mmc`
+node. A SoC needs `mode="read+write"` (the default of `add_sdcard`) to run Linux on the card.
 
 **The driver.** The upstream driver (kernel master branch) handles SD cards only: it declares
 the host unable to run MMC and SDIO devices, so Linux does not use an eMMC on LiteSDCard. It
-drops the 8-bit bus and takes the bus width of the device tree, so the 4 of the node gives a
-4-bit bus. The kernel sends ACMD6 itself; the driver only writes the width code into the PHY
-`settings` register, at offset `0x18` of the `phy` range. The write timeout register
-`dataw_timeout` comes after it, at `0x1c`, so the driver and the gateware agree on that offset.
+drops the 8-bit bus and takes the bus width of the device tree: a node with 4 gives a 4-bit bus,
+the width of an SD card. The kernel sends ACMD6 itself; the driver only writes the width code into the PHY
+`settings` register, at offset `0x18` of the `phy` range.
 
-With a driver and a gateware that agree on the register map, the card appears as `mmcblk0` with one
-device per partition. The Linux-on-LiteX-VexRiscv project documents its use in its HOWTO:
+The card appears as `mmcblk0` with one device per partition. The Linux-on-LiteX-VexRiscv project documents its use in its HOWTO:
 
 ```text
 Plug the SDCard, it should be detected with all partitions on it:

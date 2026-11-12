@@ -270,9 +270,8 @@ In LiteSDCard, the whole sequence is software: `sdcard_init()` of the BIOS drive
 The BIOS driver keeps the init clock until the card has its address, then raises the card clock
 to `SDCARD_CLK_FREQ`, 25 MHz by default, once CMD3 is answered.
 
-The driver sends ACMD41 with argument `0x70ff8000`: the voltage window `0x00ff8000` (2.7 V to
-3.6 V), HCS (bit 30) and the XPC bit (bit 28); it also sets bit 29, which the SD specification
-reserves. A card that does not answer CMD8 but answers CMD1 is handled as an eMMC. The driver has
+The driver sends ACMD41 with argument `0x50ff8000`: the voltage window `0x00ff8000` (2.7 V to
+3.6 V), HCS (bit 30) and the XPC bit (bit 28). A card that does not answer CMD8 but answers CMD1 is handled as an eMMC. The driver has
 no path for SD cards older than version 2.00 (no answer to CMD8): they are not supported.
 
 ## Card states {#primer-states}

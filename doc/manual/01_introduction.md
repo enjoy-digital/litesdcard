@@ -140,8 +140,8 @@ eMMC, 1.8 V on some boards), at default speed and high speed. The following are 
 
 By default the emulator holds a single 512-byte block, so it answers the commands of a card but
 does not store a disk image. Its `size` and `image` parameters give it a block-addressed store,
-optionally loaded from a raw disk image, but `add_sdcard` does not pass them ([The SD card
-emulator](#emulator)).
+optionally loaded from a raw disk image, which `add_sdcard` passes as `emulator_size` and
+`emulator_image` and `litex_sim` as `--sdcard-image` ([The SD card emulator](#emulator)).
 
 ## Repository layout {#intro-layout}
 
