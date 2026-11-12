@@ -42,6 +42,7 @@ class _FakePHY:
             sink_layout=[("block_length", 10)],
             source_layout=[("data", 8), ("status", 3), ("drop", 1)],
         )
+        self.datar.abort = Signal()
 
 
 class _EndpointPair:
@@ -394,6 +395,70 @@ class TestSDCore(unittest.TestCase):
 
             run_simulation(dut, [host_gen(), cmdw_gen(), cmdr_gen()])
             self.assertEqual(data_done, [1])
+
+    def _run_read_cmd_error(self, response, status):
+        phy  = _FakePHY()
+        dut  = SDCore(phy)
+        idle = dut.fsm.ongoing("IDLE")
+
+        armed = []
+        abort = []
+
+        def host_gen():
+            yield dut.block_length.storage.eq(512)
+            yield dut.block_count.storage.eq(1)
+            yield dut.cmd_command.fields.cmd_type.eq(SDCARD_CTRL_RESPONSE_SHORT)
+            yield dut.cmd_command.fields.crc.eq(1)
+            yield dut.cmd_command.fields.data_type.eq(SDCARD_CTRL_DATA_TRANSFER_READ)
+            yield dut.cmd_command.fields.cmd.eq(17)
+            yield dut.cmd_send.wr_stb.eq(1)
+            yield
+            yield dut.cmd_send.wr_stb.eq(0)
+
+        def cmdw_gen():
+            yield phy.cmdw.sink.ready.eq(1)
+            for _ in range(32):
+                yield
+
+        def cmdr_gen():
+            for _ in range(64):
+                if (yield phy.cmdr.sink.valid):
+                    break
+                yield
+            for i, data in enumerate(response):
+                yield phy.cmdr.source.data.eq(data)
+                yield phy.cmdr.source.status.eq(status)
+                yield phy.cmdr.source.last.eq(i == len(response) - 1)
+                yield phy.cmdr.source.valid.eq(1)
+                yield
+            yield phy.cmdr.source.valid.eq(0)
+
+        def datar_gen():
+            # Data reader accepts the block request issued in CMD-RESPONSE.
+            for _ in range(64):
+                if (yield phy.datar.sink.valid):
+                    armed.append(True)
+                    break
+                yield
+            for _ in range(64):
+                if (yield phy.datar.abort):
+                    abort.append((yield idle))
+                yield
+
+        run_simulation(dut, [host_gen(), cmdw_gen(), cmdr_gen(), datar_gen()])
+        return armed, abort
+
+    def test_read_cmd_timeout_aborts_datar(self):
+        armed, abort = self._run_read_cmd_error([0x00], SDCARD_STREAM_STATUS_TIMEOUT)
+        self.assertEqual(armed, [True])
+        self.assertEqual(len(abort), 1)
+
+    def test_read_cmd_crc_error_aborts_datar(self):
+        response = [0x11, 0x00, 0x00, 0x09, 0x00]
+        response.append(((_crc7(response) ^ 0x01) << 1) | 1)
+        armed, abort = self._run_read_cmd_error(response, SDCARD_STREAM_STATUS_OK)
+        self.assertEqual(armed, [True])
+        self.assertEqual(len(abort), 1)
 
 if __name__ == "__main__":
     unittest.main()

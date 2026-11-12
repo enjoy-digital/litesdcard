@@ -95,6 +95,11 @@ class SDCore(LiteXModule):
         self.submodules.data_read_fifo = data_read_fifo
         self.comb += phy.datar.source.connect(data_read_fifo.sink)
 
+        # Data Reader abort: the reader is armed in CMD-RESPONSE, abort it when the Cmd fails.
+        datar_abort = Signal()
+        if hasattr(phy.datar, "abort"):
+            self.comb += phy.datar.abort.eq(datar_abort)
+
         self.comb += [
             # Decode type of Cmd/Data from Register.
             cmd_type.eq(self.cmd_command.fields.cmd_type),
@@ -226,6 +231,7 @@ class SDCore(LiteXModule):
                     If(data_type != SDCARD_CTRL_DATA_TRANSFER_NONE,
                         NextValue(data_error, 1),
                     ),
+                    datar_abort.eq(1),
                     NextState("IDLE")
                 # On last Cmd byte:
                 ).Elif(phy.cmdr.source.last,
@@ -253,6 +259,7 @@ class SDCore(LiteXModule):
                         If(data_type != SDCARD_CTRL_DATA_TRANSFER_NONE,
                             NextValue(data_error, 1),
                         ),
+                        datar_abort.eq(1),
                         NextState("IDLE"),
                     ),
                 # Else Shift Cmd Response.

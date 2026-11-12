@@ -576,6 +576,7 @@ class SDPHYDATAR(LiteXModule):
         self.sink     = sink     = stream.Endpoint([("block_length", 10)])
         self.source   = source   = stream.Endpoint([("data", 8), ("status", 3), ("drop", 1)])
         self.stop     = Signal()
+        self.abort    = Signal() # Return to IDLE (Cmd of the armed read failed).
 
         self.timeout  = CSRStorage(32, reset=int(data_timeout*sys_clk_freq))
 
@@ -659,7 +660,8 @@ class SDPHYDATAR(LiteXModule):
 
         self.comb += Case(data_width, datar_cases)
 
-        self.fsm = fsm = FSM(reset_state="IDLE")
+        self.fsm = fsm = ResetInserter()(FSM(reset_state="IDLE"))
+        self.comb += fsm.reset.eq(self.abort)
         fsm.act("IDLE",
             NextValue(count, 0),
             NextValue(crc_count, 0),
